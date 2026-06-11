@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Salary Payslip</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+        }
+        .company-name {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 9pt;
+            color: #555;
+        }
+        .title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-top: 10px;
+            text-decoration: underline;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .info-table td {
+            padding: 5px;
+            width: 25%;
+        }
+        .info-table td.label {
+            font-weight: bold;
+            color: #555;
+        }
+        .payslip-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .payslip-table th, .payslip-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .payslip-table th {
+            background-color: #0056b3;
+            color: white;
+            font-weight: bold;
+        }
+        .payslip-table td.amount {
+            text-align: right;
+        }
+        .summary-row {
+            font-weight: bold;
+            background-color: #f2f2f2;
+        }
+        .net-pay-section {
+            border: 2px solid #0056b3;
+            padding: 15px;
+            background-color: #f9f9f9;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .net-pay-amount {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .footer-note {
+            text-align: center;
+            font-size: 8pt;
+            color: #777;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR & Payroll Division • Secure Corporate Node</div>
+        <div class="title">PAYSLIP FOR {{ slip.month }}/{{ slip.year }}</div>
+    </div>
+    
+    <table class="info-table">
+        <tr>
+            <td class="label">Employee Name:</td>
+            <td>{{ employee.first_name }} {{ employee.last_name }}</td>
+            <td class="label">Employee ID:</td>
+            <td>{{ employee.emp_id }}</td>
+        </tr>
+        <tr>
+            <td class="label">Department:</td>
+            <td>{{ employee.department.name }}</td>
+            <td class="label">Designation:</td>
+            <td>{{ employee.designation }}</td>
+        </tr>
+        <tr>
+            <td class="label">Month/Year:</td>
+            <td>{{ slip.month }}/{{ slip.year }}</td>
+            <td class="label">Payslip Number:</td>
+            <td>{{ slip.payslip_no }}</td>
+        </tr>
+        <tr>
+            <td class="label">Working Days:</td>
+            <td>{{ slip.working_days }}</td>
+            <td class="label">Days Worked:</td>
+            <td>{{ slip.days_worked }}</td>
+        </tr>
+        <tr>
+            <td class="label">LOP Days:</td>
+            <td>{{ slip.lop_days }}</td>
+            <td class="label">Payment Mode:</td>
+            <td>{{ slip.get_payment_mode_display }}</td>
+        </tr>
+        <tr>
+            <td class="label">Payment Date:</td>
+            <td>{{ slip.payment_date|date:"F d, Y" }}</td>
+            <td class="label">Status:</td>
+            <td>Paid</td>
+        </tr>
+    </table>
+    
+    <table class="payslip-table">
+        <thead>
+            <tr>
+                <th style="width: 35%;">Earnings</th>
+                <th style="width: 15%; text-align: right;">Base Amount</th>
+                <th style="width: 15%; text-align: right;">Earned Amount</th>
+                <th style="width: 20%;">Deductions</th>
+                <th style="width: 15%; text-align: right;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Basic Salary</td>
+                <td class="amount">{{ details.structure.basic }}</td>
+                <td class="amount">{{ details.basic_earned|floatformat:2 }}</td>
+                <td>Provident Fund (PF)</td>
+                <td class="amount">{{ details.pf }}</td>
+            </tr>
+            <tr>
+                <td>HRA (House Rent Allowance)</td>
+                <td class="amount">{{ details.structure.hra }}</td>
+                <td class="amount">{{ details.hra_earned|floatformat:2 }}</td>
+                <td>Professional Tax (PT)</td>
+                <td class="amount">{{ details.pt }}</td>
+            </tr>
+            <tr>
+                <td>Conveyance Allowance</td>
+                <td class="amount">{{ details.structure.conveyance }}</td>
+                <td class="amount">{{ details.conveyance_earned|floatformat:2 }}</td>
+                <td>Income Tax (TDS)</td>
+                <td class="amount">{{ details.tds }}</td>
+            </tr>
+            <tr>
+                <td>Medical Allowance</td>
+                <td class="amount">{{ details.structure.medical }}</td>
+                <td class="amount">{{ details.medical_earned|floatformat:2 }}</td>
+                <td>
+                    {% if details.other_deductions_earned %}
+                        {{ details.other_deductions_earned.0.label }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="amount">
+                    {% if details.other_deductions_earned %}
+                        {{ details.other_deductions_earned.0.amount }}
+                    {% else %}
+                        0.00
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td>Special Allowance</td>
+                <td class="amount">{{ details.structure.special }}</td>
+                <td class="amount">{{ details.special_earned|floatformat:2 }}</td>
+                <td>
+                    {% if details.other_deductions_earned|length > 1 %}
+                        {{ details.other_deductions_earned.1.label }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="amount">
+                    {% if details.other_deductions_earned|length > 1 %}
+                        {{ details.other_deductions_earned.1.amount }}
+                    {% else %}
+                        0.00
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td>Monthly Bonus</td>
+                <td class="amount">{{ details.structure.monthly_bonus }}</td>
+                <td class="amount">{{ details.bonus_earned|floatformat:2 }}</td>
+                <td>One-time Deduction</td>
+                <td class="amount">{{ slip.one_time_deduction }}</td>
+            </tr>
+            <tr>
+                <td>
+                    {% if details.other_allowances_earned %}
+                        {{ details.other_allowances_earned.0.label }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="amount">
+                    {% if details.other_allowances_earned %}
+                        {{ details.other_allowances_earned.0.base_amount }}
+                    {% else %}
+                        0.00
+                    {% endif %}
+                </td>
+                <td class="amount">
+                    {% if details.other_allowances_earned %}
+                        {{ details.other_allowances_earned.0.earned_amount }}
+                    {% else %}
+                        0.00
+                    {% endif %}
+                </td>
+                <td>-</td>
+                <td class="amount">0.00</td>
+            </tr>
+            <tr>
+                <td>One-time Bonus</td>
+                <td class="amount">0.00</td>
+                <td class="amount">{{ slip.one_time_bonus }}</td>
+                <td>-</td>
+                <td class="amount">0.00</td>
+            </tr>
+            <tr class="summary-row">
+                <td>Gross Earnings</td>
+                <td class="amount">-</td>
+                <td class="amount">{{ slip.gross }}</td>
+                <td>Total Deductions</td>
+                <td class="amount">{{ slip.total_deductions }}</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <div class="net-pay-section">
+        <div>NET TAKE HOME PAY</div>
+        <div class="net-pay-amount">Rs. {{ slip.net_pay }}</div>
+        <div style="font-size: 9pt; color: #555; margin-top: 5px;">(Gross Earnings less Total Deductions)</div>
+    </div>
+    
+    <div class="footer-note">
+        This is a system-generated document and does not require a physical signature.
+    </div>
+</body>
+</html>

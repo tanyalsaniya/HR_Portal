@@ -41,12 +41,15 @@ INSTALLED_APPS = [
     'import_export',
 
     # Custom apps
-    'authentication',
-    'employees',
-    'exit_management',
+    'accounts',
+    'roles',
+    'employee_onboarding',
     'salary',
-    'certificates',
-    'dashboard',
+    'exit_formality',
+    'student_certificate',
+    'notifications',
+    'audit_logs',
+    'common',
 ]
 
 MIDDLEWARE = [
@@ -58,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'common.middleware.CurrentUserMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -124,6 +128,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # ---------- DEFAULT PRIMARY KEY ----------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+AUTH_USER_MODEL = 'accounts.User'
 
 # ---------- DJANGO REST FRAMEWORK (DRF) ----------
 

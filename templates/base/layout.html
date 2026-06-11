@@ -1,0 +1,2573 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTLV HR Portal</title>
+    <!-- Premium stylesheet system -->
+    <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=2.0">
+    <style>
+        /* Modern adjustments for layout shell */
+        :root {
+            --sidebar-width: 250px;
+            --navbar-height: 70px;
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #e2e8f0;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --border-color: #334155;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .portal-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar styling */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 10;
+        }
+
+        .sidebar-brand {
+            padding: 20px;
+            font-size: 16pt;
+            font-weight: bold;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 20px 0;
+            margin: 0;
+            flex-grow: 1;
+        }
+
+        .sidebar-item {
+            margin-bottom: 5px;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            border-left: 4px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sidebar-link:hover, .sidebar-link.active {
+            background-color: rgba(37, 99, 235, 0.08);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Navbar & Main Content */
+        .main-container {
+            margin-left: var(--sidebar-width);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            height: var(--navbar-height);
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .view-panel {
+            padding: 30px;
+            flex-grow: 1;
+            display: none;
+        }
+
+        /* UI elements */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-color);
+            position: relative;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .btn-icon:hover {
+            background-color: var(--bg-color);
+        }
+
+        .badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+
+        /* Slide-over Notifications panel */
+        .slideover {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100vh;
+            background-color: var(--card-bg);
+            border-left: 1px solid var(--border-color);
+            z-index: 100;
+            transition: right 0.3s ease-in-out;
+            box-shadow: -4px 0 12px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slideover.open {
+            right: 0;
+        }
+
+        .slideover-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slideover-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .notif-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notif-item:hover {
+            background-color: var(--bg-color);
+        }
+
+        .notif-item.unread {
+            border-left: 4px solid var(--primary-color);
+            background-color: rgba(37, 99, 235, 0.03);
+        }
+
+        .notif-text {
+            font-size: 9.5pt;
+            font-weight: 500;
+        }
+
+        .notif-time {
+            font-size: 8pt;
+            color: #777;
+            margin-top: 5px;
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border-left: 6px solid var(--primary-color);
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 250px;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success { border-left-color: #22c55e; }
+        .toast-warning { border-left-color: #eab308; }
+        .toast-error { border-left-color: #ef4444; }
+
+        /* Dashboard widgets layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .widget-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .widget-value {
+            font-size: 22pt;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-top: 5px;
+        }
+
+        /* Generic views utilities */
+        .flex-row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th, .data-table td {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .data-table th {
+            background-color: rgba(0,0,0,0.02);
+            font-weight: bold;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 30px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .form-group-full {
+            grid-column: span 2;
+        }
+
+        /* Custom inputs styling */
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 9.5pt;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        /* Roles Control System styles */
+        .roles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .role-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .role-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+        }
+
+        .role-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .role-card-title {
+            font-size: 13pt;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-color);
+        }
+
+        .role-code-badge {
+            font-size: 8pt;
+            font-weight: bold;
+            background-color: rgba(37, 99, 235, 0.1);
+            color: var(--primary-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .role-card-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .module-perms-group {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            background-color: rgba(0, 0, 0, 0.01);
+        }
+
+        .module-perms-title {
+            font-size: 9pt;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 4px;
+        }
+
+        .perm-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 9pt;
+            cursor: pointer;
+        }
+
+        .perm-checkbox-item input {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .role-card-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: .3s;
+            border-radius: 22px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Active tab custom styling */
+        .active-tab {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color) !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-layout">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="sidebar-brand">MTLV HR Portal</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item" id="dashboardLink">
+                    <a class="sidebar-link active" data-view="dashboardView" onclick="switchView('dashboardView')">Dashboard</a>
+                </li>
+                <li class="sidebar-item" id="onboardingLink" style="display: none;">
+                    <a class="sidebar-link" data-view="onboardingView" onclick="switchView('onboardingView')">Employees</a>
+                </li>
+                <li class="sidebar-item" id="salaryLink" style="display: none;">
+                    <a class="sidebar-link" data-view="salaryView" onclick="switchView('salaryView')">Salaries & Slip</a>
+                </li>
+                <li class="sidebar-item" id="exitLink" style="display: none;">
+                    <a class="sidebar-link" data-view="exitView" onclick="switchView('exitView')">Exit Tracker</a>
+                </li>
+                <li class="sidebar-item" id="studentLink" style="display: none;">
+                    <a class="sidebar-link" data-view="studentView" onclick="switchView('studentView')">Students / Interns</a>
+                </li>
+                <li class="sidebar-item" id="adminLogsLink" style="display: none;">
+                    <a class="sidebar-link" data-view="logsView" onclick="switchView('logsView')">Audit Logs</a>
+                </li>
+                <li class="sidebar-item" id="adminRolesLink" style="display: none;">
+                    <a class="sidebar-link" data-view="rolesView" onclick="switchView('rolesView')">Roles & Permissions</a>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div id="usernameLabel" style="font-weight: bold;"></div>
+                <a style="font-size: 9pt; color: #ef4444; cursor: pointer; text-decoration: underline;" onclick="logout()">Log out</a>
+            </div>
+        </div>
+
+        <!-- MAIN WINDOW -->
+        <div class="main-container">
+            <!-- NAVBAR -->
+            <div class="navbar">
+                <div style="font-weight: 600; font-size: 14pt;" id="pageTitle">HR Panel</div>
+                <div class="header-actions">
+                    <!-- Theme Toggle -->
+                    <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                    </button>
+                    <!-- Bell Notifications -->
+                    <button class="btn-icon" onclick="toggleNotifPanel()" title="Notifications">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        <span class="badge" id="notifBadge" style="display: none;">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 1: DASHBOARD -->
+            <div id="dashboardView" class="view-panel" style="display: block;">
+                <div class="dashboard-grid">
+                    <div class="widget-card">
+                        <div style="font-size: 9pt; color: #777;">Total Employees</div>
+                        <div class="widget-value" id="statTotalEmployees">0</div>
+                    </div>
+                    <div class="widget-card">
+                        <div style="font-size: 9pt; color: #777;">Active Employees</div>
+                        <div class="widget-value" id="statActiveEmployees">0</div>
+                    </div>
+                    <div class="widget-card">
+                        <div style="font-size: 9pt; color: #777;">Pending Exits</div>
+                        <div class="widget-value" id="statPendingExits">0</div>
+                    </div>
+                    <div class="widget-card" id="adminWidgetIncrements" style="display: none;">
+                        <div style="font-size: 9pt; color: #777;">Anniversaries (15 Days)</div>
+                        <div class="widget-value" id="statAnniversaries">0</div>
+                    </div>
+                    <div class="widget-card">
+                        <div style="font-size: 9pt; color: #777;">Active Students</div>
+                        <div class="widget-value" id="statActiveStudents">0</div>
+                    </div>
+                </div>
+
+                <h3>Recent Operational Logs</h3>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Actor</th>
+                                <th>Action</th>
+                                <th>Model</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboardRecentLogsBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center;">No logs visible. Log in as Admin to see details.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW 2: ONBOARDING / EMPLOYEES -->
+            <div id="onboardingView" class="view-panel">
+                <div class="flex-row-header">
+                    <h2>Employee Directory</h2>
+                    <button class="btn btn-primary" id="addEmployeeBtn" onclick="openOnboardModal()">+ Onboard New Employee</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Emp ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Department</th>
+                                <th>Designation</th>
+                                <th>Joining Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employeeTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW 3: SALARIES, PAYSLIPS & INCREMENTS -->
+            <div id="salaryView" class="view-panel">
+                <div class="flex-row-header">
+                    <h2>Salary Structure & Payroll</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" id="bulkSlipsBtn" onclick="openBulkSlipModal()">Bulk Generate Slips</button>
+                        <button class="btn btn-primary" id="setupSalaryBtn" onclick="openSalaryStructureModal()">Setup Structure</button>
+                    </div>
+                </div>
+
+                <h3>Salary Structure List</h3>
+                <div class="table-responsive" style="margin-bottom: 30px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Basic Salary</th>
+                                <th>HRA</th>
+                                <th>Gross Salary</th>
+                                <th>Total Deductions</th>
+                                <th>Net Salary</th>
+                                <th>Effective From</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salaryStructureTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="adminIncrementsHeader" style="display: none;">Upcoming Anniversaries & Raises (Admin Only)</h3>
+                <div class="table-responsive" id="adminIncrementsTableContainer" style="display: none;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Anniversary Date</th>
+                                <th>Cycle Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salaryIncrementsReminderBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW 4: EXIT TRACKER -->
+            <div id="exitView" class="view-panel">
+                <div class="flex-row-header">
+                    <h2>Exit Clearances</h2>
+                    <button class="btn btn-primary" id="addExitBtn" onclick="openInitiateExitModal()">Initiate Exit</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Employee Name</th>
+                                <th>Resignation Date</th>
+                                <th>Last Working Day</th>
+                                <th>Status</th>
+                                <th>Action Links</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exitTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW 5: STUDENTS & INTERNS -->
+            <div id="studentView" class="view-panel">
+                <div class="flex-row-header">
+                    <h2>Student & Intern Directory</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" id="exportStudentBtn" onclick="window.location.href='/api/student/students/export-excel/'">Export to Excel</button>
+                        <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()">+ Register Student</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Cert No</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Type</th>
+                                <th>Joining Date</th>
+                                <th>Completion Date</th>
+                                <th>Total Fees</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW 6: AUDIT LOGS (Admin Only) -->
+            <div id="logsView" class="view-panel">
+                <h2>System Audit Trail</h2>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Actor</th>
+                                <th>Action</th>
+                                <th>Model</th>
+                                <th>Object ID</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW 7: ROLES & PERMISSIONS -->
+            <div id="rolesView" class="view-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h2 style="margin:0;">Roles & Permissions Control</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" onclick="openAddRoleModal()">+ Add Custom Role</button>
+                    </div>
+                </div>
+
+                <!-- Custom styled tabs -->
+                <div style="display: flex; gap: 20px; border-bottom: 2px solid var(--border-color); margin-bottom: 30px; padding-bottom: 10px;">
+                    <a id="tabCategoryRoles" class="active-tab" onclick="switchRolesTab('roles-categories')" style="font-weight: 600; cursor: pointer; color: var(--primary-color); padding-bottom: 10px; margin-bottom: -12px;">Category Roles</a>
+                    <a id="tabGlobalPermissions" onclick="switchRolesTab('roles-permissions')" style="font-weight: 600; cursor: pointer; color: var(--text-color); padding-bottom: 10px; transition: color 0.2s;">Global Permissions</a>
+                </div>
+
+                <!-- Tab 1: Category Roles Grid -->
+                <div id="rolesCategoriesTab" style="display: block;">
+                    <div class="roles-grid" id="rolesGridContainer">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Tab 2: Global Permissions Module List -->
+                <div id="rolesPermissionsTab" style="display: none;">
+                    <div class="flex-row-header">
+                        <h3>Global Database Permissions</h3>
+                        <button class="btn btn-primary" onclick="openAddPermissionModal()">+ Add Global Permission</button>
+                    </div>
+                    <div class="roles-grid" id="permissionsGridContainer">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- TOAST POPUPS -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- NOTIFICATIONS OVERLAY PANEL -->
+    <div class="slideover" id="notifPanel">
+        <div class="slideover-header">
+            <h3 style="margin:0;">Notifications Feed</h3>
+            <div>
+                <a style="font-size: 8.5pt; text-decoration: underline; cursor: pointer; color: var(--primary-color); margin-right: 15px;" onclick="markAllNotifsRead()">Mark all read</a>
+                <button onclick="toggleNotifPanel()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+        </div>
+        <div class="slideover-body" id="notifList">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+
+    <!-- MODAL 1: ADD NEW EMPLOYEE -->
+    <div class="modal" id="onboardModal">
+        <div class="modal-content" style="width: 700px;">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Onboard New Employee</h3>
+                <button onclick="closeOnboardModal()" style="background:none; border:none; font-size: 16pt; cursor: pointer;">&times;</button>
+            </div>
+            <form id="onboardForm">
+                <div class="form-grid">
+                    <div>
+                        <label>First Name*</label>
+                        <input type="text" id="empFirstName" required>
+                    </div>
+                    <div>
+                        <label>Last Name*</label>
+                        <input type="text" id="empLastName" required>
+                    </div>
+                    <div>
+                        <label>Email Address*</label>
+                        <input type="email" id="empEmail" required>
+                    </div>
+                    <div>
+                        <label>Phone Number*</label>
+                        <input type="text" id="empPhone" placeholder="10-digit Indian mobile" required>
+                    </div>
+                    <div>
+                        <label>Date of Birth*</label>
+                        <input type="date" id="empDob" required>
+                    </div>
+                    <div>
+                        <label>Gender*</label>
+                        <select id="empGender" required>
+                            <option value="MALE">Male</option>
+                            <option value="FEMALE">Female</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group-full">
+                        <label>Address Line 1*</label>
+                        <input type="text" id="empAddr1" required>
+                    </div>
+                    <div>
+                        <label>City*</label>
+                        <input type="text" id="empCity" required>
+                    </div>
+                    <div>
+                        <label>State*</label>
+                        <select id="empState" required></select>
+                    </div>
+                    <div>
+                        <label>PIN Code*</label>
+                        <input type="text" id="empPin" required>
+                    </div>
+                    <div>
+                        <label>Department*</label>
+                        <select id="empDept" required></select>
+                    </div>
+                    <div>
+                        <label>Designation*</label>
+                        <input type="text" id="empDesignation" required>
+                    </div>
+                    <div>
+                        <label>Employment Type*</label>
+                        <select id="empType" required>
+                            <option value="FULL_TIME">Full-time</option>
+                            <option value="PART_TIME">Part-time</option>
+                            <option value="CONTRACT">Contract</option>
+                            <option value="INTERN">Intern</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Joining Date*</label>
+                        <input type="date" id="empJoining" required>
+                    </div>
+                    <div>
+                        <label>Notice Period (Days)*</label>
+                        <input type="number" id="empNotice" value="30" required>
+                    </div>
+                    <div>
+                        <label>Bond Period (Months)</label>
+                        <input type="number" id="empBond" value="0">
+                    </div>
+                    <div>
+                        <label>Aadhaar Number (12 digit)</label>
+                        <input type="text" id="empAadhaar" placeholder="12-digit numeric">
+                    </div>
+                    <div>
+                        <label>PAN Number (10 character)</label>
+                        <input type="text" id="empPan" placeholder="ABCDE1234F">
+                    </div>
+                    <div>
+                        <label>Emergency Contact Name*</label>
+                        <input type="text" id="empEmergencyName" required>
+                    </div>
+                    <div>
+                        <label>Emergency Relationship*</label>
+                        <select id="empEmergencyRel" required>
+                            <option value="PARENT">Parent</option>
+                            <option value="SPOUSE">Spouse</option>
+                            <option value="SIBLING">Sibling</option>
+                            <option value="FRIEND">Friend</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Emergency Phone*</label>
+                        <input type="text" id="empEmergencyPhone" required>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: INITIATE EXIT -->
+    <div class="modal" id="initiateExitModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Initiate Exit Clearance</h3>
+                <button onclick="closeExitModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="exitForm">
+                <div>
+                    <label>Employee*</label>
+                    <select id="exitEmployeeSelect" required></select>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Resignation Date*</label>
+                    <input type="date" id="exitResignationDate" required>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Exit Type*</label>
+                    <select id="exitTypeSelect" required>
+                        <option value="RESIGNATION">Resignation</option>
+                        <option value="TERMINATION">Termination</option>
+                        <option value="RETIREMENT">Retirement</option>
+                        <option value="CONTRACT_END">Contract End</option>
+                        <option value="ABSCONDING">Absconding</option>
+                    </select>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Notice Period Waiver</label>
+                    <input type="checkbox" id="exitWaiverCheckbox" style="width: auto;"> Waive notice period schedule
+                </div>
+                <div style="margin-top: 10px; display: none;" id="exitLwdContainer">
+                    <label>Custom Last Working Day*</label>
+                    <input type="date" id="exitLwdDate">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Notice Period Letter Required</label>
+                    <input type="checkbox" id="exitNoticeLetterCheckbox" style="width: auto;"> Auto-generate Notice Letter
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Exit Reason (HR notes)*</label>
+                    <textarea id="exitReasonText" rows="3" placeholder="Min 20 characters..." required></textarea>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Initiate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: ADD STUDENT / INTERN -->
+    <div class="modal" id="studentModal">
+        <div class="modal-content" style="width: 600px;">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Register Student / Intern</h3>
+                <button onclick="closeStudentModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="studentForm">
+                <div class="form-grid">
+                    <div>
+                        <label>Student Name*</label>
+                        <input type="text" id="studName" required>
+                    </div>
+                    <div>
+                        <label>Email Address*</label>
+                        <input type="email" id="studEmail" required>
+                    </div>
+                    <div>
+                        <label>Phone Number</label>
+                        <input type="text" id="studPhone">
+                    </div>
+                    <div>
+                        <label>Institute Name*</label>
+                        <input type="text" id="studInstitute" required>
+                    </div>
+                    <div>
+                        <label>Course Name*</label>
+                        <input type="text" id="studCourse" placeholder="e.g. B.Tech CSE" required>
+                    </div>
+                    <div>
+                        <label>Student Type*</label>
+                        <select id="studType" required>
+                            <option value="INTERN">Intern</option>
+                            <option value="TRAINEE">Trainee</option>
+                            <option value="PROJECT_STUDENT">Project Student</option>
+                            <option value="INDUSTRIAL_VISIT">Industrial Visit</option>
+                        </select>
+                    </div>
+                    <div class="form-group-full">
+                        <label>Program Name*</label>
+                        <input type="text" id="studProgram" placeholder="e.g. Summer Internship 2025" required>
+                    </div>
+                    <div>
+                        <label>Department (MTLV)*</label>
+                        <select id="studDept" required></select>
+                    </div>
+                    <div>
+                        <label>Mentor Name</label>
+                        <input type="text" id="studMentor">
+                    </div>
+                    <div>
+                        <label>Joining Date*</label>
+                        <input type="date" id="studJoining" required>
+                    </div>
+                    <div>
+                        <label>Completion Date*</label>
+                        <input type="date" id="studCompletion" required>
+                    </div>
+                    <div>
+                        <label>Certificate Type*</label>
+                        <select id="studCertType" required>
+                            <option value="INTERNSHIP_CERT">Internship Certificate</option>
+                            <option value="TRAINING_CERT">Training Completion Certificate</option>
+                            <option value="PROJECT_CERT">Project Completion Certificate</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Total Program Fees (Rs.)*</label>
+                        <input type="number" id="studFees" value="0" required>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <label><strong>Fee Installment Schedule</strong></label>
+                    <div id="installmentsWrapper" style="margin-top: 10px;">
+                        <!-- dynamic installment lines -->
+                    </div>
+                    <button type="button" class="btn" style="margin-top: 5px; font-size: 9pt;" onclick="addInstallmentRow()">+ Add Installment Line</button>
+                </div>
+
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Register Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: RECORD INSTALLMENT PAYMENT -->
+    <div class="modal" id="recordPaymentModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Record Installment Payment</h3>
+                <button onclick="closeRecordPaymentModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="recordPaymentForm">
+                <input type="hidden" id="paymentInstallmentId">
+                <div>
+                    <label>Amount Paid (Rs.)*</label>
+                    <input type="number" id="paymentAmountPaid" required>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Remarks</label>
+                    <textarea id="paymentRemarks" rows="2" placeholder="Receipt number, check number, notes..."></textarea>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 5: DEFINE SALARY STRUCTURE -->
+    <div class="modal" id="salaryStructureModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Define Salary Structure</h3>
+                <button onclick="closeSalaryStructureModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="salaryStructureForm">
+                <div>
+                    <label>Employee*</label>
+                    <select id="structEmployeeSelect" required></select>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Effective From Date*</label>
+                    <input type="date" id="structEffectiveFrom" required>
+                </div>
+                <div class="form-grid" style="margin-top: 10px;">
+                    <div>
+                        <label>Basic Salary (Monthly)*</label>
+                        <input type="number" id="structBasic" required>
+                    </div>
+                    <div>
+                        <label>HRA Allowance (Monthly)*</label>
+                        <input type="number" id="structHra" required>
+                    </div>
+                    <div>
+                        <label>Conveyance Allowance</label>
+                        <input type="number" id="structConveyance" value="0">
+                    </div>
+                    <div>
+                        <label>Medical Allowance</label>
+                        <input type="number" id="structMedical" value="0">
+                    </div>
+                    <div>
+                        <label>Special Allowance</label>
+                        <input type="number" id="structSpecial" value="0">
+                    </div>
+                    <div>
+                        <label>Monthly Bonus</label>
+                        <input type="number" id="structBonus" value="0">
+                    </div>
+                    <div>
+                        <label>Provident Fund (PF)</label>
+                        <input type="number" id="structPf" value="0">
+                    </div>
+                    <div>
+                        <label>TDS Tax Deduction</label>
+                        <input type="number" id="structTds" value="0">
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Save Structure</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 6: APPROVE INCREMENT (Admin Only) -->
+    <div class="modal" id="approveIncrementModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Approve Salary Revision Raise</h3>
+                <button onclick="closeApproveIncrementModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="approveIncrementForm">
+                <input type="hidden" id="incReminderId">
+                <input type="hidden" id="incEmployeeId">
+                <div>
+                    <label>Employee Name</label>
+                    <input type="text" id="incEmployeeName" disabled>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Current Net Salary</label>
+                    <input type="text" id="incCurrentNet" disabled>
+                </div>
+                <div class="form-grid" style="margin-top: 10px;">
+                    <div>
+                        <label>New Basic Salary*</label>
+                        <input type="number" id="incNewBasic" required>
+                    </div>
+                    <div>
+                        <label>New HRA*</label>
+                        <input type="number" id="incNewHra" required>
+                    </div>
+                    <div class="form-group-full">
+                        <label>New Special Allowances*</label>
+                        <input type="number" id="incNewAllowances" required>
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Effective Date*</label>
+                    <input type="date" id="incEffectiveDate" required>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label>Increment Reason (Min 20 chars)*</label>
+                    <textarea id="incReasonText" rows="3" placeholder="Enter justification for the salary letter..." required></textarea>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Approve Raise</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 7: BULK PAYSLIPS -->
+    <div class="modal" id="bulkSlipModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Bulk Generate Salary Slips</h3>
+                <button onclick="closeBulkSlipModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="bulkSlipForm">
+                <div class="form-grid">
+                    <div>
+                        <label>Month*</label>
+                        <select id="bulkSlipMonth" required>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Year*</label>
+                        <input type="number" id="bulkSlipYear" value="2026" required>
+                    </div>
+                    <div>
+                        <label>Working Days in Month*</label>
+                        <input type="number" id="bulkSlipWorkingDays" value="30" required>
+                    </div>
+                    <div>
+                        <label>Payment Date*</label>
+                        <input type="date" id="bulkSlipPaymentDate" required>
+                    </div>
+                    <div class="form-group-full">
+                        <label>Payment Mode</label>
+                        <select id="bulkSlipPaymentMode">
+                            <option value="BANK_TRANSFER">Bank Transfer</option>
+                            <option value="CHEQUE">Cheque</option>
+                            <option value="CASH">Cash</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Generate Bulk Slips</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 8: ADD NEW ROLE -->
+    <div class="modal" id="addRoleModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Add Custom Role</h3>
+                <button onclick="closeAddRoleModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="addRoleForm" onsubmit="submitAddRole(event)">
+                <div>
+                    <label>Role Name*</label>
+                    <input type="text" id="roleNameInput" placeholder="e.g. Junior HR Analyst" required>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label>Role Code (Uppercase, No Spaces)*</label>
+                    <input type="text" id="roleCodeInput" placeholder="e.g. JUNIOR_HR" required>
+                </div>
+                <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="roleActiveInput" checked style="width: auto; cursor: pointer;">
+                    <label for="roleActiveInput" style="margin: 0; cursor: pointer;">Role is Active</label>
+                </div>
+                <div style="margin-top: 25px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Create Role</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 9: ADD NEW PERMISSION -->
+    <div class="modal" id="addPermissionModal">
+        <div class="modal-content">
+            <div class="flex-row-header">
+                <h3 style="margin:0;">Add Global Permission</h3>
+                <button onclick="closeAddPermissionModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            </div>
+            <form id="addPermissionForm" onsubmit="submitAddPermission(event)">
+                <div>
+                    <label>Permission Name*</label>
+                    <input type="text" id="permNameInput" placeholder="e.g. Publish Slips to Portal" required>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label>Permission Codename (format: module.action)*</label>
+                    <input type="text" id="permCodenameInput" placeholder="e.g. salary.publish" required>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label>Module*</label>
+                    <select id="permModuleSelect" required>
+                        <option value="onboarding">onboarding</option>
+                        <option value="salary">salary</option>
+                        <option value="exit">exit</option>
+                        <option value="student">student</option>
+                        <option value="audit">audit</option>
+                        <option value="roles">roles</option>
+                    </select>
+                </div>
+                <div style="margin-top: 25px; text-align: right;">
+                    <button type="submit" class="btn btn-primary">Create Permission</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- LOAD APP JS -->
+    <script src="{% static 'js/app.js' %}"></script>
+    <script>
+        // Check Auth on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                window.location.href = '/login/';
+                return;
+            }
+
+            // Fetch User Details to setup UI permissions
+            try {
+                const res = await apiFetch('/auth/me/');
+                if (res.ok) {
+                    currentUser = await res.json();
+                    document.getElementById('usernameLabel').textContent = currentUser.username;
+                    
+                    // Apply dynamic permissions on sidebar and dashboard items
+                    applyPermissionsToUI();
+                    
+                    // Initialize Dashboard
+                    switchView('dashboardView');
+                    checkNotifications();
+                    
+                    // Poll Notifications every 15 seconds
+                    setInterval(checkNotifications, 15000);
+                } else {
+                    logout();
+                }
+            } catch (e) {
+                console.error(e);
+                logout();
+            }
+
+            // Populate States lists in onboarding modal
+            populateStatesDropdown();
+        });
+
+        // Theme Toggle
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+        }
+
+        // Toggle Notifications slide-over
+        function toggleNotifPanel() {
+            const panel = document.getElementById('notifPanel');
+            panel.classList.toggle('open');
+        }
+
+        // Populate State list in dropdown
+        function populateStatesDropdown() {
+            const states = [
+                ["AP", "Andhra Pradesh"], ["AR", "Arunachal Pradesh"], ["AS", "Assam"],
+                ["BR", "Bihar"], ["CG", "Chhattisgarh"], ["GA", "Goa"], ["GJ", "Gujarat"],
+                ["HR", "Haryana"], ["HP", "Himachal Pradesh"], ["JH", "Jharkhand"],
+                ["KA", "Karnataka"], ["KL", "Kerala"], ["MP", "Madhya Pradesh"],
+                ["MH", "Maharashtra"], ["MN", "Manipur"], ["ML", "Meghalaya"],
+                ["MZ", "Mizoram"], ["NL", "Nagaland"], ["OD", "Odisha"], ["PB", "Punjab"],
+                ["RJ", "Rajasthan"], ["SK", "Sikkim"], ["TN", "Tamil Nadu"],
+                ["TG", "Telangana"], ["TR", "Tripura"], ["UP", "Uttar Pradesh"],
+                ["UK", "Uttarakhand"], ["WB", "West Bengal"], ["DL", "Delhi"],
+                ["JK", "Jammu & Kashmir"], ["PY", "Puducherry"]
+            ];
+            
+            const drop = document.getElementById('empState');
+            if (drop) {
+                drop.innerHTML = states.map(s => `<option value="${s[0]}">${s[1]}</option>`).join('');
+            }
+        }
+
+        // ---------- CORE LOADERS ----------
+        
+        // Load Dashboard details
+        async function loadDashboardData() {
+            document.getElementById('pageTitle').textContent = 'Dashboard Overview';
+            try {
+                const res = await apiFetch('/auth/dashboard/');
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // Update stats counters
+                    document.getElementById('statTotalEmployees').textContent = data.total_employees;
+                    document.getElementById('statActiveEmployees').textContent = data.active_employees;
+                    document.getElementById('statActiveStudents').textContent = data.active_students;
+                    document.getElementById('statPendingExits').textContent = data.pending_exits;
+                    document.getElementById('statAnniversaries').textContent = data.anniversaries_count;
+
+                    // Update recent logs feed
+                    const body = document.getElementById('dashboardRecentLogsBody');
+                    if (hasPermission('audit.read')) {
+                        const logsList = data.recent_logs;
+                        if (logsList && logsList.length > 0) {
+                            body.innerHTML = logsList.map(l => `
+                                <tr>
+                                    <td>${formatDate(l.timestamp)}</td>
+                                    <td>${l.actor_username || 'System'}</td>
+                                    <td>${l.action}</td>
+                                    <td>${l.model_name}</td>
+                                    <td>${l.description}</td>
+                                </tr>
+                            `).join('');
+                        } else {
+                            body.innerHTML = `<tr><td colspan="5" style="text-align: center;">No operational logs found.</td></tr>`;
+                        }
+                    } else {
+                        body.innerHTML = `<tr><td colspan="5" style="text-align: center;">Recent operational logs are only visible to authorized administrators.</td></tr>`;
+                    }
+                } else {
+                    showToast('Failed to load dashboard data.', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Failed to load dashboard data.', 'error');
+            }
+        }
+
+        // Load Employee Onboarding view
+        async function loadOnboardingData() {
+            document.getElementById('pageTitle').textContent = 'Employee Onboarding';
+            try {
+                const res = await apiFetch('/onboarding/employees/');
+                if (res.ok) {
+                    const emps = await res.json();
+                    const empList = emps.results || emps;
+                    const tbody = document.getElementById('employeeTableBody');
+                    
+                    tbody.innerHTML = empList.map(e => `
+                        <tr>
+                            <td>${e.emp_id}</td>
+                            <td>${e.first_name} ${e.last_name}</td>
+                            <td>${e.email}</td>
+                            <td>${e.department_details ? e.department_details.name : e.department}</td>
+                            <td>${e.designation}</td>
+                            <td>${e.joining_date}</td>
+                            <td><span style="font-weight:bold; color:${e.status === 'Active' ? '#22c55e' : '#ef4444'}">${e.status}</span></td>
+                            <td>
+                                ${hasPermission('onboarding.generate_letters') ? `
+                                    <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerGenerateLetter(${e.id}, 'offer')">Offer Letter</button>
+                                    <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerGenerateLetter(${e.id}, 'appointment')">Appt Letter</button>
+                                    ${e.bond_period_months > 0 ? `<button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerGenerateLetter(${e.id}, 'bond')">Bond Letter</button>` : ''}
+                                ` : ''}
+                                ${hasPermission('onboarding.delete') ? `<button class="btn" style="font-size:8pt; padding:4px 8px; background-color:#ef4444; color:white;" onclick="softDeleteEmployee(${e.id})">Delete</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Onboarding Form modals
+        function openOnboardModal() {
+            document.getElementById('onboardModal').style.display = 'flex';
+            // Load Departments dynamically into select
+            loadDepartmentsSelect('empDept');
+        }
+        function closeOnboardModal() {
+            document.getElementById('onboardModal').style.display = 'none';
+        }
+
+        async function loadDepartmentsSelect(selectId) {
+            try {
+                const res = await apiFetch('/onboarding/departments/');
+                if (res.ok) {
+                    const depts = await res.json();
+                    const deptList = depts.results || depts;
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = deptList.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Onboard Form submission
+        document.getElementById('onboardForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                first_name: document.getElementById('empFirstName').value,
+                last_name: document.getElementById('empLastName').value,
+                email: document.getElementById('empEmail').value,
+                phone: document.getElementById('empPhone').value,
+                dob: document.getElementById('empDob').value,
+                gender: document.getElementById('empGender').value,
+                address_line1: document.getElementById('empAddr1').value,
+                city: document.getElementById('empCity').value,
+                state: document.getElementById('empState').value,
+                pin_code: document.getElementById('empPin').value,
+                department: document.getElementById('empDept').value,
+                designation: document.getElementById('empDesignation').value,
+                employment_type: document.getElementById('empType').value,
+                joining_date: document.getElementById('empJoining').value,
+                notice_period_days: document.getElementById('empNotice').value,
+                bond_period_months: document.getElementById('empBond').value || 0,
+                aadhaar: document.getElementById('empAadhaar').value,
+                pan: document.getElementById('empPan').value,
+                emergency_contact_name: document.getElementById('empEmergencyName').value,
+                emergency_relationship: document.getElementById('empEmergencyRel').value,
+                emergency_phone: document.getElementById('empEmergencyPhone').value
+            };
+
+            try {
+                const res = await apiFetch('/onboarding/employees/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                
+                if (res.ok) {
+                    showToast('Employee profile created successfully.');
+                    closeOnboardModal();
+                    loadOnboardingData();
+                } else {
+                    const errors = await res.json();
+                    showToast('Validation Error: ' + JSON.stringify(errors), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+                showToast('Failed to create profile.', 'error');
+            }
+        });
+
+        // Letter PDFs Generation Actions
+        async function triggerGenerateLetter(empId, type) {
+            showToast(`Generating ${type} letter PDF...`);
+            try {
+                const res = await apiFetch(`/onboarding/employees/${empId}/generate-${type}-letter/`, {
+                    method: 'POST'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    showToast(`${type.toUpperCase()} letter created and logged.`);
+                    // Auto-open/download the PDF link
+                    if (data.document && data.document.file) {
+                        window.open(data.document.file, '_blank');
+                    }
+                    loadOnboardingData();
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Failed to generate letter.', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function softDeleteEmployee(empId) {
+            if (!confirm('Are you sure you want to soft delete this employee profile?')) return;
+            try {
+                const res = await apiFetch(`/onboarding/employees/${empId}/`, {
+                    method: 'DELETE'
+                });
+                if (res.status === 204) {
+                    showToast('Employee profile deleted.');
+                    loadOnboardingData();
+                } else {
+                    showToast('Failed to delete.', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ---------- PAYROLL / SALARIES VIEW ----------
+        async function loadSalaryData() {
+            document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
+            try {
+                // Load Salary structures
+                const structRes = await apiFetch('/salary/structures/');
+                if (structRes.ok) {
+                    const structs = await structRes.json();
+                    const structList = structs.results || structs;
+                    const tbody = document.getElementById('salaryStructureTableBody');
+                    
+                    tbody.innerHTML = structList.map(s => `
+                        <tr>
+                            <td>${s.employee_details ? s.employee_details.first_name + ' ' + s.employee_details.last_name + ' (' + s.employee_details.emp_id + ')' : s.employee}</td>
+                            <td>Rs. ${s.basic}</td>
+                            <td>Rs. ${s.hra}</td>
+                            <td>Rs. ${s.gross_salary}</td>
+                            <td>Rs. ${s.total_deductions}</td>
+                            <td><strong>Rs. ${s.net_salary}</strong></td>
+                            <td>${s.effective_from}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // If user has permission, load Raise approvals reminders
+                if (hasPermission('salary.approve_increments')) {
+                    const remRes = await apiFetch('/salary/increments/');
+                    if (remRes.ok) {
+                        const rems = await remRes.json();
+                        const remList = rems.results || rems;
+                        const tbody = document.getElementById('salaryIncrementsReminderBody');
+                        
+                        tbody.innerHTML = remList.map(r => `
+                            <tr>
+                                <td>${r.employee_details ? r.employee_details.first_name + ' ' + r.employee_details.last_name + ' (' + r.employee_details.emp_id + ')' : r.employee}</td>
+                                <td>${r.anniversary_date}</td>
+                                <td><span style="font-weight:bold; color:${r.status === 'Pending' ? '#eab308' : '#22c55e'}">${r.status}</span></td>
+                                <td>
+                                    ${r.status === 'Pending' ? `<button class="btn btn-primary" style="font-size:8pt; padding:4px 8px;" onclick="openRaiseApprovalModal(${r.id}, ${r.employee}, '${r.employee_details.first_name} ${r.employee_details.last_name}')">Review & Approve</button>` : 'Actioned'}
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Define Salary structure modal
+        function openSalaryStructureModal() {
+            document.getElementById('salaryStructureModal').style.display = 'flex';
+            loadActiveEmployeesSelect('structEmployeeSelect');
+        }
+        function closeSalaryStructureModal() {
+            document.getElementById('salaryStructureModal').style.display = 'none';
+        }
+
+        async function loadActiveEmployeesSelect(selectId) {
+            try {
+                const res = await apiFetch('/onboarding/employees/');
+                if (res.ok) {
+                    const emps = await res.json();
+                    const empList = emps.results || emps;
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = empList.filter(e => e.status === 'Active').map(e => `<option value="${e.id}">${e.first_name} ${e.last_name} (${e.emp_id})</option>`).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        document.getElementById('salaryStructureForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                employee: document.getElementById('structEmployeeSelect').value,
+                effective_from: document.getElementById('structEffectiveFrom').value,
+                basic: document.getElementById('structBasic').value,
+                hra: document.getElementById('structHra').value,
+                conveyance: document.getElementById('structConveyance').value,
+                medical: document.getElementById('structMedical').value,
+                special: document.getElementById('structSpecial').value,
+                monthly_bonus: document.getElementById('structBonus').value,
+                pf: document.getElementById('structPf').value,
+                tds: document.getElementById('structTds').value,
+            };
+
+            try {
+                const res = await apiFetch('/salary/structures/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    showToast('Salary structure saved successfully.');
+                    closeSalaryStructureModal();
+                    loadSalaryData();
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+            }
+        });
+
+        // Bulk payslip modal
+        function openBulkSlipModal() {
+            document.getElementById('bulkSlipModal').style.display = 'flex';
+        }
+        function closeBulkSlipModal() {
+            document.getElementById('bulkSlipModal').style.display = 'none';
+        }
+
+        document.getElementById('bulkSlipForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                month: document.getElementById('bulkSlipMonth').value,
+                year: document.getElementById('bulkSlipYear').value,
+                working_days: document.getElementById('bulkSlipWorkingDays').value,
+                payment_date: document.getElementById('bulkSlipPaymentDate').value,
+                payment_mode: document.getElementById('bulkSlipPaymentMode').value,
+            };
+
+            try {
+                showToast('Running bulk payslips creation...');
+                const res = await apiFetch('/salary/slips/bulk-generate/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    const summary = await res.json();
+                    showToast(`Bulk payroll run completed. Slips Generated: ${summary.generated}, Skipped: ${summary.skipped}`);
+                    closeBulkSlipModal();
+                } else {
+                    showToast('Failed to run bulk payroll.', 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+            }
+        });
+
+        // Raise approval modal
+        async function openRaiseApprovalModal(reminderId, employeeId, nameStr) {
+            document.getElementById('approveIncrementModal').style.display = 'flex';
+            document.getElementById('incReminderId').value = reminderId;
+            document.getElementById('incEmployeeId').value = employeeId;
+            document.getElementById('incEmployeeName').value = nameStr;
+            
+            // Set effective date anniversary default
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('incEffectiveDate').value = today;
+
+            // Fetch current salary details to print old net
+            try {
+                const res = await apiFetch(`/salary/structures/?employee_id=${employeeId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const list = data.results || data;
+                    if (list.length > 0) {
+                        const current = list[0];
+                        document.getElementById('incCurrentNet').value = `Gross: Rs. ${current.gross_salary} | Net: Rs. ${current.net_salary}`;
+                        document.getElementById('incNewBasic').value = current.basic;
+                        document.getElementById('incNewHra').value = current.hra;
+                        document.getElementById('incNewAllowances').value = current.special;
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function closeApproveIncrementModal() {
+            document.getElementById('approveIncrementModal').style.display = 'none';
+        }
+
+        document.getElementById('approveIncrementForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const reminderId = document.getElementById('incReminderId').value;
+            const data = {
+                employee: document.getElementById('incEmployeeId').value,
+                new_basic: document.getElementById('incNewBasic').value,
+                new_hra: document.getElementById('incNewHra').value,
+                new_allowances: document.getElementById('incNewAllowances').value,
+                effective_date: document.getElementById('incEffectiveDate').value,
+                reason: document.getElementById('incReasonText').value
+            };
+
+            try {
+                showToast('Approving raises and compiling letter...');
+                const res = await apiFetch(`/salary/increments/${reminderId}/approve/`, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                
+                if (res.ok) {
+                    showToast('Salary revision approved and letters sent!');
+                    closeApproveIncrementModal();
+                    loadSalaryData();
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+            }
+        });
+
+        // ---------- EXIT MANAGEMENT VIEW ----------
+        async function loadExitData() {
+            document.getElementById('pageTitle').textContent = 'Employee exit manager';
+            try {
+                const res = await apiFetch('/exit/requests/');
+                if (res.ok) {
+                    const exits = await res.json();
+                    const exitList = exits.results || exits;
+                    const tbody = document.getElementById('exitTableBody');
+                    
+                    tbody.innerHTML = exitList.map(x => `
+                        <tr>
+                            <td>${x.employee_details ? x.employee_details.emp_id : x.employee}</td>
+                            <td>${x.employee_details ? x.employee_details.first_name + ' ' + x.employee_details.last_name : ''}</td>
+                            <td>${x.resignation_date}</td>
+                            <td>${x.last_working_day}</td>
+                            <td><span style="font-weight:bold; color:${x.status === 'COMPLETED' ? '#22c55e' : '#eab308'}">${x.status}</span></td>
+                            <td>
+                                ${x.status === 'COMPLETED' ? `
+                                    <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerGenerateExitLetter(${x.id}, 'relieving')">Relieving Letter</button>
+                                    <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerGenerateExitLetter(${x.id}, 'experience')">Experience Letter</button>
+                                ` : `
+                                    <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerResendExitLink(${x.id})">Resend Form Link</button>
+                                `}
+                                ${x.notice_letter_required ? `<button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="triggerGenerateExitLetter(${x.id}, 'notice')">Notice Letter</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Initiate Exit modal
+        function openInitiateExitModal() {
+            document.getElementById('initiateExitModal').style.display = 'flex';
+            loadActiveEmployeesSelect('exitEmployeeSelect');
+        }
+        function closeExitModal() {
+            document.getElementById('initiateExitModal').style.display = 'none';
+        }
+
+        // Waiver LWD toggle
+        document.getElementById('exitWaiverCheckbox').addEventListener('change', (e) => {
+            document.getElementById('exitLwdContainer').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('exitForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                employee: document.getElementById('exitEmployeeSelect').value,
+                resignation_date: document.getElementById('exitResignationDate').value,
+                exit_type: document.getElementById('exitTypeSelect').value,
+                notice_waiver: document.getElementById('exitWaiverCheckbox').checked,
+                notice_letter_required: document.getElementById('exitNoticeLetterCheckbox').checked,
+                exit_reason: document.getElementById('exitReasonText').value
+            };
+
+            if (data.notice_waiver) {
+                data.last_working_day = document.getElementById('exitLwdDate').value;
+            }
+
+            try {
+                showToast('Initiating exit process and email tokens...');
+                const res = await apiFetch('/exit/requests/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                
+                if (res.ok) {
+                    showToast('Exit clearance initiated. Email token sent to employee.');
+                    closeExitModal();
+                    loadExitData();
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+            }
+        });
+
+        async function triggerResendExitLink(id) {
+            try {
+                const res = await apiFetch(`/exit/requests/${id}/send-link/`, { method: 'POST' });
+                if (res.ok) showToast('Exit link emailed successfully.');
+                else showToast('Failed to send link.', 'error');
+            } catch (e) { console.error(e); }
+        }
+
+        async function triggerGenerateExitLetter(exitId, type) {
+            showToast(`Generating ${type} PDF...`);
+            try {
+                const res = await apiFetch(`/exit/requests/${exitId}/generate-${type}/`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    showToast(`${type.toUpperCase()} PDF created.`);
+                    if (data.document && data.document.file) {
+                        window.open(data.document.file, '_blank');
+                    }
+                    loadExitData();
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Generation failed.', 'error');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ---------- STUDENTS & INTERNS VIEW ----------
+        let studentInstallmentRows = [];
+        
+        async function loadStudentData() {
+            document.getElementById('pageTitle').textContent = 'Student / Intern Module';
+            try {
+                const res = await apiFetch('/student/students/');
+                if (res.ok) {
+                    const studs = await res.json();
+                    const studList = studs.results || studs;
+                    const tbody = document.getElementById('studentTableBody');
+                    
+                    tbody.innerHTML = studList.map(s => `
+                        <tr>
+                            <td>${s.cert_no}</td>
+                            <td>${s.name}</td>
+                            <td>${s.email}</td>
+                            <td>${s.student_type}</td>
+                            <td>${s.joining_date}</td>
+                            <td>${s.completion_date}</td>
+                            <td>Rs. ${s.total_fees}</td>
+                            <td><span style="font-weight:bold; color:${s.status === 'ACTIVE' ? '#eab308' : '#22c55e'}">${s.status}</span></td>
+                            <td>
+                                <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="generateStudentCertificate(${s.id})">Generate Cert</button>
+                                ${s.cert_pdf ? `<button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="window.open('${s.cert_pdf}', '_blank')">View Cert</button>` : ''}
+                                <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="viewInstallmentsModal(${s.id}, '${s.name}')">Fee Schedule</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function openStudentModal() {
+            document.getElementById('studentModal').style.display = 'flex';
+            loadDepartmentsSelect('studDept');
+            // reset installments rows
+            studentInstallmentRows = [];
+            document.getElementById('installmentsWrapper').innerHTML = '';
+        }
+        function closeStudentModal() {
+            document.getElementById('studentModal').style.display = 'none';
+        }
+
+        function addInstallmentRow() {
+            const index = studentInstallmentRows.length + 1;
+            const div = document.createElement('div');
+            div.className = 'form-grid';
+            div.style.marginBottom = '5px';
+            div.innerHTML = `
+                <div>
+                    <label>Installment ${index} Amount (Rs.)</label>
+                    <input type="number" class="inst-amount" required>
+                </div>
+                <div>
+                    <label>Due Date</label>
+                    <input type="date" class="inst-due" required>
+                </div>
+            `;
+            document.getElementById('installmentsWrapper').appendChild(div);
+            studentInstallmentRows.push(div);
+        }
+
+        document.getElementById('studentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Build installments schedule
+            const schedule = [];
+            const amounts = document.querySelectorAll('.inst-amount');
+            const dues = document.querySelectorAll('.inst-due');
+            for (let i = 0; i < amounts.length; i++) {
+                schedule.push({
+                    amount: amounts[i].value,
+                    due_date: dues[i].value
+                });
+            }
+
+            const data = {
+                name: document.getElementById('studName').value,
+                email: document.getElementById('studEmail').value,
+                phone: document.getElementById('studPhone').value,
+                institute: document.getElementById('studInstitute').value,
+                course_at_institute: document.getElementById('studCourse').value,
+                student_type: document.getElementById('studType').value,
+                program_name: document.getElementById('studProgram').value,
+                department: document.getElementById('studDept').value,
+                mentor: document.getElementById('studMentor').value,
+                joining_date: document.getElementById('studJoining').value,
+                completion_date: document.getElementById('studCompletion').value,
+                cert_type: document.getElementById('studCertType').value,
+                total_fees: document.getElementById('studFees').value,
+                installments_schedule: schedule
+            };
+
+            try {
+                const res = await apiFetch('/student/students/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    showToast('Student registered and installment plans generated!');
+                    closeStudentModal();
+                    loadStudentData();
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+            }
+        });
+
+        async function generateStudentCertificate(studentId, override = false) {
+            showToast('Generating training certificate...');
+            try {
+                const res = await apiFetch(`/student/students/${studentId}/generate-certificate/`, {
+                    method: 'POST',
+                    body: JSON.stringify({ confirm_override: override })
+                });
+                
+                if (res.ok) {
+                    const result = await res.json();
+                    if (result.requires_override) {
+                        if (confirm(result.warning)) {
+                            generateStudentCertificate(studentId, true); // re-call with override
+                        }
+                    } else {
+                        showToast('Certificate generated successfully!');
+                        if (result.cert_pdf) {
+                            window.open(result.cert_pdf, '_blank');
+                        }
+                        loadStudentData();
+                    }
+                } else {
+                    showToast('Certificate generation failed.', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Installments viewer overlay/list
+        async function viewInstallmentsModal(studentId, name) {
+            try {
+                const res = await apiFetch(`/student/installments/?student_id=${studentId}`);
+                if (res.ok) {
+                    const installments = await res.json();
+                    const list = installments.results || installments;
+                    
+                    // Open warning toast/alert showing details or build inline popup
+                    let htmlList = list.map(inst => `
+                        <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong>Installment ${inst.installment_number}</strong><br>
+                                Amount: Rs. ${inst.amount} | Due: ${inst.due_date}<br>
+                                Paid: Rs. ${inst.paid_amount} | Date: ${inst.paid_date || 'N/A'}<br>
+                                Status: <span style="font-weight:bold; color:${inst.status === 'PAID' ? '#22c55e' : '#ef4444'}">${inst.status}</span>
+                            </div>
+                            <div>
+                                ${inst.status !== 'PAID' ? `
+                                    <button class="btn btn-primary" style="font-size:7.5pt; padding:3px 6px;" onclick="openRecordPaymentModal(${inst.id})">Pay</button>
+                                    <button class="btn" style="font-size:7.5pt; padding:3px 6px; background-color:#eab308; color:white;" onclick="triggerWarningEmail(${inst.id})">Email Warn</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+
+                    if (list.length === 0) {
+                        htmlList = '<div>No fee installments defined for this student.</div>';
+                    }
+
+                    // Build standard inline alert dialog or dynamic popup
+                    alertModalHTML(`Fee installments for ${name}`, htmlList);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function alertModalHTML(title, content) {
+            // Remove previous if exists
+            const old = document.getElementById('alertDynamicModal');
+            if (old) old.remove();
+
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.id = 'alertDynamicModal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-height:80%; overflow-y:auto;">
+                    <div class="flex-row-header">
+                        <h3 style="margin:0;">${title}</h3>
+                        <button onclick="document.getElementById('alertDynamicModal').remove()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+                    </div>
+                    <div>${content}</div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Record installment payment
+        function openRecordPaymentModal(instId) {
+            // Close dynamic installment viewer
+            const dynamic = document.getElementById('alertDynamicModal');
+            if (dynamic) dynamic.style.display = 'none';
+
+            document.getElementById('recordPaymentModal').style.display = 'flex';
+            document.getElementById('paymentInstallmentId').value = instId;
+        }
+        function closeRecordPaymentModal() {
+            document.getElementById('recordPaymentModal').style.display = 'none';
+        }
+
+        document.getElementById('recordPaymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const instId = document.getElementById('paymentInstallmentId').value;
+            const data = {
+                amount_paid: document.getElementById('paymentAmountPaid').value,
+                remarks: document.getElementById('paymentRemarks').value
+            };
+
+            try {
+                const res = await apiFetch(`/student/installments/${instId}/record-payment/`, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    showToast('Payment recorded successfully.');
+                    closeRecordPaymentModal();
+                    loadStudentData();
+                } else {
+                    showToast('Failed to record payment.', 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+            }
+        });
+
+        async function triggerWarningEmail(instId) {
+            try {
+                showToast('Sending overdue alert email...');
+                const res = await apiFetch(`/student/installments/${instId}/send-warning/`, { method: 'POST' });
+                if (res.ok) {
+                    showToast('Warning email sent successfully to student.');
+                } else {
+                    showToast('Failed to send warning email.', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ---------- AUDIT LOGS VIEW ----------
+        async function loadLogsData() {
+            document.getElementById('pageTitle').textContent = 'System Audit Logs';
+            try {
+                const res = await apiFetch('/audit/logs/');
+                if (res.ok) {
+                    const logs = await res.json();
+                    const logsList = logs.results || logs;
+                    const tbody = document.getElementById('logsTableBody');
+                    
+                    tbody.innerHTML = logsList.map(l => `
+                        <tr>
+                            <td>${formatDate(l.timestamp)}</td>
+                            <td>${l.actor_username || 'System'}</td>
+                            <td>${l.action}</td>
+                            <td>${l.model_name}</td>
+                            <td>${l.object_id || 'N/A'}</td>
+                            <td>${l.description}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ---------- RBAC GATE & UI HELPERS ----------
+        function hasPermission(codename) {
+            return currentUser && currentUser.permissions && currentUser.permissions.includes(codename);
+        }
+
+        function applyPermissionsToUI() {
+            if (!currentUser) return;
+
+            // Sidebar links visibility
+            document.getElementById('onboardingLink').style.display = hasPermission('onboarding.read') ? 'block' : 'none';
+            document.getElementById('salaryLink').style.display = hasPermission('salary.read') ? 'block' : 'none';
+            document.getElementById('exitLink').style.display = hasPermission('exit.read') ? 'block' : 'none';
+            document.getElementById('studentLink').style.display = hasPermission('student.read') ? 'block' : 'none';
+            document.getElementById('adminLogsLink').style.display = hasPermission('audit.read') ? 'block' : 'none';
+            document.getElementById('adminRolesLink').style.display = hasPermission('roles.manage') ? 'block' : 'none';
+
+            // Dashboard items
+            const incrementWidget = document.getElementById('adminWidgetIncrements');
+            if (incrementWidget) {
+                incrementWidget.style.display = hasPermission('salary.approve_increments') ? 'block' : 'none';
+            }
+
+            // Salaries view header & tables
+            const incHeader = document.getElementById('adminIncrementsHeader');
+            if (incHeader) incHeader.style.display = hasPermission('salary.approve_increments') ? 'block' : 'none';
+            const incTable = document.getElementById('adminIncrementsTableContainer');
+            if (incTable) incTable.style.display = hasPermission('salary.approve_increments') ? 'block' : 'none';
+
+            // Top action buttons
+            const addEmpBtn = document.getElementById('addEmployeeBtn');
+            if (addEmpBtn) addEmpBtn.style.display = hasPermission('onboarding.create') ? 'block' : 'none';
+
+            const bulkSlipsBtn = document.getElementById('bulkSlipsBtn');
+            if (bulkSlipsBtn) bulkSlipsBtn.style.display = hasPermission('salary.create_slips') ? 'block' : 'none';
+
+            const setupSalaryBtn = document.getElementById('setupSalaryBtn');
+            if (setupSalaryBtn) setupSalaryBtn.style.display = hasPermission('salary.create_slips') ? 'block' : 'none';
+
+            const addExitBtn = document.getElementById('addExitBtn');
+            if (addExitBtn) addExitBtn.style.display = hasPermission('exit.create') ? 'block' : 'none';
+
+            const exportStudBtn = document.getElementById('exportStudentBtn');
+            if (exportStudBtn) exportStudBtn.style.display = hasPermission('student.export') ? 'block' : 'none';
+
+            const addStudBtn = document.getElementById('addStudentBtn');
+            if (addStudBtn) addStudBtn.style.display = hasPermission('student.create') ? 'block' : 'none';
+        }
+
+        // ---------- ROLES & PERMISSIONS DATA MANAGEMENT ----------
+        let allPermissions = [];
+        let allRoles = [];
+
+        async function loadRolesData() {
+            document.getElementById('pageTitle').textContent = 'Roles & Permissions Control';
+            try {
+                // Fetch Permissions
+                const permRes = await apiFetch('/roles/permissions/');
+                if (permRes.ok) {
+                    const data = await permRes.json();
+                    allPermissions = data.results || data;
+                }
+
+                // Fetch Roles
+                const roleRes = await apiFetch('/roles/roles/');
+                if (roleRes.ok) {
+                    const data = await roleRes.json();
+                    allRoles = data.results || data;
+                }
+
+                renderCategoryRoles(allRoles, allPermissions);
+                renderGlobalPermissions(allPermissions);
+            } catch (e) {
+                console.error('Error loading roles data:', e);
+                showToast('Failed to load roles/permissions data.', 'error');
+            }
+        }
+
+        function switchRolesTab(tabId) {
+            const categoriesTab = document.getElementById('rolesCategoriesTab');
+            const permissionsTab = document.getElementById('rolesPermissionsTab');
+            const catBtn = document.getElementById('tabCategoryRoles');
+            const permBtn = document.getElementById('tabGlobalPermissions');
+
+            if (tabId === 'roles-categories') {
+                categoriesTab.style.display = 'block';
+                permissionsTab.style.display = 'none';
+                catBtn.className = 'active-tab';
+                permBtn.className = '';
+                catBtn.style.color = 'var(--primary-color)';
+                catBtn.style.borderBottom = '2px solid var(--primary-color)';
+                permBtn.style.color = 'var(--text-color)';
+                permBtn.style.borderBottom = 'none';
+            } else {
+                categoriesTab.style.display = 'none';
+                permissionsTab.style.display = 'block';
+                catBtn.className = '';
+                permBtn.className = 'active-tab';
+                permBtn.style.color = 'var(--primary-color)';
+                permBtn.style.borderBottom = '2px solid var(--primary-color)';
+                catBtn.style.color = 'var(--text-color)';
+                catBtn.style.borderBottom = 'none';
+            }
+        }
+
+        function renderCategoryRoles(roles, permissions) {
+            const container = document.getElementById('rolesGridContainer');
+            if (!container) return;
+
+            if (roles.length === 0) {
+                container.innerHTML = '<div style="grid-column: span 3; text-align: center; padding: 40px; color: #777;">No roles defined.</div>';
+                return;
+            }
+
+            // Group permissions by module for easier rendering inside cards
+            const groupedPerms = {};
+            permissions.forEach(p => {
+                if (!groupedPerms[p.module]) {
+                    groupedPerms[p.module] = [];
+                }
+                groupedPerms[p.module].push(p);
+            });
+
+            container.innerHTML = roles.map(role => {
+                const assignedPermIds = role.permissions_details ? role.permissions_details.map(p => p.id) : [];
+
+                // Render group boxes per module
+                const modulesHtml = Object.keys(groupedPerms).map(module => {
+                    const modulePerms = groupedPerms[module];
+                    const permsHtml = modulePerms.map(p => {
+                        const checked = assignedPermIds.includes(p.id) ? 'checked' : '';
+                        return `
+                            <label class="perm-checkbox-item">
+                                <input type="checkbox" data-role-id="${role.id}" data-perm-id="${p.id}" ${checked}>
+                                <span>${p.name}</span>
+                            </label>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="module-perms-group">
+                            <div class="module-perms-title">${module}</div>
+                            ${permsHtml}
+                        </div>
+                    `;
+                }).join('');
+
+                const isSystem = role.is_system;
+                const statusChecked = role.is_active ? 'checked' : '';
+
+                return `
+                    <div class="role-card" id="role-card-${role.id}">
+                        <div class="role-card-header">
+                            <div>
+                                <h4 class="role-card-title">${role.name}</h4>
+                                <span class="role-code-badge">${role.code}</span>
+                            </div>
+                            <div>
+                                <label class="toggle-switch" title="Toggle active status">
+                                    <input type="checkbox" id="role-status-${role.id}" ${statusChecked}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="role-card-body">
+                            <div style="font-size: 8.5pt; color: #777; margin-bottom: 5px;">
+                                ${isSystem ? '🔒 System Critical Role (Name/Code Locked)' : '🛠️ Custom Role'}
+                            </div>
+                            <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
+                                ${modulesHtml}
+                            </div>
+                        </div>
+                        <div class="role-card-footer">
+                            <button class="btn btn-primary" style="font-size: 9pt; padding: 8px 16px;" onclick="saveRoleChanges(${role.id}, ${isSystem})">Save Changes</button>
+                            ${isSystem ? '' : `<button class="btn" style="font-size: 9pt; padding: 8px 16px; background-color:#ef4444; color:white;" onclick="deleteRole(${role.id})">Delete</button>`}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderGlobalPermissions(permissions) {
+            const container = document.getElementById('permissionsGridContainer');
+            if (!container) return;
+
+            if (permissions.length === 0) {
+                container.innerHTML = '<div style="grid-column: span 3; text-align: center; padding: 40px; color: #777;">No permissions registered.</div>';
+                return;
+            }
+
+            // Group by module
+            const grouped = {};
+            permissions.forEach(p => {
+                if (!grouped[p.module]) grouped[p.module] = [];
+                grouped[p.module].push(p);
+            });
+
+            container.innerHTML = Object.keys(grouped).map(moduleName => {
+                const perms = grouped[moduleName];
+                const rows = perms.map(p => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                        <div>
+                            <div style="font-weight: 600; font-size: 9.5pt;">${p.name}</div>
+                            <code style="font-size: 8pt; color: var(--primary-color);">${p.codename}</code>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="role-card" style="min-height: auto;">
+                        <div class="role-card-header" style="border-bottom: 2px solid var(--primary-color);">
+                            <h4 class="role-card-title" style="text-transform: uppercase; color: var(--primary-color);">${moduleName} Module</h4>
+                        </div>
+                        <div style="display: flex; flex-direction: column; padding: 10px 0;">
+                            ${rows}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function saveRoleChanges(roleId, isSystem) {
+            // Find card inputs
+            const card = document.getElementById(`role-card-${roleId}`);
+            const checkboxes = card.querySelectorAll('input[type="checkbox"][data-perm-id]');
+            const checkedPermIds = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    checkedPermIds.push(parseInt(cb.getAttribute('data-perm-id')));
+                }
+            });
+
+            const isActive = document.getElementById(`role-status-${roleId}`).checked;
+
+            const payload = {
+                is_active: isActive,
+                permissions: checkedPermIds
+            };
+
+            showToast('Saving role access configuration...');
+            try {
+                const res = await apiFetch(`/roles/roles/${roleId}/`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    showToast('Role permissions updated successfully!');
+                    
+                    // If current user modified their own role, refresh their credentials
+                    const updatedRole = await res.json();
+                    if (currentUser && currentUser.role === updatedRole.code) {
+                        const meRes = await apiFetch('/auth/me/');
+                        if (meRes.ok) {
+                            currentUser = await meRes.json();
+                            applyPermissionsToUI();
+                        }
+                    }
+
+                    loadRolesData();
+                } else {
+                    const errors = await res.json();
+                    showToast('Failed to save changes: ' + JSON.stringify(errors), 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to communicate with API.', 'error');
+            }
+        }
+
+        async function deleteRole(roleId) {
+            if (!confirm('Are you sure you want to delete this custom role? Any users assigned to this role will be unassigned.')) return;
+
+            showToast('Deleting custom role...');
+            try {
+                const res = await apiFetch(`/roles/roles/${roleId}/`, {
+                    method: 'DELETE'
+                });
+
+                if (res.status === 204) {
+                    showToast('Custom role deleted successfully.');
+                    loadRolesData();
+                } else {
+                    const err = await res.json();
+                    showToast('Failed to delete role: ' + (err.detail || JSON.stringify(err)), 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to communicate with API.', 'error');
+            }
+        }
+
+        // Add Role Modal Handlers
+        function openAddRoleModal() {
+            document.getElementById('addRoleModal').style.display = 'flex';
+        }
+
+        function closeAddRoleModal() {
+            document.getElementById('addRoleModal').style.display = 'none';
+            document.getElementById('addRoleForm').reset();
+        }
+
+        async function submitAddRole(event) {
+            event.preventDefault();
+            const name = document.getElementById('roleNameInput').value;
+            const code = document.getElementById('roleCodeInput').value.trim().toUpperCase();
+            const isActive = document.getElementById('roleActiveInput').checked;
+
+            const payload = {
+                name: name,
+                code: code,
+                is_active: isActive,
+                permissions: [] // New role starts with empty permissions
+            };
+
+            showToast('Creating custom role...');
+            try {
+                const res = await apiFetch('/roles/roles/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    showToast(`Role ${name} created successfully!`);
+                    closeAddRoleModal();
+                    loadRolesData();
+                } else {
+                    const err = await res.json();
+                    showToast('Failed to create role: ' + JSON.stringify(err), 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Error sending API request.', 'error');
+            }
+        }
+
+        // Add Permission Modal Handlers
+        function openAddPermissionModal() {
+            document.getElementById('addPermissionModal').style.display = 'flex';
+        }
+
+        function closeAddPermissionModal() {
+            document.getElementById('addPermissionModal').style.display = 'none';
+            document.getElementById('addPermissionForm').reset();
+        }
+
+        async function submitAddPermission(event) {
+            event.preventDefault();
+            const name = document.getElementById('permNameInput').value;
+            const codename = document.getElementById('permCodenameInput').value.trim().toLowerCase();
+            const module = document.getElementById('permModuleSelect').value;
+
+            const payload = {
+                name: name,
+                codename: codename,
+                module: module
+            };
+
+            showToast('Creating database permission...');
+            try {
+                const res = await apiFetch('/roles/permissions/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    showToast(`Permission created successfully!`);
+                    closeAddPermissionModal();
+                    loadRolesData();
+                } else {
+                    const err = await res.json();
+                    showToast('Failed to create permission: ' + JSON.stringify(err), 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Error sending API request.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

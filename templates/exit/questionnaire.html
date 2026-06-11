@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Exit Clearance Form</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .form-card {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px;
+            width: 650px;
+            max-width: 100%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .title {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .employee-info {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 10pt;
+        }
+        .section-title {
+            font-weight: bold;
+            color: #0056b3;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            border-left: 4px solid #0056b3;
+            padding-left: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 9.5pt;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: #ffffff;
+            color: #334155;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11pt;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 25px;
+        }
+        .btn-submit:hover {
+            background-color: #004085;
+        }
+        .error-message {
+            background-color: #fef2f2;
+            color: #ef4444;
+            border: 1px solid #fee2e2;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="form-card" id="formWrapper">
+        <div class="header">
+            <div class="title">Exit Clearance & Questionnaire</div>
+            <div style="font-size: 9.5pt; color: #64748b; margin-top: 5px;">MTLV Solutions Private Limited</div>
+        </div>
+
+        <div class="error-message" id="errorAlert"></div>
+
+        <!-- Pre-filled Employee Info -->
+        <div class="employee-info">
+            <div><strong>Employee Name:</strong> <span id="infoName">Loading...</span></div>
+            <div><strong>Employee ID:</strong> <span id="infoId">Loading...</span></div>
+            <div style="grid-column: span 2;"><strong>Last Working Day:</strong> <span id="infoLwd">Loading...</span></div>
+        </div>
+
+        <form id="questionnaireForm">
+            <!-- Asset Return Checklists -->
+            <div class="section-title">1. Company Assets Return</div>
+            
+            <div class="form-group">
+                <label><input type="checkbox" id="assetLaptop" style="width:auto;"> Laptop / Desktop Returned</label>
+                <input type="text" id="assetLaptopRemarks" placeholder="Serial number, accessories returned, notes...">
+            </div>
+            
+            <div class="form-group">
+                <label><input type="checkbox" id="assetId" style="width:auto;"> ID Card Returned</label>
+                <input type="text" id="assetIdRemarks" placeholder="Status of card...">
+            </div>
+            
+            <div class="form-group">
+                <label><input type="checkbox" id="assetAccess" style="width:auto;"> Access Card / Keys Returned</label>
+                <input type="text" id="assetAccessRemarks" placeholder="Keys or token status...">
+            </div>
+            
+            <div class="form-group">
+                <label>Other Assets Returned Details</label>
+                <textarea id="assetOthers" rows="2" placeholder="List any other company devices, chargers, monitors..."></textarea>
+            </div>
+
+            <!-- Knowledge Transfer -->
+            <div class="section-title">2. Knowledge Handover & Transfer</div>
+            <div class="form-group">
+                <label>Knowledge Transfer Status*</label>
+                <select id="ktStatus" required>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="NA">Not Applicable</option>
+                </select>
+            </div>
+            <div class="form-group" id="ktHandoverContainer">
+                <label>KT Handover Recipient Name*</label>
+                <input type="text" id="ktHandoverTo" placeholder="Name of employee receiving KT">
+            </div>
+            <div class="form-group">
+                <label>KT Handover Remarks / Files Locations</label>
+                <textarea id="ktRemarks" rows="2" placeholder="Shared drive links, repository URLs, tasks list..."></textarea>
+            </div>
+
+            <!-- Feedback survey -->
+            <div class="section-title">3. Exit Feedback Survey</div>
+            <div class="form-group">
+                <label>Reason for Leaving*</label>
+                <select id="reasonDropdown" required>
+                    <option value="Better Opportunity">Better Opportunity</option>
+                    <option value="Higher Studies">Higher Studies</option>
+                    <option value="Personal Reasons">Personal Reasons</option>
+                    <option value="Relocation">Relocation</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group" id="reasonDetailsContainer" style="display: none;">
+                <label>Details of Leaving Reason (Min 20 characters)*</label>
+                <textarea id="reasonDetails" rows="2" placeholder="Please elaborate..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Work Environment Rating (1 = Very Poor, 5 = Excellent)*</label>
+                <select id="ratingEnv" required>
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Neutral</option>
+                    <option value="2">2 - Poor</option>
+                    <option value="1">1 - Very Poor</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Management Rating (1 = Very Poor, 5 = Excellent)*</label>
+                <select id="ratingMgmt" required>
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Neutral</option>
+                    <option value="2">2 - Poor</option>
+                    <option value="1">1 - Very Poor</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Would you recommend this company?*</label>
+                <select id="recommend" required>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Maybe">Maybe</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Personal Email Address (for future communications)*</label>
+                <input type="email" id="personalEmail" required>
+            </div>
+            <div class="form-group">
+                <label>Personal Phone Number</label>
+                <input type="text" id="personalPhone">
+            </div>
+            <div class="form-group">
+                <label>Any Feedback / Suggestions for Improvement</label>
+                <textarea id="feedback" rows="3" placeholder="Enter comments..."></textarea>
+            </div>
+
+            <!-- Declaration -->
+            <div class="form-group">
+                <label><input type="checkbox" id="declaration" style="width:auto;" required> I confirm all the information provided above is accurate.*</label>
+            </div>
+
+            <button type="submit" class="btn-submit">Submit Exit Clearance</button>
+        </form>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!token) {
+                showError('Error: Access token is missing. Please contact HR.');
+                return;
+            }
+
+            // Validate token and fetch employee details
+            try {
+                const res = await fetch(`/api/exit/public-questionnaire/?token=${token}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('infoName').textContent = data.employee_name;
+                    document.getElementById('infoId').textContent = data.employee_id;
+                    document.getElementById('infoLwd').textContent = data.last_working_day;
+                } else {
+                    const err = await res.json();
+                    showError(err.error || 'This link has expired or is invalid.');
+                }
+            } catch (e) {
+                showError('Server is currently unreachable.');
+            }
+        });
+
+        // Toggle LWD details based on Other
+        document.getElementById('reasonDropdown').addEventListener('change', (e) => {
+            document.getElementById('reasonDetailsContainer').style.display = e.target.value === 'Other' ? 'block' : 'none';
+        });
+
+        // Form submit
+        document.getElementById('questionnaireForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                token: token,
+                asset_laptop_returned: document.getElementById('assetLaptop').checked,
+                asset_laptop_remarks: document.getElementById('assetLaptopRemarks').value,
+                asset_id_returned: document.getElementById('assetId').checked,
+                asset_id_remarks: document.getElementById('assetIdRemarks').value,
+                asset_access_card_returned: document.getElementById('assetAccess').checked,
+                asset_access_card_remarks: document.getElementById('assetAccessRemarks').value,
+                asset_others_details: document.getElementById('assetOthers').value,
+                kt_status: document.getElementById('ktStatus').value,
+                kt_handover_to: document.getElementById('ktHandoverTo').value,
+                kt_remarks: document.getElementById('ktRemarks').value,
+                reason_dropdown: document.getElementById('reasonDropdown').value,
+                reason_details: document.getElementById('reasonDetails').value,
+                rating_env: document.getElementById('ratingEnv').value,
+                rating_mgmt: document.getElementById('ratingMgmt').value,
+                recommend: document.getElementById('recommend').value,
+                personal_email: document.getElementById('personalEmail').value,
+                personal_phone: document.getElementById('personalPhone').value,
+                feedback: document.getElementById('feedback').value
+            };
+
+            try {
+                const res = await fetch('/api/exit/public-questionnaire/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    document.getElementById('formWrapper').innerHTML = `
+                        <div class="header">
+                            <div class="title" style="color: #22c55e;">Form Submitted Successfully</div>
+                        </div>
+                        <p style="text-align:center; font-size:11pt; line-height:1.6;">Thank you for completing your offboarding clearance form. The HR department has been notified, and your relieving certificates will be issued shortly.</p>
+                    `;
+                } else {
+                    const err = await res.json();
+                    alert('Validation error: ' + JSON.stringify(err));
+                }
+            } catch (ex) {
+                alert('Failed to submit form.');
+            }
+        });
+
+        function showError(msg) {
+            document.getElementById('errorAlert').textContent = msg;
+            document.getElementById('errorAlert').style.display = 'block';
+            document.getElementById('questionnaireForm').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Service Agreement Bond</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9pt;
+                color: #555;
+            }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .company-name {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 10pt;
+            color: #555;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .salutation {
+            margin-bottom: 15px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 5px;
+            color: #0056b3;
+        }
+        .signature-section {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+        }
+        .signatures-row {
+            display: table;
+            width: 100%;
+            margin-top: 50px;
+        }
+        .signature-col {
+            display: table-cell;
+            width: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    </div>
+    
+    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
+    
+    <div class="subject">SERVICE BOND AGREEMENT</div>
+    
+    <div class="content">
+        <p>This Service Bond Agreement is entered into on this day, <strong>{{ today|date:"F d, Y" }}</strong>, by and between <strong>{{ company_name }}</strong> (hereinafter referred to as the "Company") and <strong>{{ employee.first_name }} {{ employee.last_name }}</strong> (hereinafter referred to as the "Employee"), residing at {{ employee.address_line1 }}, {{ employee.city }}, {{ employee.get_state_display }}.</p>
+        
+        <p>WHEREAS, the Employee has been appointed as <strong>{{ employee.designation }}</strong> under the employee ID <strong>{{ employee.emp_id }}</strong>, starting on <strong>{{ employee.joining_date|date:"F d, Y" }}</strong>.</p>
+        
+        <div class="section-title">1. Service Period Bond</div>
+        <p>In consideration of the specialized training, orientation, and resources provided by the Company to the Employee, the Employee hereby covenants and agrees that they shall serve the Company faithfully and diligently for a minimum period of <strong>{{ bond_period }} months</strong> starting from the Joining Date.</p>
+        
+        <div class="section-title">2. Consequences of Early Termination</div>
+        <p>In the event that the Employee resigns, absconds, or terminates their employment prior to the completion of the service bond period of {{ bond_period }} months, the Employee agrees to compensate the Company for liquidated damages, training expenses, and administrative costs incurred during onboarding.</p>
+        
+        <div class="section-title">3. Notice Period and Settlement</div>
+        <p>The service bond does not waive the notice period requirements. If early termination is approved under specific waivers, all dues and settlements will be calculated in accordance with the Company’s HR policies.</p>
+        
+        <p>Both parties have read and understood the terms of this Service Bond Agreement and sign as a token of absolute consent.</p>
+    </div>
+    
+    <div class="signatures-row">
+        <div class="signature-col">
+            <p>For <strong>{{ company_name }}</strong>,</p>
+            <div class="signature-line">Authorized Signatory</div>
+        </div>
+        <div class="signature-col">
+            <p>For the <strong>Employee</strong>,</p>
+            <div class="signature-line">Signature of Employee</div>
+        </div>
+    </div>
+</body>
+</html>

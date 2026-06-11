@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Experience Certificate</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .company-name {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 10pt;
+            color: #555;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .signature-section {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    </div>
+    
+    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
+    
+    <div class="subject">TO WHOMSOEVER IT MAY CONCERN</div>
+    
+    <div class="content">
+        <p>This is to certify that <strong>{{ employee.first_name }} {{ employee.last_name }}</strong> was employed with <strong>{{ company_name }}</strong> as a <strong>{{ employee.designation }}</strong> in the <strong>{{ employee.department.name }}</strong> department.</p>
+        
+        <p>The tenure of employment was from <strong>{{ employee.joining_date|date:"F d, Y" }}</strong> to <strong>{{ exit_request.last_working_day|date:"F d, Y" }}</strong>, covering a total service period of approximately <strong>{{ tenure_years }} years</strong>.</p>
+        
+        <p>During the period of association, we found the employee to be dedicated, hard-working, and professional in all duties. They exhibited strong technical skills and worked productively as a team member.</p>
+        
+        <p>We wish them success in all future professional endeavors.</p>
+    </div>
+    
+    <div class="signature-section">
+        <p>For <strong>{{ company_name }}</strong>,</p>
+        <div class="signature-line">Authorized Signatory</div>
+    </div>
+</body>
+</html>

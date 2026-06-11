@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Notice Period Letter</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .company-name {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 10pt;
+            color: #555;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 25px;
+        }
+        .salutation {
+            margin-bottom: 15px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .signature-section {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    </div>
+    
+    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
+    
+    <div class="salutation">Dear {{ employee.first_name }} {{ employee.last_name }},</div>
+    
+    <div class="subject">Subject: Acknowledgment of Resignation and Notice Period</div>
+    
+    <div class="content">
+        <p>We acknowledge receipt of your resignation letter dated <strong>{{ exit_request.resignation_date|date:"F d, Y" }}</strong>, in which you expressed your intention to resign from your position as <strong>{{ employee.designation }}</strong>.</p>
+        
+        <p>As per the terms of your employment contract, you are required to serve a notice period of <strong>{{ employee.notice_period_days }} days</strong>. Accordingly, your last working day with the company is scheduled to be <strong>{{ exit_request.last_working_day|date:"F d, Y" }}</strong>.</p>
+        
+        <p>During this notice period, you are expected to perform your normal duties diligently and ensure a smooth and complete knowledge transfer (KT) to the team members designated by your manager.</p>
+        
+        <p>Please return all company assets (including laptop, access cards, and keys) on or before your last working day. Once the exit clearance processes are completed, your relieving certificate and full and final settlement statement will be issued.</p>
+        
+        <p>We thank you for your services to the company and wish you the best.</p>
+    </div>
+    
+    <div class="signature-section">
+        <p>For <strong>{{ company_name }}</strong>,</p>
+        <div class="signature-line">Authorized Signatory</div>
+    </div>
+</body>
+</html>

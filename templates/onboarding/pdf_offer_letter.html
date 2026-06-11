@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Offer Letter</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9pt;
+                color: #555;
+            }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .company-name {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 10pt;
+            color: #555;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 25px;
+        }
+        .salutation {
+            margin-bottom: 15px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .details-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        .details-table td.label {
+            font-weight: bold;
+            background-color: #f9f9f9;
+            width: 30%;
+        }
+        .signature-section {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    </div>
+    
+    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
+    
+    <div class="salutation">Dear {{ employee.first_name }} {{ employee.last_name }},</div>
+    
+    <div class="subject">Subject: Offer of Employment</div>
+    
+    <div class="content">
+        <p>With reference to your application and subsequent interview, we are pleased to offer you the position of <strong>{{ employee.designation }}</strong> in the <strong>{{ employee.department.name }}</strong> department at <strong>{{ company_name }}</strong>.</p>
+        
+        <p>Your employment details are outlined below:</p>
+        
+        <table class="details-table">
+            <tr>
+                <td class="label">Employee ID</td>
+                <td>{{ employee.emp_id }}</td>
+            </tr>
+            <tr>
+                <td class="label">Designation</td>
+                <td>{{ employee.designation }}</td>
+            </tr>
+            <tr>
+                <td class="label">Department</td>
+                <td>{{ employee.department.name }}</td>
+            </tr>
+            <tr>
+                <td class="label">Employment Type</td>
+                <td>{{ employee.get_employment_type_display }}</td>
+            </tr>
+            <tr>
+                <td class="label">Joining Date</td>
+                <td>{{ employee.joining_date|date:"F d, Y" }}</td>
+            </tr>
+            <tr>
+                <td class="label">Notice Period</td>
+                <td>{{ employee.notice_period_days }} Days</td>
+            </tr>
+            {% if employee.bond_period_months > 0 %}
+            <tr>
+                <td class="label">Service Bond</td>
+                <td>{{ employee.bond_period_months }} Months</td>
+            </tr>
+            {% endif %}
+        </table>
+        
+        <p>This offer is subject to the verification of your references and background checks, as well as the submission of required onboarding documents (Aadhaar, PAN, certificates).</p>
+        
+        <p>Please sign and return the duplicate copy of this letter as a token of your acceptance of this offer.</p>
+    </div>
+    
+    <div class="signature-section">
+        <p>For <strong>{{ company_name }}</strong>,</p>
+        <div class="signature-line">Authorized Signatory</div>
+    </div>
+</body>
+</html>
