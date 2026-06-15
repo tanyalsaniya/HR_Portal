@@ -1,0 +1,205 @@
+<!-- VIEW 3: SALARIES, PAYSLIPS & INCREMENTS -->
+<div id="salaryView" class="view-panel">
+    <div class="flex-row-header">
+        <h2>Salary Structure & Payroll</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="bulkSlipsBtn" onclick="openBulkSlipModal()">Bulk Generate Slips</button>
+            <button class="btn btn-primary" id="setupSalaryBtn" onclick="openSalaryStructureModal()">Setup Structure</button>
+        </div>
+    </div>
+
+    <h3>Salary Structure List</h3>
+    <div class="table-responsive" style="margin-bottom: 30px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Basic Salary</th>
+                    <th>HRA</th>
+                    <th>Gross Salary</th>
+                    <th>Total Deductions</th>
+                    <th>Net Salary</th>
+                    <th>Effective From</th>
+                </tr>
+            </thead>
+            <tbody id="salaryStructureTableBody">
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <h3 id="adminIncrementsHeader" style="display: none;">Upcoming Anniversaries & Raises (Admin Only)</h3>
+    <div class="table-responsive" id="adminIncrementsTableContainer" style="display: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Anniversary Date</th>
+                    <th>Cycle Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="salaryIncrementsReminderBody">
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL 5: DEFINE SALARY STRUCTURE -->
+<div class="modal" id="salaryStructureModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Define Salary Structure</h3>
+            <button onclick="closeSalaryStructureModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="salaryStructureForm">
+            <div>
+                <label>Employee*</label>
+                <select id="structEmployeeSelect" required></select>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Effective From Date*</label>
+                <input type="date" id="structEffectiveFrom" required>
+            </div>
+            <div class="form-grid" style="margin-top: 10px;">
+                <div>
+                    <label>Basic Salary (Monthly)*</label>
+                    <input type="number" id="structBasic" required>
+                </div>
+                <div>
+                    <label>HRA Allowance (Monthly)*</label>
+                    <input type="number" id="structHra" required>
+                </div>
+                <div>
+                    <label>Conveyance Allowance</label>
+                    <input type="number" id="structConveyance" value="0">
+                </div>
+                <div>
+                    <label>Medical Allowance</label>
+                    <input type="number" id="structMedical" value="0">
+                </div>
+                <div>
+                    <label>Special Allowance</label>
+                    <input type="number" id="structSpecial" value="0">
+                </div>
+                <div>
+                    <label>Monthly Bonus</label>
+                    <input type="number" id="structBonus" value="0">
+                </div>
+                <div>
+                    <label>Provident Fund (PF)</label>
+                    <input type="number" id="structPf" value="0">
+                </div>
+                <div>
+                    <label>TDS Tax Deduction</label>
+                    <input type="number" id="structTds" value="0">
+                </div>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Save Structure</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 6: APPROVE INCREMENT (Admin Only) -->
+<div class="modal" id="approveIncrementModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Approve Salary Revision Raise</h3>
+            <button onclick="closeApproveIncrementModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="approveIncrementForm">
+            <input type="hidden" id="incReminderId">
+            <input type="hidden" id="incEmployeeId">
+            <div>
+                <label>Employee Name</label>
+                <input type="text" id="incEmployeeName" disabled>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Current Net Salary</label>
+                <input type="text" id="incCurrentNet" disabled>
+            </div>
+            <div class="form-grid" style="margin-top: 10px;">
+                <div>
+                    <label>New Basic Salary*</label>
+                    <input type="number" id="incNewBasic" required>
+                </div>
+                <div>
+                    <label>New HRA*</label>
+                    <input type="number" id="incNewHra" required>
+                </div>
+                <div class="form-group-full">
+                    <label>New Special Allowances*</label>
+                    <input type="number" id="incNewAllowances" required>
+                </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Effective Date*</label>
+                <input type="date" id="incEffectiveDate" required>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Increment Reason (Min 20 chars)*</label>
+                <textarea id="incReasonText" rows="3" placeholder="Enter justification for the salary letter..." required></textarea>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Approve Raise</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 7: BULK PAYSLIPS -->
+<div class="modal" id="bulkSlipModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Bulk Generate Salary Slips</h3>
+            <button onclick="closeBulkSlipModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="bulkSlipForm">
+            <div class="form-grid">
+                <div>
+                    <label>Month*</label>
+                    <select id="bulkSlipMonth" required>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Year*</label>
+                    <input type="number" id="bulkSlipYear" value="2026" required>
+                </div>
+                <div>
+                    <label>Working Days in Month*</label>
+                    <input type="number" id="bulkSlipWorkingDays" value="30" required>
+                </div>
+                <div>
+                    <label>Payment Date*</label>
+                    <input type="date" id="bulkSlipPaymentDate" required>
+                </div>
+                <div class="form-group-full">
+                    <label>Payment Mode</label>
+                    <select id="bulkSlipPaymentMode">
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="CHEQUE">Cheque</option>
+                        <option value="CASH">Cash</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Generate Bulk Slips</button>
+            </div>
+        </form>
+    </div>
+</div>

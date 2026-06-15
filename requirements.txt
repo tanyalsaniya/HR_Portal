@@ -10,6 +10,7 @@ python-dotenv==1.0.1
 
 # PDF Generation
 WeasyPrint==61.2
+pydyf<0.11.0
 
 # Excel/CSV Import & Export
 django-import-export==3.3.9
@@ -27,6 +28,7 @@ djangorestframework-simplejwt==5.3.1
 # Background tasks (optional – for future scalability)
 celery==5.3.6
 redis==5.0.1
+requests==2.34.2
 
 # Image & file handling (for document uploads)
 Pillow

@@ -55,3 +55,33 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     def save(self):
         self.user.set_password(self.validated_data['new_password'])
         self.user.save()
+
+
+class UserAccountSerializer(serializers.ModelSerializer):
+    role_name = serializers.CharField(source='role.name', read_only=True)
+    role_code = serializers.CharField(source='role.code', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'phone', 'role', 'role_name', 'role_code', 'is_active']
+        read_only_fields = ['id', 'username', 'email']
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    role_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    auto_generate_password = serializers.BooleanField(write_only=True, default=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'phone', 'role_id', 'password', 'auto_generate_password']
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value

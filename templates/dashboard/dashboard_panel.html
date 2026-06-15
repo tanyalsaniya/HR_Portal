@@ -1,0 +1,45 @@
+<!-- VIEW 1: DASHBOARD -->
+<div id="dashboardView" class="view-panel" style="display: block;">
+    <div class="dashboard-grid">
+        <div class="widget-card">
+            <div style="font-size: 9pt; color: #777;">Total Employees</div>
+            <div class="widget-value" id="statTotalEmployees">0</div>
+        </div>
+        <div class="widget-card">
+            <div style="font-size: 9pt; color: #777;">Active Employees</div>
+            <div class="widget-value" id="statActiveEmployees">0</div>
+        </div>
+        <div class="widget-card">
+            <div style="font-size: 9pt; color: #777;">Pending Exits</div>
+            <div class="widget-value" id="statPendingExits">0</div>
+        </div>
+        <div class="widget-card">
+            <div style="font-size: 9pt; color: #777;">Active Students</div>
+            <div class="widget-value" id="statActiveStudents">0</div>
+        </div>
+        <div class="widget-card" id="adminWidgetIncrements" style="display: none;">
+            <div style="font-size: 9pt; color: #777;">Pending Salary Increments</div>
+            <div class="widget-value" id="statAnniversaries">0</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 40px;">
+        <h3>Recent Operational Logs</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Model Name</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody id="dashboardRecentLogsBody">
+                <tr>
+                    <td colspan="5" style="text-align: center;">No logs visible. Log in as Admin to see details.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

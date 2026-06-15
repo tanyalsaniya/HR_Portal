@@ -56,6 +56,20 @@
             margin-bottom: 5px;
             color: #0056b3;
         }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .details-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        .details-table td.label {
+            font-weight: bold;
+            background-color: #f9f9f9;
+            width: 30%;
+        }
         .signature-section {
             margin-top: 50px;
             page-break-inside: avoid;
@@ -94,12 +108,90 @@
         <div class="section-title">4. Code of Conduct & Confidentiality</div>
         <p>You agree to adhere to all policies, rules, and guidelines set by the company. You must maintain the highest standards of integrity, professional conduct, and confidentiality regarding all business secrets and client information.</p>
         
+        {% if salary %}
+        <div style="page-break-before: always;"></div>
+        <div class="header">
+            <div class="company-name">{{ company_name }}</div>
+            <div class="company-sub">HR Division • Annexure A: CTC Salary Structure</div>
+        </div>
+        <p>Salary Structure details for <strong>{{ employee.first_name }} {{ employee.last_name }}</strong>:</p>
+        <table class="details-table">
+            <thead>
+                <tr style="background-color: #0056b3; color: white; font-weight: bold;">
+                    <td>Earnings Component</td>
+                    <td>Monthly (Rs.)</td>
+                    <td>Deductions Component</td>
+                    <td>Monthly (Rs.)</td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="label">Basic Salary</td>
+                    <td>{{ basic }}</td>
+                    <td class="label">Provident Fund (PF)</td>
+                    <td>{{ pf }}</td>
+                </tr>
+                <tr>
+                    <td class="label">House Rent Allowance (HRA)</td>
+                    <td>{{ hra }}</td>
+                    <td class="label">Professional Tax (PT)</td>
+                    <td>{{ professional_tax }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Conveyance Allowance</td>
+                    <td>{{ conveyance }}</td>
+                    <td class="label">TDS (Income Tax)</td>
+                    <td>{{ tds }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Medical Allowance</td>
+                    <td>{{ medical }}</td>
+                    <td class="label">Other Deductions</td>
+                    <td>
+                        {% for ded in other_deductions %}
+                            {{ ded.label }}: {{ ded.amount }}<br>
+                        {% empty %}
+                            0.00
+                        {% endfor %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Special Allowance</td>
+                    <td>{{ special }}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                {% if monthly_bonus > 0 %}
+                <tr>
+                    <td class="label">Monthly Bonus</td>
+                    <td>{{ monthly_bonus }}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                {% endif %}
+                <tr style="font-weight: bold; background-color: #f9f9f9;">
+                    <td>Gross Salary (A)</td>
+                    <td>{{ gross_salary }}</td>
+                    <td>Total Deductions (B)</td>
+                    <td>{{ total_deductions }}</td>
+                </tr>
+                <tr style="font-weight: bold; background-color: #e6f2ff; color: #0056b3;">
+                    <td colspan="2">Net Take-Home Salary (A - B)</td>
+                    <td colspan="2">Rs. {{ net_salary }} / month</td>
+                </tr>
+            </tbody>
+        </table>
+        {% endif %}
+        
         <p>Please sign and return the duplicate copy of this letter as confirmation of your agreement to these terms.</p>
     </div>
     
     <div class="signature-section">
         <p>For <strong>{{ company_name }}</strong>,</p>
-        <div class="signature-line">Authorized Signatory</div>
+        <div class="signature-line">
+            <strong>{{ signatory_name }}</strong><br>
+            {{ signatory_designation }}
+        </div>
     </div>
 </body>
 </html>

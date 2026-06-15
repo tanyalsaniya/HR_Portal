@@ -111,3 +111,33 @@ class DashboardAPIView(APIView):
             data['recent_logs'] = serializer.data
 
         return Response(data)
+
+from django.shortcuts import render
+
+def hybrid_view(view_class_or_func, actions=None, template_name='base/layout.html'):
+    """
+    Returns an API response if the request is an AJAX/JSON request (Accept: application/json or XHR header),
+    otherwise renders the base layout template for the browser.
+    """
+    if hasattr(view_class_or_func, 'as_view'):
+        if actions:
+            api_view_func = view_class_or_func.as_view(actions)
+        else:
+            api_view_func = view_class_or_func.as_view()
+    else:
+        api_view_func = view_class_or_func
+
+    def wrapper(request, *args, **kwargs):
+        is_json = (
+            'application/json' in request.META.get('HTTP_ACCEPT', '') or
+            request.headers.get('x-requested-with') == 'XMLHttpRequest' or
+            request.GET.get('format') == 'json'
+        )
+        if is_json:
+            response = api_view_func(request, *args, **kwargs)
+            if hasattr(response, 'render'):
+                response.render()
+            return response
+        else:
+            return render(request, template_name)
+    return wrapper
