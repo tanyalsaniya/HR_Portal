@@ -3,7 +3,7 @@ Django==4.2.11
 djangorestframework==3.15.1
 
 # Database - PostgreSQL adapter
-psycopg2-binary==2.9.9
+psycopg2-binary
 
 # Environment variables management
 python-dotenv==1.0.1
@@ -29,7 +29,7 @@ celery==5.3.6
 redis==5.0.1
 
 # Image & file handling (for document uploads)
-Pillow==10.2.0
+Pillow
 
 # Logging and debugging (optional but useful)
 django-debug-toolbar==4.3.0
