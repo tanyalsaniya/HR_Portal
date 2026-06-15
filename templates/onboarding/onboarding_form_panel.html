@@ -1,0 +1,116 @@
+<!-- VIEW 2b: ONBOARD NEW EMPLOYEE (FORM PAGE) -->
+<div id="onboardingFormView" class="view-panel" style="display: none;">
+    <div class="flex-row-header">
+        <h2>Onboard New Employee</h2>
+        <button class="btn" style="background-color: var(--border-color); color: var(--text-color);" onclick="switchView('onboardingView')">Back to Directory</button>
+    </div>
+    <div class="card" style="background-color: var(--card-bg); border-radius: 8px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-top: 20px;">
+        <form id="onboardForm">
+            <div class="form-grid">
+                <div>
+                    <label>First Name*</label>
+                    <input type="text" id="empFirstName" required>
+                </div>
+                <div>
+                    <label>Last Name*</label>
+                    <input type="text" id="empLastName" required>
+                </div>
+                <div>
+                    <label>Email Address*</label>
+                    <input type="email" id="empEmail" required>
+                </div>
+                <div>
+                    <label>Phone Number*</label>
+                    <input type="text" id="empPhone" placeholder="10-digit Indian mobile" required>
+                </div>
+                <div>
+                    <label>Date of Birth*</label>
+                    <input type="date" id="empDob" required>
+                </div>
+                <div>
+                    <label>Gender*</label>
+                    <select id="empGender" required>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                <div class="form-group-full">
+                    <label>Address Line 1*</label>
+                    <input type="text" id="empAddr1" required>
+                </div>
+                <div>
+                    <label>City*</label>
+                    <input type="text" id="empCity" required>
+                </div>
+                <div>
+                    <label>State*</label>
+                    <select id="empState" required></select>
+                </div>
+                <div>
+                    <label>PIN Code*</label>
+                    <input type="text" id="empPin" required>
+                </div>
+                <div>
+                    <label>Department*</label>
+                    <select id="empDept" required></select>
+                </div>
+                <div>
+                    <label>Designation*</label>
+                    <input type="text" id="empDesignation" required>
+                </div>
+                <div>
+                    <label>Employment Type*</label>
+                    <select id="empType" required>
+                        <option value="FULL_TIME">Full-time</option>
+                        <option value="PART_TIME">Part-time</option>
+                        <option value="CONTRACT">Contract</option>
+                        <option value="INTERN">Intern</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Joining Date*</label>
+                    <input type="date" id="empJoining" required>
+                </div>
+                <div>
+                    <label>Notice Period (Days)*</label>
+                    <input type="number" id="empNotice" value="30" required>
+                </div>
+                <div>
+                    <label>Bond Period (Months)</label>
+                    <input type="number" id="empBond" value="0">
+                </div>
+                <div>
+                    <label>Aadhaar Number (12 digit)</label>
+                    <input type="text" id="empAadhaar" placeholder="12-digit numeric">
+                </div>
+                <div>
+                    <label>PAN Number (10 character)</label>
+                    <input type="text" id="empPan" placeholder="ABCDE1234F">
+                </div>
+                <div>
+                    <label>Emergency Contact Name*</label>
+                    <input type="text" id="empEmergencyName" required>
+                </div>
+                <div>
+                    <label>Emergency Relationship*</label>
+                    <select id="empEmergencyRel" required>
+                        <option value="PARENT">Parent</option>
+                        <option value="SPOUSE">Spouse</option>
+                        <option value="SIBLING">Sibling</option>
+                        <option value="FRIEND">Friend</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Emergency Phone*</label>
+                    <input type="text" id="empEmergencyPhone" required>
+                </div>
+            </div>
+            <div style="margin-top: 25px; text-align: right;">
+                <button type="button" class="btn" style="margin-right: 10px; background-color: var(--border-color); color: var(--text-color);" onclick="switchView('onboardingView')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+            </div>
+        </form>
+    </div>
+</div>

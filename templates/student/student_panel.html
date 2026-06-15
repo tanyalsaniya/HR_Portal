@@ -1,0 +1,142 @@
+<!-- VIEW 5: STUDENTS & INTERNS -->
+<div id="studentView" class="view-panel">
+    <div class="flex-row-header">
+        <h2>Student & Intern Directory</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="exportStudentBtn" onclick="window.location.href='/api/student/students/export-excel/'">Export to Excel</button>
+            <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()">+ Register Student</button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Cert No</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Type</th>
+                    <th>Joining Date</th>
+                    <th>Completion Date</th>
+                    <th>Total Fees</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="studentTableBody">
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL 3: ADD STUDENT / INTERN -->
+<div class="modal" id="studentModal">
+    <div class="modal-content" style="width: 600px;">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Register Student / Intern</h3>
+            <button onclick="closeStudentModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="studentForm">
+            <div class="form-grid">
+                <div>
+                    <label>Student Name*</label>
+                    <input type="text" id="studName" required>
+                </div>
+                <div>
+                    <label>Email Address*</label>
+                    <input type="email" id="studEmail" required>
+                </div>
+                <div>
+                    <label>Phone Number</label>
+                    <input type="text" id="studPhone">
+                </div>
+                <div>
+                    <label>Institute Name*</label>
+                    <input type="text" id="studInstitute" required>
+                </div>
+                <div>
+                    <label>Course Name*</label>
+                    <input type="text" id="studCourse" placeholder="e.g. B.Tech CSE" required>
+                </div>
+                <div>
+                    <label>Student Type*</label>
+                    <select id="studType" required>
+                        <option value="INTERN">Intern</option>
+                        <option value="TRAINEE">Trainee</option>
+                        <option value="PROJECT_STUDENT">Project Student</option>
+                        <option value="INDUSTRIAL_VISIT">Industrial Visit</option>
+                    </select>
+                </div>
+                <div class="form-group-full">
+                    <label>Program Name*</label>
+                    <input type="text" id="studProgram" placeholder="e.g. Summer Internship 2025" required>
+                </div>
+                <div>
+                    <label>Department (MTLV)*</label>
+                    <select id="studDept" required></select>
+                </div>
+                <div>
+                    <label>Mentor Name</label>
+                    <input type="text" id="studMentor">
+                </div>
+                <div>
+                    <label>Joining Date*</label>
+                    <input type="date" id="studJoining" required>
+                </div>
+                <div>
+                    <label>Completion Date*</label>
+                    <input type="date" id="studCompletion" required>
+                </div>
+                <div>
+                    <label>Certificate Type*</label>
+                    <select id="studCertType" required>
+                        <option value="INTERNSHIP_CERT">Internship Certificate</option>
+                        <option value="TRAINING_CERT">Training Completion Certificate</option>
+                        <option value="PROJECT_CERT">Project Completion Certificate</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Total Program Fees (Rs.)*</label>
+                    <input type="number" id="studFees" value="0" required>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <label><strong>Fee Installment Schedule</strong></label>
+                <div id="installmentsWrapper" style="margin-top: 10px;">
+                    <!-- dynamic installment lines -->
+                </div>
+                <button type="button" class="btn" style="margin-top: 5px; font-size: 9pt;" onclick="addInstallmentRow()">+ Add Installment Line</button>
+            </div>
+
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Register Student</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 4: RECORD INSTALLMENT PAYMENT -->
+<div class="modal" id="recordPaymentModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Record Installment Payment</h3>
+            <button onclick="closeRecordPaymentModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="recordPaymentForm">
+            <input type="hidden" id="paymentInstallmentId">
+            <div>
+                <label>Amount Paid (Rs.)*</label>
+                <input type="number" id="paymentAmountPaid" required>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Remarks</label>
+                <textarea id="paymentRemarks" rows="2" placeholder="Receipt number, check number, notes..."></textarea>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Record</button>
+            </div>
+        </form>
+    </div>
+</div>

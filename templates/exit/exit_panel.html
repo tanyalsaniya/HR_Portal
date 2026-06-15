@@ -1,0 +1,74 @@
+<!-- VIEW 4: EXIT TRACKER -->
+<div id="exitView" class="view-panel">
+    <div class="flex-row-header">
+        <h2>Exit Clearances</h2>
+        <button class="btn btn-primary" id="addExitBtn" onclick="openInitiateExitModal()">Initiate Exit</button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Employee Name</th>
+                    <th>Resignation Date</th>
+                    <th>Last Working Day</th>
+                    <th>Status</th>
+                    <th>Action Links</th>
+                </tr>
+            </thead>
+            <tbody id="exitTableBody">
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL 2: INITIATE EXIT -->
+<div class="modal" id="initiateExitModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Initiate Exit Clearance</h3>
+            <button onclick="closeExitModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="exitForm">
+            <div>
+                <label>Employee*</label>
+                <select id="exitEmployeeSelect" required></select>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Resignation Date*</label>
+                <input type="date" id="exitResignationDate" required>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Exit Type*</label>
+                <select id="exitTypeSelect" required>
+                    <option value="RESIGNATION">Resignation</option>
+                    <option value="TERMINATION">Termination</option>
+                    <option value="RETIREMENT">Retirement</option>
+                    <option value="CONTRACT_END">Contract End</option>
+                    <option value="ABSCONDING">Absconding</option>
+                </select>
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Notice Period Waiver</label>
+                <input type="checkbox" id="exitWaiverCheckbox" style="width: auto;"> Waive notice period schedule
+            </div>
+            <div style="margin-top: 10px; display: none;" id="exitLwdContainer">
+                <label>Custom Last Working Day*</label>
+                <input type="date" id="exitLwdDate">
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Notice Period Letter Required</label>
+                <input type="checkbox" id="exitNoticeLetterCheckbox" style="width: auto;"> Auto-generate Notice Letter
+            </div>
+            <div style="margin-top: 10px;">
+                <label>Exit Reason (HR notes)*</label>
+                <textarea id="exitReasonText" rows="3" placeholder="Min 20 characters..." required></textarea>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Initiate</button>
+            </div>
+        </form>
+    </div>
+</div>

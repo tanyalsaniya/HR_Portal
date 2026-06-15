@@ -44,13 +44,16 @@ MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 MAX_PROFILE_PHOTO_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
 
 VALID_DOC_TYPES = (
-    ('RESUME', 'Resume'),
-    ('AADHAAR', 'Aadhaar'),
-    ('PAN', 'PAN'),
-    ('OFFER_LETTER', 'Offer Letter'),
-    ('APPOINTMENT_LETTER', 'Appointment Letter'),
-    ('BOND_LETTER', 'Bond Letter'),
-    ('OTHER', 'Other'),
+    ('RESUME', 'Resume / CV'),
+    ('AADHAAR', 'Aadhaar Card (scan/photo)'),
+    ('PAN', 'PAN Card (scan/photo)'),
+    ('OFFER_LETTER', 'Offer Letter (signed copy)'),
+    ('APPOINTMENT_LETTER', 'Appointment Letter (signed copy)'),
+    ('BOND_LETTER', 'Bond / Service Agreement (signed copy)'),
+    ('EDU_CERT', 'Educational Certificates'),
+    ('EXP_LETTER', 'Previous Experience Letter'),
+    ('BANK_DETAILS', 'Bank Account Details / Cancelled Cheque'),
+    ('OTHER', 'Other (custom label)'),
 )
 
 # ---------- EXIT PROCESS RULES ----------

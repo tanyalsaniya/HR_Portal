@@ -53,6 +53,15 @@ class Employee(models.Model):
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Active')
     is_deleted = models.BooleanField(default=False)
+    onboarding_complete = models.BooleanField(default=False, db_index=True)
+    bitrix_sync_status = models.CharField(
+        max_length=20,
+        choices=(('Synced', 'Synced'), ('Pending', 'Pending'), ('Failed', 'Failed')),
+        default='Pending'
+    )
+    bitrix_contact_id = models.CharField(max_length=100, blank=True, null=True)
+    bitrix_sync_error = models.TextField(blank=True, null=True)
+
     rejoined_from = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='tenures')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -64,17 +73,39 @@ class Employee(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.emp_id:
-            self.emp_id = generate_employee_id()
+            # Generate employee ID using the joining year instead of today's year
+            from django.apps import apps
+            year = self.joining_date.year if self.joining_date else datetime.date.today().year
+            prefix = f"EMP-{year}-"
+            Employee = apps.get_model('employee_onboarding', 'Employee')
+            last_emp = Employee.objects.filter(emp_id__startswith=prefix).order_by('-emp_id').first()
+            if last_emp:
+                try:
+                    last_sequence = int(last_emp.emp_id.split('-')[-1])
+                    new_sequence = last_sequence + 1
+                except (ValueError, IndexError):
+                    new_sequence = 1
+            else:
+                new_sequence = 1
+            self.emp_id = f"{prefix}{new_sequence:04d}"
         super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.emp_id})"
 
+def upload_to_uuid_filename(instance, filename):
+    import uuid
+    import os
+    ext = os.path.splitext(filename)[1].lower()
+    uuid_filename = f"{uuid.uuid4()}{ext}"
+    return f"employees/{instance.employee.emp_id}/docs/{uuid_filename}"
+
 class EmployeeDocument(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='documents')
     doc_type = models.CharField(max_length=30, choices=VALID_DOC_TYPES)
     label = models.CharField(max_length=100, blank=True, null=True)
-    file = models.FileField(upload_to='employees/documents/')
+    file = models.FileField(upload_to=upload_to_uuid_filename)
+    original_filename = models.CharField(max_length=255, blank=True, null=True)
     upload_date = models.DateTimeField(auto_now_add=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -83,5 +114,28 @@ class EmployeeDocument(models.Model):
         related_name='uploaded_documents'
     )
 
+    def save(self, *args, **kwargs):
+        if not self.original_filename and self.file:
+            import os
+            self.original_filename = os.path.basename(self.file.name)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.employee.emp_id} - {self.get_doc_type_display()}"
+
+
+class LetterTemplate(models.Model):
+    TEMPLATE_CHOICES = (
+        ('OFFER_LETTER', 'Offer Letter'),
+        ('APPOINTMENT_LETTER', 'Appointment Letter'),
+        ('BOND_LETTER', 'Bond Letter'),
+    )
+    name = models.CharField(max_length=30, choices=TEMPLATE_CHOICES, unique=True)
+    title = models.CharField(max_length=100)
+    html_content = models.TextField()
+    allow_hr_edit = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+

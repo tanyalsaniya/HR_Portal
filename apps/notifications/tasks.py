@@ -1,5 +1,6 @@
 # apps/notifications/tasks.py
 import datetime
+from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
@@ -164,6 +165,7 @@ def check_expiring_exit_links():
     return notifs_sent
 
 
+@shared_task
 def run_daily_checks():
     """
     Combines all scheduled checks to run as a single pipeline task.
@@ -171,3 +173,89 @@ def run_daily_checks():
     check_upcoming_anniversaries()
     check_overdue_student_installments()
     check_expiring_exit_links()
+
+@shared_task
+def run_daily_onboarding_pipeline():
+    """
+    Combines all onboarding-related daily checks (graduation, bond letter warning, salary structure missing, notifications)
+    """
+    print("Running run_daily_onboarding_pipeline task...")
+    today = datetime.date.today()
+    admins_and_hrs = User.objects.filter(role__code__in=['ADMIN', 'HR'])
+    
+    # 1. Graduate employees on Day 16
+    graduation_date = today - datetime.timedelta(days=15)
+    to_graduate = Employee.objects.filter(
+        onboarding_complete=False,
+        joining_date__lte=graduation_date,
+        status='Active',
+        is_deleted=False
+    )
+    graduated_count = 0
+    for emp in to_graduate:
+        emp.onboarding_complete = True
+        emp.save()
+        graduated_count += 1
+        
+        # Trigger Bitrix24 status update task
+        from employee_onboarding.tasks import update_bitrix24_onboarding_status
+        update_bitrix24_onboarding_status.delay(emp.id)
+        
+        # Notify HR + Admin
+        msg = f"Onboarding Graduation: Employee {emp.first_name} {emp.last_name} ({emp.emp_id}) completes onboarding today and has moved to All Employees."
+        for user in admins_and_hrs:
+            Notification.objects.create(
+                recipient=user,
+                notif_type='INFO',
+                message=msg,
+                link=f"/employees/"
+            )
+            
+    # 2. Day 14 Reminder (onboarding completes tomorrow)
+    day_14_date = today - datetime.timedelta(days=14)
+    upcoming_grads = Employee.objects.filter(joining_date=day_14_date, status='Active', is_deleted=False)
+    for emp in upcoming_grads:
+        msg = f"Graduation Warning: Employee {emp.first_name} {emp.last_name} ({emp.emp_id}) completes onboarding tomorrow."
+        for user in admins_and_hrs:
+            Notification.objects.create(
+                recipient=user,
+                notif_type='WARNING',
+                message=msg,
+                link=f"/employees/"
+            )
+
+    # 3. Bond Letter Pending warning (if bond_period > 0 and no letter generated)
+    bond_pending = Employee.objects.filter(
+        onboarding_complete=False, 
+        bond_period_months__gt=0,
+        is_deleted=False
+    ).exclude(documents__doc_type='BOND_LETTER')
+    for emp in bond_pending:
+        msg = f"Pending Letter: Bond Agreement Letter has not been generated for {emp.first_name} {emp.last_name} ({emp.emp_id})."
+        for user in admins_and_hrs:
+            Notification.objects.create(
+                recipient=user,
+                notif_type='WARNING',
+                message=msg,
+                link=f"/employees/"
+            )
+
+    # 4. Salary structure missing warning (3 days after joining)
+    joined_3_days_ago = today - datetime.timedelta(days=3)
+    missing_salaries = Employee.objects.filter(
+        joining_date=joined_3_days_ago,
+        status='Active',
+        is_deleted=False
+    ).exclude(salary_structures__isnull=False)
+    for emp in missing_salaries:
+        msg = f"Missing Salary Setup: Salary structure is missing for {emp.first_name} {emp.last_name} ({emp.emp_id}) who joined 3 days ago."
+        for user in admins_and_hrs:
+            Notification.objects.create(
+                recipient=user,
+                notif_type='DANGER',
+                message=msg,
+                link=f"/employees/"
+            )
+            
+    print(f"Onboarding daily pipeline checks completed. Graduated {graduated_count} employees.")
+    return f"Graduated {graduated_count} employees."

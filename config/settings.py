@@ -168,6 +168,10 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 if not EMAIL_HOST_USER:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+# ---------- AUTHENTICATION BACKENDS ----------
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmailOrUsernameModelBackend',
+]
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
@@ -176,3 +180,26 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# ---------- CELERY SETTINGS ----------
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'daily-onboarding-graduation-and-alerts': {
+        'task': 'notifications.tasks.run_daily_onboarding_pipeline',
+        'schedule': crontab(hour=8, minute=0),  # Daily at 08:00 IST
+    },
+}
+
+# ---------- COMPANY & SIGNATORY DEFAULTS FOR LETTERS ----------
+COMPANY_NAME = "MTLV Solutions Private Limited"
+COMPANY_ADDRESS = "HR Division, Secure Enterprise Operations, India"
+LETTER_SIGNATORY_NAME = os.getenv('LETTER_SIGNATORY_NAME', 'Head of HR Operations')
+LETTER_SIGNATORY_DESIGNATION = os.getenv('LETTER_SIGNATORY_DESIGNATION', 'Authorized Signatory')
+
