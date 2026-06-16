@@ -40,8 +40,10 @@ class Employee(models.Model):
     designation = models.CharField(max_length=100)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES)
     joining_date = models.DateField()
+    exit_date = models.DateField(null=True, blank=True)
     notice_period_days = models.PositiveIntegerField(default=30)
     bond_period_months = models.PositiveIntegerField(default=0, blank=True)
+
     
     emergency_contact_name = models.CharField(max_length=100)
     emergency_relationship = models.CharField(max_length=20, choices=EMERGENCY_RELATION_CHOICES)
@@ -129,6 +131,12 @@ class LetterTemplate(models.Model):
         ('OFFER_LETTER', 'Offer Letter'),
         ('APPOINTMENT_LETTER', 'Appointment Letter'),
         ('BOND_LETTER', 'Bond Letter'),
+        ('RELIEVING_LETTER', 'Relieving Letter'),
+        ('EXPERIENCE_LETTER', 'Experience Letter'),
+        ('NOTICE_LETTER', 'Notice Period Letter'),
+        ('NOC_LETTER', 'NOC Letter'),
+        ('FF_SETTLEMENT_LETTER', 'F&F Settlement Letter'),
+        ('FF_SALARY_SLIP', 'Final Month Payslip'),
     )
     name = models.CharField(max_length=30, choices=TEMPLATE_CHOICES, unique=True)
     title = models.CharField(max_length=100)

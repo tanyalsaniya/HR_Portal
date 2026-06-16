@@ -94,7 +94,7 @@ def generate_payslip_pdf(salary_slip, details, user=None):
         'slip': salary_slip,
         'details': details,
         'employee': salary_slip.employee,
-        'company_name': 'MTLV Solutions Private Limited',
+        'company_name': 'DevexHub Pvt. Ltd.',
         'today': datetime.date.today()
     }
     

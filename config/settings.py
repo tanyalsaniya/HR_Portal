@@ -19,6 +19,17 @@ load_dotenv(BASE_DIR / '.env')
 # Add 'apps' folder to Python path (so custom apps can be imported without 'apps.')
 sys.path.insert(0, str(BASE_DIR / 'apps'))
 
+# Configure DLL path for WeasyPrint/GTK on Windows
+tess_path = r"C:\Program Files\Tesseract-OCR"
+if os.path.exists(tess_path):
+    os.environ["PATH"] = tess_path + os.pathsep + os.environ.get("PATH", "")
+    if hasattr(os, "add_dll_directory"):
+        try:
+            os.add_dll_directory(tess_path)
+        except Exception:
+            pass
+
+
 # ---------- SECURITY ----------
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-$$exa==o9et_2o5x5x&nuqgepp!hr0sxh%9-4iu6(rkn0qmvvh')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
@@ -85,16 +96,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # ---------- DATABASE (PostgreSQL) ----------
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'hr_portal'),
-        'USER': os.getenv('DB_USER', 'hr_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+import sys
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'hr_portal'),
+            'USER': os.getenv('DB_USER', 'hr_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
 
 # ---------- PASSWORD VALIDATION ----------
 AUTH_PASSWORD_VALIDATORS = [
@@ -117,6 +137,8 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kolkata'      # Indian time zone (IST)
 USE_I18N = True
 USE_TZ = True
+
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # ---------- STATIC & MEDIA FILES ----------
 STATIC_URL = '/static/'

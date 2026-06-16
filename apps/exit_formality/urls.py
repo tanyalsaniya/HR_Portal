@@ -1,7 +1,7 @@
 # apps/exit_formality/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ExitRequestViewSet, ExitPublicQuestionnaireView, RejoiningAPIView
+from .views import ExitRequestViewSet, ExitPublicQuestionnaireView, RejoiningAPIView, exit_form_view
 from accounts.views import hybrid_view
 from django.views.generic import TemplateView
 
@@ -14,6 +14,7 @@ urlpatterns = [
     path('', include(router.urls)),
     
     # Standard non-hybrid view routes
+    path('exit/form/<str:token>/', exit_form_view, name='exit_secure_form'),
     path('api/exit/public-questionnaire/', ExitPublicQuestionnaireView.as_view(), name='exit_public_questionnaire'),
     path('api/exit/rejoin/', RejoiningAPIView.as_view(), name='rejoin_ex_employee'),
     path('exit-questionnaire/', TemplateView.as_view(template_name='exit/questionnaire.html'), name='exit_questionnaire'),

@@ -32,7 +32,7 @@ class HasModelPermission(permissions.BasePermission):
         # 3. Employee Onboarding module
         if 'Employee' in view_name or 'Department' in view_name:
             # Check detail letter actions
-            if action in ['generate_offer_letter_api', 'generate_appointment_letter_api', 'generate_bond_letter_api']:
+            if action in ['generate_offer_letter_api', 'generate_appointment_letter_api', 'generate_bond_letter_api', 'preview_letter_api']:
                 return 'onboarding.generate_letters' in user_perms
             if action in ['list', 'retrieve']:
                 return 'onboarding.read' in user_perms
@@ -56,16 +56,20 @@ class HasModelPermission(permissions.BasePermission):
         if 'ExitRequest' in view_name or 'ExitForm' in view_name or 'ExitSecureLink' in view_name or 'Rejoining' in view_name:
             if 'Rejoining' in view_name:
                 return 'exit.rejoin' in user_perms
-            if action in ['generate_relieving_api', 'generate_experience_api', 'generate_notice_api']:
+            if action in ['generate_relieving_api', 'generate_experience_api', 'generate_notice_api', 'preview_letter']:
                 return 'exit.generate_letters' in user_perms
+            if action == 'generate_noc_api':
+                return False
             if action == 'rejoin_api':
                 return 'exit.rejoin' in user_perms
             if action in ['list', 'retrieve']:
                 return 'exit.read' in user_perms
             if action == 'create':
                 return 'exit.create' in user_perms
-            if action in ['update', 'partial_update', 'send_link_api']:
+            if action in ['update', 'partial_update', 'send_link_api', 'resend_link', 'update_clearances', 'update_it_checklist', 'process_ff', 'mark_fully_exited']:
                 return 'exit.update' in user_perms
+            if action in ['cancel', 'override', 'reopen', 'extend_lwd', 'approve_ff']:
+                return False
             if action == 'destroy':
                 return 'exit.delete' in user_perms
 

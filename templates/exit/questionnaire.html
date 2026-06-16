@@ -225,10 +225,13 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
+        let token = urlParams.get('token');
+        if (!token || token === 'None' || token === '') {
+            token = '{{ token }}';
+        }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            if (!token) {
+            if (!token || token === 'None' || token === '') {
                 showError('Error: Access token is missing. Please contact HR.');
                 return;
             }
@@ -278,8 +281,18 @@
                 recommend: document.getElementById('recommend').value,
                 personal_email: document.getElementById('personalEmail').value,
                 personal_phone: document.getElementById('personalPhone').value,
-                feedback: document.getElementById('feedback').value
+                feedback: document.getElementById('feedback').value,
+                declaration_confirmed: document.getElementById('declaration').checked
             };
+
+            // Clear previous errors and alerts
+            const errorAlert = document.getElementById('errorAlert');
+            if (errorAlert) errorAlert.style.display = 'none';
+            document.querySelectorAll('.field-error-msg').forEach(el => el.remove());
+            document.querySelectorAll('input, select, textarea').forEach(el => {
+                el.style.borderColor = '#cbd5e1';
+                el.style.boxShadow = 'none';
+            });
 
             try {
                 const res = await fetch('/api/exit/public-questionnaire/', {
@@ -297,12 +310,84 @@
                     `;
                 } else {
                     const err = await res.json();
-                    alert('Validation error: ' + JSON.stringify(err));
+                    displayFieldErrors(err);
                 }
             } catch (ex) {
                 alert('Failed to submit form.');
             }
         });
+
+        function displayFieldErrors(errors) {
+            // Clear previous errors
+            document.querySelectorAll('.field-error-msg').forEach(el => el.remove());
+            document.querySelectorAll('input, select, textarea').forEach(el => {
+                el.style.borderColor = '#cbd5e1';
+                el.style.boxShadow = 'none';
+            });
+
+            // Map backend fields to frontend elements
+            const fieldMap = {
+                'asset_laptop_returned': 'assetLaptop',
+                'asset_laptop_remarks': 'assetLaptopRemarks',
+                'asset_id_returned': 'assetId',
+                'asset_id_remarks': 'assetIdRemarks',
+                'asset_access_card_returned': 'assetAccess',
+                'asset_access_card_remarks': 'assetAccessRemarks',
+                'asset_others_details': 'assetOthers',
+                'kt_status': 'ktStatus',
+                'kt_handover_to': 'ktHandoverTo',
+                'kt_remarks': 'ktRemarks',
+                'reason_dropdown': 'reasonDropdown',
+                'reason_details': 'reasonDetails',
+                'rating_env': 'ratingEnv',
+                'rating_mgmt': 'ratingMgmt',
+                'recommend': 'recommend',
+                'personal_email': 'personalEmail',
+                'personal_phone': 'personalPhone',
+                'feedback': 'feedback',
+                'declaration_confirmed': 'declaration'
+            };
+
+            let firstInvalidEl = null;
+
+            for (const [field, messages] of Object.entries(errors)) {
+                const elementId = fieldMap[field] || field;
+                const element = document.getElementById(elementId);
+                
+                if (element) {
+                    element.style.borderColor = '#ef4444';
+                    element.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.15)';
+                    
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'field-error-msg';
+                    errorDiv.style.color = '#ef4444';
+                    errorDiv.style.fontSize = '8.5pt';
+                    errorDiv.style.marginTop = '4px';
+                    errorDiv.style.fontWeight = '500';
+                    
+                    const messageText = Array.isArray(messages) ? messages.join(' ') : messages;
+                    errorDiv.textContent = messageText;
+                    
+                    element.parentElement.appendChild(errorDiv);
+
+                    if (!firstInvalidEl) {
+                        firstInvalidEl = element;
+                    }
+                }
+            }
+
+            if (firstInvalidEl) {
+                firstInvalidEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidEl.focus();
+            } else {
+                const errorAlert = document.getElementById('errorAlert');
+                if (errorAlert) {
+                    errorAlert.textContent = errors.error || errors.detail || 'Validation failed. Please check your inputs.';
+                    errorAlert.style.display = 'block';
+                    errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
 
         function showError(msg) {
             document.getElementById('errorAlert').textContent = msg;

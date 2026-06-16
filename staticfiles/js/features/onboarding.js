@@ -1951,7 +1951,16 @@ async function loadProfileLettersList() {
     if (!currentDetailEmployeeId) return;
     try {
         closeLetterWorkspace();
-        switchLettersSubTab('generate');
+        
+        const isAdmin = currentUser && (currentUser.role_code === 'ADMIN' || currentUser.role === 'ADMIN' || currentUser.is_superuser);
+        const hasGenPerm = hasPermission('onboarding.generate_letters');
+        const hasTemplatePerm = hasPermission('onboarding.manage_templates');
+        
+        if (isAdmin || hasGenPerm) {
+            switchLettersSubTab('generate');
+        } else if (hasTemplatePerm) {
+            switchLettersSubTab('template');
+        }
         
         const res = await apiFetch(`/onboarding/documents/?employee_id=${currentDetailEmployeeId}`);
         if (res.ok) {

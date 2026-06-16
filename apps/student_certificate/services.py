@@ -24,7 +24,7 @@ def generate_student_certificate_pdf(student, user=None):
     context = {
         'student': student,
         'today': datetime.date.today(),
-        'company_name': 'MTLV Solutions Private Limited'
+        'company_name': 'DevexHub Solutions Pvt. Ltd.',
     }
     
     html_string = render_to_string(template_name, context)
