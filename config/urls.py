@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 from employee_onboarding.views import SecureDocumentServeView
 
 urlpatterns = [
+    path('', include('accounts.urls')),
     path('', include('salary.urls')),
     path('admin/', admin.site.urls),
     
@@ -13,7 +14,6 @@ urlpatterns = [
     path('media/employees/<str:emp_id>/docs/<str:filename>', SecureDocumentServeView.as_view(), name='secure_doc_serve'),
     
     # Delegate routing to respective app-level urls.py configurations
-    path('', include('accounts.urls')),
     path('', include('employee_onboarding.urls')),
     path('', include('exit_formality.urls')),
     path('', include('student_certificate.urls')),

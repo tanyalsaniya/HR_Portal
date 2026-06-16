@@ -784,6 +784,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aadhaarVal) formData.append('aadhaar', aadhaarVal);
             if (panVal) formData.append('pan', panVal);
             
+            const photoInput = document.getElementById('empProfilePhoto');
+            if (photoInput && photoInput.files && photoInput.files[0]) {
+                formData.append('profile_photo', photoInput.files[0]);
+            }
+
             formData.append('emergency_contact_name', document.getElementById('empEmergencyName').value);
             formData.append('emergency_relationship', document.getElementById('empEmergencyRel').value);
             formData.append('emergency_phone', document.getElementById('empEmergencyPhone').value);
@@ -797,6 +802,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.status === 201 || res.ok) {
                     showToast('Employee profile created successfully.');
                     onboardForm.reset();
+                    const preview = document.getElementById('empPhotoPreview');
+                    const placeholder = document.getElementById('empPhotoPlaceholder');
+                    if (preview) {
+                        preview.src = '';
+                        preview.style.display = 'none';
+                    }
+                    if (placeholder) {
+                        placeholder.style.display = 'block';
+                    }
                     switchView('onboardingView');
                     loadFilteredEmployeeData();
                 } else {
@@ -1998,5 +2012,31 @@ async function softDeleteEmployee(empId) {
 function deleteCurrentEmployee() {
     if (currentDetailEmployeeId) {
         softDeleteEmployee(currentDetailEmployeeId);
+    }
+}
+
+function previewProfilePhoto(input) {
+    const preview = document.getElementById('empPhotoPreview');
+    const placeholder = document.getElementById('empPhotoPlaceholder');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            if (preview) {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            }
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+        }
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        if (preview) {
+            preview.src = '';
+            preview.style.display = 'none';
+        }
+        if (placeholder) {
+            placeholder.style.display = 'block';
+        }
     }
 }
