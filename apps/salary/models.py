@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from decimal import Decimal
+from common.fields import EncryptedDecimalField
 
 class SalaryImportBatch(models.Model):
     STATUS_CHOICES = (
@@ -35,12 +36,12 @@ class SalaryStructure(models.Model):
         on_delete=models.CASCADE,
         related_name='salary_structures'
     )
-    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    pf_contribution = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    esi = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    labour_welfare_fund = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    professional_tax = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    other_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    gross_salary = EncryptedDecimalField(default=Decimal('0.00'))
+    pf_contribution = EncryptedDecimalField(default=Decimal('0.00'))
+    esi = EncryptedDecimalField(default=Decimal('0.00'))
+    labour_welfare_fund = EncryptedDecimalField(default=Decimal('0.00'))
+    professional_tax = EncryptedDecimalField(default=Decimal('0.00'))
+    other_deductions = EncryptedDecimalField(default=Decimal('0.00'))
     effective_from = models.DateField()
 
     @property
@@ -90,19 +91,19 @@ class SalarySlip(models.Model):
     extra_days = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
 
     # Earnings
-    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    gross_salary = EncryptedDecimalField(default=Decimal('0.00'))
 
     # Deductions
-    pf_contribution = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    esi = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    labour_welfare_fund = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    professional_tax = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    other_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    total_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    pf_contribution = EncryptedDecimalField(default=Decimal('0.00'))
+    esi = EncryptedDecimalField(default=Decimal('0.00'))
+    labour_welfare_fund = EncryptedDecimalField(default=Decimal('0.00'))
+    professional_tax = EncryptedDecimalField(default=Decimal('0.00'))
+    other_deductions = EncryptedDecimalField(default=Decimal('0.00'))
+    total_deductions = EncryptedDecimalField(default=Decimal('0.00'))
 
     # Net Pay
-    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    net_credited_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    net_salary = EncryptedDecimalField(default=Decimal('0.00'))
+    net_credited_amount = EncryptedDecimalField(default=Decimal('0.00'))
 
     # Metadata & Status
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
@@ -183,13 +184,13 @@ class SalaryIncrementApproval(models.Model):
         blank=True,
         related_name='approvals'
     )
-    old_net = models.DecimalField(max_digits=10, decimal_places=2)
-    new_basic = models.DecimalField(max_digits=10, decimal_places=2)
-    new_hra = models.DecimalField(max_digits=10, decimal_places=2)
-    new_allowances = models.DecimalField(max_digits=10, decimal_places=2)
-    new_net = models.DecimalField(max_digits=10, decimal_places=2)
-    increment_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    increment_pct = models.DecimalField(max_digits=5, decimal_places=2)
+    old_net = EncryptedDecimalField()
+    new_basic = EncryptedDecimalField()
+    new_hra = EncryptedDecimalField()
+    new_allowances = EncryptedDecimalField()
+    new_net = EncryptedDecimalField()
+    increment_amount = EncryptedDecimalField()
+    increment_pct = EncryptedDecimalField()
     effective_date = models.DateField()
     reason = models.TextField()
     approved_by = models.ForeignKey(
