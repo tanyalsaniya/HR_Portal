@@ -996,113 +996,36 @@ let repeatableAllowances = [];
 let repeatableDeductions = [];
 
 function togglePfInput() {
-    const pfMode = document.getElementById('salPfMode').value;
-    const pfLabel = document.getElementById('salPfLabel');
-    const pfVal = document.getElementById('salPfValue');
-    
-    if (pfMode === 'PERCENT') {
-        pfLabel.textContent = 'PF Percent (%)*';
-        pfVal.placeholder = 'e.g. 12%';
-        if (parseFloat(pfVal.value) > 100) pfVal.value = 12;
-    } else {
-        pfLabel.textContent = 'PF Fixed Amount*';
-        pfVal.placeholder = 'e.g. 1800.00';
-    }
+    // Legacy stub
 }
 
 // Live calculation of Gross, Deductions, and Net salary
 function calculateTakeHomeSalary() {
-    const basic = parseFloat(document.getElementById('salBasic').value || 0);
-    const hra = parseFloat(document.getElementById('salHra').value || 0);
-    const conveyance = parseFloat(document.getElementById('salConveyance').value || 0);
-    const medical = parseFloat(document.getElementById('salMedical').value || 0);
-    const special = parseFloat(document.getElementById('salSpecial').value || 0);
-    const monthlyBonus = parseFloat(document.getElementById('salMonthlyBonus').value || 0);
+    const gross = parseFloat(document.getElementById('salGrossSalary').value || 0);
+    const pf = parseFloat(document.getElementById('salPfContribution').value || 0);
+    const esi = parseFloat(document.getElementById('salEsi').value || 0);
+    const lwf = parseFloat(document.getElementById('salLabourWelfareFund').value || 0);
+    const pt = parseFloat(document.getElementById('salProfessionalTax').value || 0);
+    const other = parseFloat(document.getElementById('salOtherDeductions').value || 0);
 
-    // Sum other allowances from dynamic rows
-    let otherAllowancesSum = 0;
-    const allowanceInputs = document.querySelectorAll('.allowance-amount-input');
-    allowanceInputs.forEach(i => otherAllowancesSum += parseFloat(i.value || 0));
-
-    const gross = basic + hra + conveyance + medical + special + monthlyBonus + otherAllowancesSum;
-    document.getElementById('salSummaryGross').value = gross.toFixed(2);
-
-    // Deductions
-    const pfMode = document.getElementById('salPfMode').value;
-    const pfVal = parseFloat(document.getElementById('salPfValue').value || 0);
-    let pfAmount = 0;
-    if (pfMode === 'PERCENT') {
-        pfAmount = basic * (pfVal / 100);
-    } else {
-        pfAmount = pfVal;
-    }
-
-    const pt = parseFloat(document.getElementById('salPt').value || 0);
-    const tds = parseFloat(document.getElementById('salTds').value || 0);
-
-    // Sum other deductions
-    let otherDeductionsSum = 0;
-    const deductionInputs = document.querySelectorAll('.deduction-amount-input');
-    deductionInputs.forEach(i => otherDeductionsSum += parseFloat(i.value || 0));
-
-    const totalDeductions = pfAmount + pt + tds + otherDeductionsSum;
-    document.getElementById('salSummaryDeductions').value = totalDeductions.toFixed(2);
-
+    const totalDeductions = pf + esi + lwf + pt + other;
     const net = gross - totalDeductions;
-    document.getElementById('salSummaryNet').value = net.toFixed(2);
+
+    const summaryGross = document.getElementById('salSummaryGross');
+    if (summaryGross) summaryGross.value = gross.toFixed(2);
+
+    const summaryDeductions = document.getElementById('salSummaryDeductions');
+    if (summaryDeductions) summaryDeductions.value = totalDeductions.toFixed(2);
+
+    const summaryNet = document.getElementById('salSummaryNet');
+    if (summaryNet) summaryNet.value = net.toFixed(2);
 }
 
-// Repeatable allowances logic
-function addAllowanceRow(label = '', amount = '') {
-    const container = document.getElementById('allowanceRowsList');
-    const idx = container.children.length;
-    
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.gap = '10px';
-    row.style.alignItems = 'center';
-    row.id = `allowanceRow-${idx}`;
-    row.innerHTML = `
-        <input type="text" placeholder="Allowance Label" class="allowance-label-input" value="${label}" required style="flex:2; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--card-bg); color:var(--text-color);">
-        <input type="number" step="0.01" placeholder="Amount (Rs)" class="allowance-amount-input" value="${amount}" required oninput="calculateTakeHomeSalary()" style="flex:1; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--card-bg); color:var(--text-color);">
-        <button type="button" class="btn" style="background-color:#ef4444; color:white; font-size:12px; padding:4px 8px;" onclick="removeAllowanceRow(${idx})">&times;</button>
-    `;
-    container.appendChild(row);
-}
-
-function removeAllowanceRow(idx) {
-    const row = document.getElementById(`allowanceRow-${idx}`);
-    if (row) {
-        row.remove();
-        calculateTakeHomeSalary();
-    }
-}
-
-// Repeatable deductions logic
-function addDeductionRow(label = '', amount = '') {
-    const container = document.getElementById('deductionRowsList');
-    const idx = container.children.length;
-    
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.gap = '10px';
-    row.style.alignItems = 'center';
-    row.id = `deductionRow-${idx}`;
-    row.innerHTML = `
-        <input type="text" placeholder="Deduction Label" class="deduction-label-input" value="${label}" required style="flex:2; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--card-bg); color:var(--text-color);">
-        <input type="number" step="0.01" placeholder="Amount (Rs)" class="deduction-amount-input" value="${amount}" required oninput="calculateTakeHomeSalary()" style="flex:1; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--card-bg); color:var(--text-color);">
-        <button type="button" class="btn" style="background-color:#ef4444; color:white; font-size:12px; padding:4px 8px;" onclick="removeDeductionRow(${idx})">&times;</button>
-    `;
-    container.appendChild(row);
-}
-
-function removeDeductionRow(idx) {
-    const row = document.getElementById(`deductionRow-${idx}`);
-    if (row) {
-        row.remove();
-        calculateTakeHomeSalary();
-    }
-}
+// Repeatable allowances/deductions legacy no-ops
+function addAllowanceRow() {}
+function removeAllowanceRow() {}
+function addDeductionRow() {}
+function removeDeductionRow() {}
 
 // Submit Salary structure
 document.addEventListener('DOMContentLoaded', () => {
@@ -1114,56 +1037,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             showToast('Saving salary structure...');
 
-            // Collect allowances JSON
-            const allowancesList = [];
-            const allowanceLabels = document.querySelectorAll('.allowance-label-input');
-            const allowanceAmounts = document.querySelectorAll('.allowance-amount-input');
-            allowanceLabels.forEach((el, index) => {
-                allowancesList.push({
-                    label: el.value,
-                    amount: parseFloat(allowanceAmounts[index].value || 0)
-                });
-            });
-
-            // Collect deductions JSON
-            const deductionsList = [];
-            const deductionLabels = document.querySelectorAll('.deduction-label-input');
-            const deductionAmounts = document.querySelectorAll('.deduction-amount-input');
-            deductionLabels.forEach((el, index) => {
-                deductionsList.push({
-                    label: el.value,
-                    amount: parseFloat(deductionAmounts[index].value || 0)
-                });
-            });
-
-            const pfMode = document.getElementById('salPfMode').value;
-            const pfVal = parseFloat(document.getElementById('salPfValue').value || 0);
-            const basicSal = parseFloat(document.getElementById('salBasic').value || 0);
-            let finalPf = pfVal;
-            if (pfMode === 'PERCENT') {
-                finalPf = basicSal * (pfVal / 100);
-            }
-
             const data = {
                 employee: currentDetailEmployeeId,
                 effective_from: document.getElementById('salEffectiveFrom').value,
-                basic: basicSal,
-                hra: parseFloat(document.getElementById('salHra').value || 0),
-                conveyance: parseFloat(document.getElementById('salConveyance').value || 0),
-                medical: parseFloat(document.getElementById('salMedical').value || 0),
-                special: parseFloat(document.getElementById('salSpecial').value || 0),
-                monthly_bonus: parseFloat(document.getElementById('salMonthlyBonus').value || 0),
-                other_allowances: allowancesList,
-                pf: finalPf,
-                pf_type: pfMode,
-                pf_value: pfVal,
-                professional_tax: parseFloat(document.getElementById('salPt').value || 200),
-                tds: parseFloat(document.getElementById('salTds').value || 0),
-                other_deductions: deductionsList
+                gross_salary: parseFloat(document.getElementById('salGrossSalary').value || 0),
+                pf_contribution: parseFloat(document.getElementById('salPfContribution').value || 0),
+                esi: parseFloat(document.getElementById('salEsi').value || 0),
+                labour_welfare_fund: parseFloat(document.getElementById('salLabourWelfareFund').value || 0),
+                professional_tax: parseFloat(document.getElementById('salProfessionalTax').value || 0),
+                other_deductions: parseFloat(document.getElementById('salOtherDeductions').value || 0)
             };
 
             try {
-                const res = await apiFetch('/salaries/structures/', {
+                const res = await apiFetch('/salaries/', {
                     method: 'POST',
                     body: JSON.stringify(data)
                 });
@@ -1171,8 +1057,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     showToast('Salary structure defined successfully.');
                     salForm.reset();
-                    document.getElementById('allowanceRowsList').innerHTML = '';
-                    document.getElementById('deductionRowsList').innerHTML = '';
                     loadProfileSalaryHistory();
                 } else {
                     const err = await res.json();
@@ -1190,7 +1074,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadProfileSalaryHistory() {
     if (!currentDetailEmployeeId) return;
     try {
-        const res = await apiFetch(`/salaries/structures/?employee_id=${currentDetailEmployeeId}`);
+        const res = await apiFetch(`/salaries/?employee_id=${currentDetailEmployeeId}`);
         if (res.ok) {
             const structures = await res.json();
             const structList = structures.results || structures;
@@ -1203,33 +1087,27 @@ async function loadProfileSalaryHistory() {
                 }
                 
                 const latest = structList[0];
-                document.getElementById('salEffectiveFrom').value = latest.effective_from;
-                document.getElementById('salBasic').value = latest.basic;
-                document.getElementById('salHra').value = latest.hra;
-                document.getElementById('salConveyance').value = latest.conveyance;
-                document.getElementById('salMedical').value = latest.medical;
-                document.getElementById('salSpecial').value = latest.special;
-                document.getElementById('salMonthlyBonus').value = latest.monthly_bonus;
-                
-                document.getElementById('salPfMode').value = latest.pf_type || 'FIXED';
-                document.getElementById('salPfValue').value = latest.pf_value || latest.pf;
-                document.getElementById('salPt').value = latest.professional_tax;
-                document.getElementById('salTds').value = latest.tds;
-                
-                togglePfInput();
-                
-                const allowancesListContainer = document.getElementById('allowanceRowsList');
-                allowancesListContainer.innerHTML = '';
-                if (latest.other_allowances) {
-                    latest.other_allowances.forEach(a => addAllowanceRow(a.label, a.amount));
-                }
+                const effFrom = document.getElementById('salEffectiveFrom');
+                if (effFrom) effFrom.value = latest.effective_from || '';
 
-                const deductionsListContainer = document.getElementById('deductionRowsList');
-                deductionsListContainer.innerHTML = '';
-                if (latest.other_deductions) {
-                    latest.other_deductions.forEach(d => addDeductionRow(d.label, d.amount));
-                }
+                const gross = document.getElementById('salGrossSalary');
+                if (gross) gross.value = latest.gross_salary || '';
 
+                const pf = document.getElementById('salPfContribution');
+                if (pf) pf.value = latest.pf_contribution || '';
+
+                const esi = document.getElementById('salEsi');
+                if (esi) esi.value = latest.esi || '';
+
+                const lwf = document.getElementById('salLabourWelfareFund');
+                if (lwf) lwf.value = latest.labour_welfare_fund || '';
+
+                const pt = document.getElementById('salProfessionalTax');
+                if (pt) pt.value = latest.professional_tax || '';
+
+                const other = document.getElementById('salOtherDeductions');
+                if (other) other.value = latest.other_deductions || '';
+                
                 calculateTakeHomeSalary();
 
                 tbody.innerHTML = structList.map(s => {
@@ -1348,18 +1226,18 @@ async function openLetterWorkspace(type) {
             if (latestSalary) {
                 document.getElementById('custCTC').value = parseFloat(latestSalary.gross_salary || 0);
                 document.getElementById('custInHand').value = parseFloat(latestSalary.net_salary || 0);
-                document.getElementById('custBasic').value = parseFloat(latestSalary.basic || 0);
-                document.getElementById('custHra').value = parseFloat(latestSalary.hra || 0);
-                document.getElementById('custConveyance').value = parseFloat(latestSalary.conveyance || 0);
-                document.getElementById('custMedical').value = parseFloat(latestSalary.medical || 0);
-                document.getElementById('custSpecial').value = parseFloat(latestSalary.special || 0);
-                document.getElementById('custBonus').value = parseFloat(latestSalary.monthly_bonus || 0);
+                document.getElementById('custBasic').value = parseFloat(latestSalary.gross_salary || 0);
+                document.getElementById('custHra').value = 0;
+                document.getElementById('custConveyance').value = 0;
+                document.getElementById('custMedical').value = 0;
+                document.getElementById('custSpecial').value = 0;
+                document.getElementById('custBonus').value = 0;
                 
                 document.getElementById('custEsiEmployer').value = 0;
                 document.getElementById('custPfEmployer').value = 0;
-                document.getElementById('custPfEmployee').value = parseFloat(latestSalary.pf || 0);
-                document.getElementById('custEsiEmployee').value = 0;
-                document.getElementById('custLwf').value = 0;
+                document.getElementById('custPfEmployee').value = parseFloat(latestSalary.pf_contribution || 0);
+                document.getElementById('custEsiEmployee').value = parseFloat(latestSalary.esi || 0);
+                document.getElementById('custLwf').value = parseFloat(latestSalary.labour_welfare_fund || 0);
                 document.getElementById('custPT').value = parseFloat(latestSalary.professional_tax || 200);
             } else {
                 const salaryFields = ['custCTC', 'custInHand', 'custBasic', 'custHra', 'custConveyance', 'custMedical', 'custSpecial', 'custBonus', 'custEsiEmployer', 'custPfEmployer', 'custPfEmployee', 'custEsiEmployee', 'custLwf', 'custPT'];

@@ -1,26 +1,48 @@
 import datetime
-from django.db import transaction
-from django.core.mail import send_mail
+import os
+import openpyxl
+from decimal import Decimal
+from django.db import models, transaction
+from django.core.files.base import ContentFile
 from django.conf import settings
+from django.http import HttpResponse, Http404
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import viewsets, status, serializers
-from rest_framework.decorators import action
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.pagination import PageNumberPagination
 
-from roles.permissions import HasModelPermission
-from common.utils import generate_payslip_number
 from employee_onboarding.models import Employee
-from .models import SalaryStructure, SalarySlip, SalaryIncrementReminder, SalaryIncrementApproval
+from .models import SalaryStructure, SalarySlip, SalaryImportBatch, SalaryIncrementReminder, SalaryIncrementApproval
 from .serializers import (
-    SalaryStructureSerializer, SalarySlipSerializer,
+    SalaryStructureSerializer, SalarySlipSerializer, SalaryImportBatchSerializer,
     SalaryIncrementReminderSerializer, SalaryIncrementApprovalSerializer
 )
-from .services import calculate_payslip_details, generate_payslip_pdf, generate_increment_letter_pdf
-from rules import ROLE_ADMIN
+from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words
 
+# Helper to check roles
+def check_role(user):
+    if not user or not user.is_authenticated:
+        return None
+    if user.is_superuser or (user.role and user.role.code == 'ADMIN'):
+        return 'admin'
+    if user.role and user.role.code == 'HR':
+        return 'hr'
+    return 'employee'
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+# Legacy viewsets for backward compatibility with UI
 class SalaryStructureViewSet(viewsets.ModelViewSet):
     serializer_class = SalaryStructureSerializer
-    permission_classes = [HasModelPermission]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = SalaryStructure.objects.all().order_by('-effective_from')
@@ -29,129 +51,15 @@ class SalaryStructureViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(employee_id=employee_id)
         return queryset
 
-
-class SalarySlipViewSet(viewsets.ModelViewSet):
-    serializer_class = SalarySlipSerializer
-    permission_classes = [HasModelPermission]
-
-    def get_queryset(self):
-        queryset = SalarySlip.objects.all().order_by('-year', '-month')
-        employee_id = self.request.query_params.get('employee_id')
-        if employee_id:
-            queryset = queryset.filter(employee_id=employee_id)
-        return queryset
-
-    @transaction.atomic
     def perform_create(self, serializer):
-        employee = serializer.validated_data['employee']
-        month = serializer.validated_data['month']
-        year = serializer.validated_data['year']
-        working_days = serializer.validated_data['working_days']
-        days_worked = serializer.validated_data['days_worked']
-        one_time_bonus = serializer.validated_data.get('one_time_bonus', 0)
-        one_time_deduction = serializer.validated_data.get('one_time_deduction', 0)
-        
-        # Check if payslip already exists for this employee/month/year
-        if SalarySlip.objects.filter(employee=employee, month=month, year=year).exists():
-            raise ValidationError(f"A payslip already exists for this employee for {month}/{year}.")
-            
-        # Calculate salary slip components
-        try:
-            details = calculate_payslip_details(
-                employee=employee,
-                year=year,
-                month=month,
-                working_days=working_days,
-                days_worked=days_worked,
-                one_time_bonus=one_time_bonus,
-                one_time_deduction=one_time_deduction
-            )
-        except ValueError as e:
-            raise ValidationError(str(e))
-            
-        # Generate Payslip number
-        payslip_no = generate_payslip_number(year, month)
-        
-        # Save slip details
-        slip = serializer.save(
-            payslip_no=payslip_no,
-            lop_days=details['lop_days'],
-            gross=details['gross'],
-            total_deductions=details['total_deductions'],
-            net_pay=details['net_pay'],
-            generated_by=self.request.user
-        )
-        
-        # Generate PDF
-        generate_payslip_pdf(slip, details, user=self.request.user)
+        # Admin check
+        if check_role(self.request.user) != 'admin':
+            raise PermissionDenied("Only Admin can manage salary structures.")
+        serializer.save()
 
-    @action(detail=False, methods=['POST'], url_path='bulk-generate')
-    @transaction.atomic
-    def bulk_generate(self, request):
-        month = request.data.get('month')
-        year = request.data.get('year')
-        working_days = request.data.get('working_days')
-        payment_date = request.data.get('payment_date')
-        payment_mode = request.data.get('payment_mode', 'BANK_TRANSFER')
 
-        if not all([month, year, working_days, payment_date]):
-            return Response({'error': 'month, year, working_days, and payment_date are required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Get all active employees
-        active_employees = Employee.objects.filter(status='Active', is_deleted=False)
-        generated_count = 0
-        skipped_count = 0
-
-        for employee in active_employees:
-            # Check if payslip already exists
-            if SalarySlip.objects.filter(employee=employee, month=month, year=year).exists():
-                skipped_count += 1
-                continue
-
-            # Check if salary structure exists
-            structure = SalaryStructure.objects.filter(employee=employee).order_by('-effective_from').first()
-            if not structure:
-                skipped_count += 1
-                continue
-
-            # For bulk, assume employee worked all days (no LOP)
-            details = calculate_payslip_details(
-                employee=employee,
-                year=int(year),
-                month=int(month),
-                working_days=int(working_days),
-                days_worked=int(working_days)
-            )
-
-            payslip_no = generate_payslip_number(year, month)
-            
-            slip = SalarySlip.objects.create(
-                employee=employee,
-                payslip_no=payslip_no,
-                month=int(month),
-                year=int(year),
-                working_days=int(working_days),
-                days_worked=int(working_days),
-                lop_days=0,
-                gross=details['gross'],
-                total_deductions=details['total_deductions'],
-                net_pay=details['net_pay'],
-                payment_date=payment_date,
-                payment_mode=payment_mode,
-                generated_by=request.user
-            )
-
-            # Generate PDF
-            generate_payslip_pdf(slip, details, user=request.user)
-            generated_count += 1
-
-        return Response({
-            'message': f"Bulk payslip generation completed.",
-            'generated': generated_count,
-            'skipped': skipped_count
-        }, status=status.HTTP_201_CREATED)
 class SalaryIncrementViewSet(viewsets.ModelViewSet):
-    permission_classes = [HasModelPermission]
+    permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
         if self.action == 'approve':
@@ -172,13 +80,10 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='approve')
     @transaction.atomic
     def approve(self, request, pk=None):
-        # Admin or permission validation
-        is_admin = request.user.is_superuser or (request.user.role and request.user.role.code == 'ADMIN')
-        has_perm = request.user.role and request.user.role.permissions.filter(codename='salary.approve_increments').exists()
-        if not (is_admin or has_perm):
-            raise PermissionDenied("Only Admin users or roles with increment approval permission can approve salary increments.")
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can approve increments.")
 
-        reminder = self.get_object()
+        reminder = get_object_or_404(SalaryIncrementReminder, pk=pk)
         if reminder.status == 'Actioned':
             return Response({'error': 'This increment reminder has already been actioned.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -187,53 +92,32 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         if not active_structure:
             return Response({'error': 'Active salary structure not found.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Deserialize input fields
         serializer = SalaryIncrementApprovalSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         new_basic = serializer.validated_data['new_basic']
         new_hra = serializer.validated_data['new_hra']
-        new_allowances = serializer.validated_data['new_allowances'] # parsed allowances amount
+        new_allowances = serializer.validated_data['new_allowances']
         effective_date = serializer.validated_data.get('effective_date', reminder.anniversary_date)
         reason = serializer.validated_data['reason']
 
-        # Calculate difference
         old_net = active_structure.net_salary
-        
-        # Build temp structure to calculate new net
-        temp_struct = SalaryStructure(
-            employee=employee,
-            basic=new_basic,
-            hra=new_hra,
-            conveyance=active_structure.conveyance,
-            medical=active_structure.medical,
-            special=new_allowances, # Add raises in special allowance
-            pf=active_structure.pf,
-            professional_tax=active_structure.professional_tax,
-            tds=active_structure.tds
-        )
-        new_net = temp_struct.net_salary
-        increment_amount = new_net - old_net
-        increment_pct = (increment_amount / old_net) * 100 if old_net > 0 else 0
 
-        # Save new SalaryStructure in database
         new_structure = SalaryStructure.objects.create(
             employee=employee,
             effective_from=effective_date,
-            basic=new_basic,
-            hra=new_hra,
-            conveyance=active_structure.conveyance,
-            medical=active_structure.medical,
-            special=new_allowances,
-            pf=active_structure.pf,
+            gross_salary=new_basic,
+            pf_contribution=active_structure.pf_contribution,
+            esi=active_structure.esi,
+            labour_welfare_fund=active_structure.labour_welfare_fund,
             professional_tax=active_structure.professional_tax,
-            tds=active_structure.tds,
-            other_allowances=active_structure.other_allowances,
-            other_deductions=active_structure.other_deductions,
-            created_by=request.user
+            other_deductions=active_structure.other_deductions
         )
 
-        # Save approval record
+        new_net = new_structure.net_salary
+        increment_amount = new_net - old_net
+        increment_pct = (increment_amount / old_net) * 100 if old_net > 0 else 0
+
         approval = serializer.save(
             employee=employee,
             reminder=reminder,
@@ -244,29 +128,682 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
             approved_by=request.user
         )
 
-        # Mark reminder as Actioned
         reminder.status = 'Actioned'
         reminder.actioned_by = request.user
-        reminder.actioned_at = datetime.datetime.now()
+        reminder.actioned_at = timezone.now()
         reminder.save()
 
-        # Compile PDF Letter
         generate_increment_letter_pdf(approval, user=request.user)
-
-        # Email letter to employee
-        self._email_increment_letter(approval)
 
         return Response({
             'message': 'Salary increment approved and new structure applied.',
             'approval': SalaryIncrementApprovalSerializer(approval).data
         }, status=status.HTTP_201_CREATED)
 
-    def _email_increment_letter(self, approval):
-        recipient = approval.employee.email
-        send_mail(
-            subject="Congratulations: Salary Increment Review Approved",
-            message=f"Dear {approval.employee.first_name},\n\nWe are pleased to inform you that your salary review has been completed and approved by the management. Your salary increment letter has been generated.\n\nEffective Date: {approval.effective_date}\n\nSincerely,\nHR Management",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[recipient],
-            fail_silently=False
+
+# New Endpoints
+class SalaryExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can export salary sheets.")
+
+        month_param = request.query_params.get('month')
+        year_param = request.query_params.get('year')
+
+        if not month_param or not year_param:
+            return Response({'error': 'month and year parameters are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month_param)
+            year = int(year_param)
+        except ValueError:
+            return Response({'error': 'Invalid month or year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Columns
+        headers = [
+            "Emp ID", "Emp Name", "Department", "Location", "Gross Salary", 
+            "PF Contribution", "ESI", "Labour Welfare Fund", "Professional Tax", 
+            "Other Deductions", "Leaves Available", "Working Days", "Leave Encashment / Extra Days"
+        ]
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"Salary_{month}_{year}"
+        ws.append(headers)
+
+        # Apply sheet protection
+        ws.protection.sheet = True
+        ws.protection.password = 'mtlv_payroll'
+
+        from openpyxl.styles import Protection
+        locked_style = Protection(locked=True)
+        unlocked_style = Protection(locked=False)
+
+        # Check if salary slips already exist
+        slips = SalarySlip.objects.filter(month=month, year=year).select_related('employee', 'employee__department')
+        
+        row_idx = 2
+        if slips.exists():
+            for slip in slips:
+                row_data = [
+                    slip.employee.emp_id,
+                    slip.employee.name,
+                    slip.employee.department.name if slip.employee.department else "",
+                    slip.location,
+                    float(slip.gross_salary),
+                    float(slip.pf_contribution),
+                    float(slip.esi),
+                    float(slip.labour_welfare_fund),
+                    float(slip.professional_tax),
+                    float(slip.other_deductions),
+                    float(slip.leaves_available),
+                    float(slip.working_days),
+                    float(slip.extra_days)
+                ]
+                ws.append(row_data)
+                
+                # Lock A, B, C (1, 2, 3), unlock others
+                for col_idx in range(1, 14):
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    if col_idx in [1, 2, 3]:
+                        cell.protection = locked_style
+                    else:
+                        cell.protection = unlocked_style
+                row_idx += 1
+        else:
+            # Export empty template using active employees & structures
+            employees = Employee.objects.filter(status='Active', is_deleted=False).select_related('department')
+            for emp in employees:
+                struct = SalaryStructure.objects.filter(employee=emp, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
+                if not struct:
+                    # Fallback to absolute latest if none effective yet
+                    struct = SalaryStructure.objects.filter(employee=emp).order_by('-effective_from').first()
+
+                row_data = [
+                    emp.emp_id,
+                    emp.name,
+                    emp.department.name if emp.department else "",
+                    "Mohali",
+                    float(struct.gross_salary) if struct else 0.0,
+                    float(struct.pf_contribution) if struct else 0.0,
+                    float(struct.esi) if struct else 0.0,
+                    float(struct.labour_welfare_fund) if struct else 0.0,
+                    float(struct.professional_tax) if struct else 0.0,
+                    float(struct.other_deductions) if struct else 0.0,
+                    "",  # Leaves Available (blank)
+                    "",  # Working Days (blank)
+                    ""   # Extra Days (blank)
+                ]
+                ws.append(row_data)
+
+                for col_idx in range(1, 14):
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    if col_idx in [1, 2, 3]:
+                        cell.protection = locked_style
+                    else:
+                        cell.protection = unlocked_style
+                row_idx += 1
+
+        response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response['Content-Disposition'] = f'attachment; filename="salary_sheet_{month}_{year}.xlsx"'
+        wb.save(response)
+        return response
+
+
+class SalaryImportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can import salary sheets.")
+
+        file_obj = request.FILES.get('file')
+        month_str = request.data.get('month')
+        year_str = request.data.get('year')
+
+        if not file_obj or not month_str or not year_str:
+            return Response({'error': 'file, month, and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month_str)
+            year = int(year_str)
+            if not (1 <= month <= 12):
+                raise ValueError()
+        except ValueError:
+            return Response({'error': 'Invalid month or year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Create batch
+        batch = SalaryImportBatch.objects.create(
+            month=month,
+            year=year,
+            file_name=file_obj.name,
+            uploaded_by=request.user,
+            status='processing'
         )
+
+        try:
+            wb = openpyxl.load_workbook(file_obj, data_only=True)
+            ws = wb.active
+        except Exception as e:
+            batch.status = 'failed'
+            batch.save()
+            return Response({'error': f'Failed to parse Excel file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Parsers
+        def parse_decimal(val, col_name):
+            if val is None or str(val).strip() == "":
+                return Decimal("0.00")
+            try:
+                cleaned = str(val).strip().replace("$", "").replace(",", "")
+                d = Decimal(cleaned)
+                if d < 0:
+                    raise ValueError()
+                return d
+            except Exception:
+                raise ValueError(f"Invalid value in column {col_name}")
+
+        headers = [
+            "Emp ID", "Emp Name", "Department", "Location", "Gross Salary", 
+            "PF Contribution", "ESI", "Labour Welfare Fund", "Professional Tax", 
+            "Other Deductions", "Leaves Available", "Working Days", "Leave Encashment / Extra Days"
+        ]
+
+        total_records = 0
+        success_count = 0
+        failed_count = 0
+        failed_rows_data = []
+
+        try:
+            with transaction.atomic():
+                for r_idx in range(2, ws.max_row + 1):
+                    emp_id_val = ws.cell(row=r_idx, column=1).value
+                    if emp_id_val is None or str(emp_id_val).strip() == "":
+                        continue
+
+                    total_records += 1
+                    row_vals = [ws.cell(row=r_idx, column=c).value for c in range(1, 14)]
+                    emp_id = str(emp_id_val).strip()
+
+                    sid = transaction.savepoint()
+                    try:
+                        # Validate Employee
+                        employee = Employee.objects.filter(emp_id=emp_id, is_deleted=False).first()
+                        if not employee:
+                            raise ValueError("Employee ID not found")
+                        if employee.status != 'Active':
+                            raise ValueError("Employee is inactive")
+
+                        # Parse data
+                        location = str(ws.cell(row=r_idx, column=4).value or "Mohali").strip()
+                        gross_salary = parse_decimal(ws.cell(row=r_idx, column=5).value, "Gross Salary")
+                        pf_contribution = parse_decimal(ws.cell(row=r_idx, column=6).value, "PF Contribution")
+                        esi = parse_decimal(ws.cell(row=r_idx, column=7).value, "ESI")
+                        labour_welfare_fund = parse_decimal(ws.cell(row=r_idx, column=8).value, "Labour Welfare Fund")
+                        professional_tax = parse_decimal(ws.cell(row=r_idx, column=9).value, "Professional Tax")
+                        other_deductions = parse_decimal(ws.cell(row=r_idx, column=10).value, "Other Deductions")
+                        leaves_available = parse_decimal(ws.cell(row=r_idx, column=11).value, "Leaves Available")
+                        working_days = parse_decimal(ws.cell(row=r_idx, column=12).value, "Working Days")
+                        extra_days = parse_decimal(ws.cell(row=r_idx, column=13).value, "Leave Encashment / Extra Days")
+
+                        # Save SalarySlip
+                        slip = SalarySlip.objects.filter(employee=employee, month=month, year=year).first()
+                        if slip:
+                            slip.location = location
+                            slip.gross_salary = gross_salary
+                            slip.pf_contribution = pf_contribution
+                            slip.esi = esi
+                            slip.labour_welfare_fund = labour_welfare_fund
+                            slip.professional_tax = professional_tax
+                            slip.other_deductions = other_deductions
+                            slip.leaves_available = leaves_available
+                            slip.working_days = working_days
+                            slip.extra_days = extra_days
+                            slip.status = 'draft' # Re-review needed
+                            slip.uploaded_batch = batch
+                            slip.save()
+                        else:
+                            slip = SalarySlip.objects.create(
+                                employee=employee,
+                                month=month,
+                                year=year,
+                                location=location,
+                                gross_salary=gross_salary,
+                                pf_contribution=pf_contribution,
+                                esi=esi,
+                                labour_welfare_fund=labour_welfare_fund,
+                                professional_tax=professional_tax,
+                                other_deductions=other_deductions,
+                                leaves_available=leaves_available,
+                                working_days=working_days,
+                                extra_days=extra_days,
+                                status='draft',
+                                uploaded_batch=batch
+                            )
+                        
+                        generate_payslip_pdf(slip)
+                        transaction.savepoint_commit(sid)
+                        success_count += 1
+                    except Exception as e:
+                        transaction.savepoint_rollback(sid)
+                        failed_count += 1
+                        failed_rows_data.append((row_vals, str(e)))
+
+                if failed_count == total_records and total_records > 0:
+                    raise Exception("All rows failed validation")
+        except Exception as batch_err:
+            # Batch fully failed rollback occurred
+            batch.status = 'failed'
+            batch.total_records = total_records
+            batch.success_count = 0
+            batch.failed_count = total_records
+            
+            error_report_url = self.generate_error_xlsx(batch.id, headers, failed_rows_data)
+            batch.error_report_path = error_report_url
+            batch.save()
+            return Response({
+                "total": total_records,
+                "success": 0,
+                "failed": total_records,
+                "error_report_url": error_report_url,
+                "detail": str(batch_err)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Batch committed
+        if failed_count > 0:
+            batch.status = 'partial'
+            error_report_url = self.generate_error_xlsx(batch.id, headers, failed_rows_data)
+            batch.error_report_path = error_report_url
+        else:
+            batch.status = 'success'
+            error_report_url = None
+
+        batch.total_records = total_records
+        batch.success_count = success_count
+        batch.failed_count = failed_count
+        batch.save()
+
+        return Response({
+            "total": total_records,
+            "success": success_count,
+            "failed": failed_count,
+            "error_report_url": error_report_url
+        }, status=status.HTTP_200_OK)
+
+    def generate_error_xlsx(self, batch_id, headers, failed_rows_data):
+        error_report_dir = os.path.join(settings.MEDIA_ROOT, "error_reports")
+        os.makedirs(error_report_dir, exist_ok=True)
+        report_filename = f"error_report_{batch_id}_{int(datetime.datetime.now().timestamp())}.xlsx"
+        report_path = os.path.join(error_report_dir, report_filename)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Errors"
+        ws.append(headers + ["Error Reason"])
+
+        for row_vals, reason in failed_rows_data:
+            ws.append(row_vals + [reason])
+
+        wb.save(report_path)
+        return f"{settings.MEDIA_URL}error_reports/{report_filename}"
+
+
+class SalaryPublishView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can publish slips.")
+
+        month_str = request.data.get('month')
+        year_str = request.data.get('year')
+
+        if not month_str or not year_str:
+            return Response({'error': 'month and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month_str)
+            year = int(year_str)
+        except ValueError:
+            return Response({'error': 'Invalid month or year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        slips = SalarySlip.objects.filter(month=month, year=year, status='draft')
+        count = slips.count()
+        for slip in slips:
+            slip.status = 'published'
+            slip.save()
+            generate_payslip_pdf(slip)
+
+        return Response({'message': f'Successfully published {count} salary slips.'}, status=status.HTTP_200_OK)
+
+
+class SalaryEditView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can edit salary slips.")
+
+        slip = get_object_or_404(SalarySlip, pk=pk)
+
+        # Exclude read-only calculations from direct parsing
+        mutable_fields = [
+            'location', 'leaves_available', 'working_days', 'extra_days',
+            'gross_salary', 'pf_contribution', 'esi', 'labour_welfare_fund',
+            'professional_tax', 'other_deductions', 'net_credited_amount',
+            'payment_status', 'payment_date', 'transaction_ref'
+        ]
+
+        for field in mutable_fields:
+            if field in request.data:
+                val = request.data[field]
+                if field in ['payment_status', 'transaction_ref', 'location']:
+                    setattr(slip, field, val)
+                elif field == 'payment_date':
+                    setattr(slip, field, val if val else None)
+                else:
+                    setattr(slip, field, Decimal(str(val)) if val else Decimal('0.00'))
+
+        slip.status = 'draft' # Re-review needed after edit
+        slip.save()
+        generate_payslip_pdf(slip)
+
+        serializer = SalarySlipSerializer(slip)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class SalaryHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        role = check_role(request.user)
+        
+        # Scoped logic
+        if role == 'employee':
+            # Force self
+            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
+            if not employee:
+                return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+            slips = SalarySlip.objects.filter(employee=employee, status='published').order_by('-year', '-month')
+        else:
+            # Admin / HR
+            employee_id = request.query_params.get('employee_id') or kwargs.get('employee_id')
+            if employee_id:
+                slips = SalarySlip.objects.filter(employee_id=employee_id).order_by('-year', '-month')
+            else:
+                # Paginate all employees slips
+                slips = SalarySlip.objects.all().order_by('-year', '-month')
+
+        # Payment status filtering
+        payment_status = request.query_params.get('payment_status')
+        if payment_status:
+            slips = slips.filter(payment_status=payment_status)
+
+        # Date range filtering
+        from_param = request.query_params.get('from') # format: YYYY-MM
+        to_param = request.query_params.get('to')     # format: YYYY-MM
+
+        if from_param:
+            try:
+                fY, fM = map(int, from_param.split('-'))
+                slips = slips.filter(
+                    models.Q(year__gt=fY) | models.Q(year=fY, month__gte=fM)
+                )
+            except ValueError:
+                pass
+
+        if to_param:
+            try:
+                tY, tM = map(int, to_param.split('-'))
+                slips = slips.filter(
+                    models.Q(year__lt=tY) | models.Q(year=tY, month__lte=tM)
+                )
+            except ValueError:
+                pass
+
+        # Pagination
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(slips, request, view=self)
+        
+        data = []
+        target_list = page if page is not None else slips
+        for s in target_list:
+            data.append({
+                'id': s.id,
+                'employee_id': s.employee.id,
+                'employee_name': s.employee.name,
+                'month': s.month,
+                'year': s.year,
+                'location': s.location,
+                'leaves_available': str(s.leaves_available),
+                'working_days': str(s.working_days),
+                'extra_days': str(s.extra_days),
+                'gross_salary': str(s.gross_salary),
+                'pf_contribution': str(s.pf_contribution),
+                'esi': str(s.esi),
+                'labour_welfare_fund': str(s.labour_welfare_fund),
+                'professional_tax': str(s.professional_tax),
+                'other_deductions': str(s.other_deductions),
+                'total_deductions': str(s.total_deductions),
+                'net_salary': str(s.net_salary),
+                'net_credited_amount': str(s.net_credited_amount),
+                'payment_status': s.payment_status,
+                'payment_date': str(s.payment_date) if s.payment_date else '',
+                'transaction_ref': s.transaction_ref or '',
+                'status': s.status
+            })
+
+        if page is not None:
+            return paginator.get_paginated_response(data)
+        return Response(data)
+
+
+class SalarySlipDownloadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        role = check_role(request.user)
+
+        employee_id = request.query_params.get('employee_id')
+        download_type = request.query_params.get('type') # single | last3 | last4 | range | bulk_month | selected
+
+        if role == 'employee':
+            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
+            if not employee:
+                return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+            employee_id = employee.id
+            # Employees can only download published slips
+            slips_qs = SalarySlip.objects.filter(employee_id=employee_id, status='published')
+        else:
+            # Admin/HR
+            if download_type in ['bulk_month', 'selected'] and not employee_id:
+                slips_qs = SalarySlip.objects.all()
+            else:
+                if not employee_id:
+                    return Response({'error': 'employee_id parameter is required for Admin/HR.'}, status=status.HTTP_400_BAD_REQUEST)
+                slips_qs = SalarySlip.objects.filter(employee_id=employee_id)
+
+        # Filters
+        slips = []
+        if download_type == 'single':
+            month_str = request.query_params.get('month')
+            year_str = request.query_params.get('year')
+            if not month_str or not year_str:
+                return Response({'error': 'month and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            slips = slips_qs.filter(month=int(month_str), year=int(year_str))
+        elif download_type == 'last3':
+            slips = slips_qs.order_by('-year', '-month')[:3]
+        elif download_type == 'last4':
+            slips = slips_qs.order_by('-year', '-month')[:4]
+        elif download_type == 'range':
+            from_month = int(request.query_params.get('from_month', 1))
+            from_year = int(request.query_params.get('from_year', 2000))
+            to_month = int(request.query_params.get('to_month', 12))
+            to_year = int(request.query_params.get('to_year', 2100))
+            
+            # Filters BETWEEN from and to inclusive
+            slips = slips_qs.filter(
+                models.Q(year__gt=from_year) | models.Q(year=from_year, month__gte=from_month)
+            ).filter(
+                models.Q(year__lt=to_year) | models.Q(year=to_year, month__lte=to_month)
+            ).order_by('year', 'month')
+        elif download_type == 'bulk_month':
+            if role not in ['admin', 'hr']:
+                raise PermissionDenied("Only Admin/HR can bulk download slips.")
+            month_str = request.query_params.get('month')
+            year_str = request.query_params.get('year')
+            if not month_str or not year_str:
+                return Response({'error': 'month and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            slips = slips_qs.filter(month=int(month_str), year=int(year_str))
+        elif download_type == 'selected':
+            slip_ids_str = request.query_params.get('slip_ids')
+            if not slip_ids_str:
+                return Response({'error': 'slip_ids parameter is required for type=selected.'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                ids = [int(x) for x in slip_ids_str.split(',')]
+                slips = slips_qs.filter(id__in=ids)
+            except ValueError:
+                return Response({'error': 'Invalid slip_ids parameter.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'error': 'Invalid download type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        slips = list(slips)
+        if not slips:
+            return Response({'error': 'No salary slips found matching parameters.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if len(slips) == 1:
+            slip = slips[0]
+            # Ensure PDF exists
+            generate_payslip_pdf(slip)
+            
+            # Serve single PDF
+            response = HttpResponse(slip.pdf_file.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="payslip_{slip.employee.emp_id}_{slip.month}_{slip.year}.pdf"'
+            return response
+        else:
+            # Serve ZIP
+            zip_type = 'bulk' if download_type == 'bulk_month' else 'employee'
+            zip_data = generate_payslips_zip(slips, zip_type)
+            
+            response = HttpResponse(zip_data, content_type='application/zip')
+            response['Content-Disposition'] = f'attachment; filename="payslips_{int(datetime.datetime.now().timestamp())}.zip"'
+            return response
+
+
+class SalaryImportBatchesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can view import batches.")
+
+        batches = SalaryImportBatch.objects.all().order_by('-uploaded_at')
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(batches, request, view=self)
+        serializer = SalaryImportBatchSerializer(page if page is not None else batches, many=True)
+        
+        if page is not None:
+            return paginator.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+
+class SalaryEmployeeSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, employee_id):
+        role = check_role(request.user)
+        if role == 'employee':
+            # Employees can only view their own summary
+            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
+            if not employee or employee.id != employee_id:
+                raise PermissionDenied("You can only view your own salary summary.")
+
+        slips = SalarySlip.objects.filter(employee_id=employee_id)
+        
+        total_credited = slips.aggregate(models.Sum('net_credited_amount'))['net_credited_amount__sum'] or Decimal('0.00')
+        total_deductions = slips.aggregate(models.Sum('total_deductions'))['total_deductions__sum'] or Decimal('0.00')
+        total_payslips = slips.count()
+        last_paid_slip = slips.filter(payment_status='paid', payment_date__isnull=False).order_by('-payment_date').first()
+        last_payment_date = last_paid_slip.payment_date.strftime('%Y-%m-%d') if last_paid_slip else '-'
+
+        return Response({
+            'total_salary_credited': str(total_credited),
+            'total_deductions': str(total_deductions),
+            'total_payslips': total_payslips,
+            'last_payment_date': last_payment_date
+        })
+
+
+class SalaryEmployeeHistoryExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, employee_id):
+        role = check_role(request.user)
+        if role == 'employee':
+            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
+            if not employee or employee.id != employee_id:
+                raise PermissionDenied("You can only export your own salary history.")
+        else:
+            employee = get_object_or_404(Employee, id=employee_id, is_deleted=False)
+
+        slips = SalarySlip.objects.filter(employee=employee).order_by('-year', '-month')
+
+        from_param = request.query_params.get('from')
+        to_param = request.query_params.get('to')
+        payment_status = request.query_params.get('payment_status')
+
+        if from_param:
+            try:
+                fY, fM = map(int, from_param.split('-'))
+                slips = slips.filter(models.Q(year__gt=fY) | models.Q(year=fY, month__gte=fM))
+            except ValueError:
+                pass
+        if to_param:
+            try:
+                tY, tM = map(int, to_param.split('-'))
+                slips = slips.filter(models.Q(year__lt=tY) | models.Q(year=tY, month__lte=tM))
+            except ValueError:
+                pass
+        if payment_status:
+            slips = slips.filter(payment_status=payment_status)
+
+        headers = [
+            "Month/Year", "Location", "Gross Salary", "PF Contribution", "ESI", 
+            "Labour Welfare Fund", "Professional Tax", "Other Deductions", "Leaves Available", 
+            "Working Days", "Leave Encashment / Extra Days", "Total Deductions", "Net Salary", 
+            "Net Credited Amount", "Payment Status", "Payment Date", "Transaction Ref"
+        ]
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Salary History"
+        ws.append(headers)
+
+        month_names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+        for s in slips:
+            ws.append([
+                f"{month_names[s.month]} {s.year}",
+                s.location,
+                float(s.gross_salary),
+                float(s.pf_contribution),
+                float(s.esi),
+                float(s.labour_welfare_fund),
+                float(s.professional_tax),
+                float(s.other_deductions),
+                float(s.leaves_available),
+                float(s.working_days),
+                float(s.extra_days),
+                float(s.total_deductions),
+                float(s.net_salary),
+                float(s.net_credited_amount),
+                s.payment_status.capitalize(),
+                s.payment_date.strftime('%Y-%m-%d') if s.payment_date else '',
+                s.transaction_ref or ''
+            ])
+
+        response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response['Content-Disposition'] = f'attachment; filename="salary_history_{employee.emp_id}.xlsx"'
+        wb.save(response)
+        return response

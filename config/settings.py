@@ -14,7 +14,7 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
-load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR / '.env', override=True)
 
 # Add 'apps' folder to Python path (so custom apps can be imported without 'apps.')
 sys.path.insert(0, str(BASE_DIR / 'apps'))

@@ -57,6 +57,8 @@ class EmployeeSalaryStructureSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    name = serializers.ReadOnlyField()
+    department_name = serializers.ReadOnlyField(source='department.name')
     aadhaar = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=12)
     pan = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=10)
     aadhaar_masked = serializers.SerializerMethodField(read_only=True)

@@ -325,7 +325,7 @@
                 </div>
             </div>
 
-            <!-- TAB 3: SALARY STRUCTURE -->
+                    <!-- TAB 3: SALARY STRUCTURE -->
             <div id="profileTabSalary" class="profile-tab-content" style="display: none;">
                 <!-- Setup/Edit Salary structure Form -->
                 <div class="card" id="salaryStructureSetupCard" style="background-color: var(--bg-card); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; margin-bottom: 30px; box-shadow: var(--shadow-sm);">
@@ -351,36 +351,9 @@
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 15px;">
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Basic Salary *</label>
-                                        <input type="number" step="0.01" id="salBasic" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Gross Salary *</label>
+                                        <input type="number" step="0.01" id="salGrossSalary" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
-                                    <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">HRA *</label>
-                                        <input type="number" step="0.01" id="salHra" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Conveyance Allowance</label>
-                                        <input type="number" step="0.01" id="salConveyance" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Medical Allowance</label>
-                                        <input type="number" step="0.01" id="salMedical" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Special Allowance</label>
-                                        <input type="number" step="0.01" id="salSpecial" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Monthly Bonus</label>
-                                        <input type="number" step="0.01" id="salMonthlyBonus" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
-                                    </div>
-                                </div>
-                                
-                                <!-- Repeatable Allowance rows -->
-                                <div id="repeatableAllowancesContainer" style="margin-top: 20px;">
-                                    <label style="font-weight: 700; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Other Allowances</label>
-                                    <div id="allowanceRowsList" style="display:flex; flex-direction:column; gap:10px; margin-top:10px;"></div>
-                                    <button type="button" class="btn" onclick="addAllowanceRow()" style="font-size:11px; padding:6px 12px; border-radius:6px; margin-top:10px; background-color: var(--bg-main); border: 1.5px solid var(--border-accent); color: var(--text-secondary);">+ Add Custom Allowance</button>
                                 </div>
                             </div>
                             
@@ -391,31 +364,25 @@
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 15px;">
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">PF Mode *</label>
-                                        <select id="salPfMode" onchange="togglePfInput(); calculateTakeHomeSalary();" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
-                                            <option value="FIXED">Fixed Amount</option>
-                                            <option value="PERCENT">Percent of Basic</option>
-                                        </select>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">PF Contribution</label>
+                                        <input type="number" step="0.01" id="salPfContribution" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
-                                        <label id="salPfLabel" style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">PF Amount *</label>
-                                        <input type="number" step="0.01" id="salPfValue" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">ESI</label>
+                                        <input type="number" step="0.01" id="salEsi" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Professional Tax *</label>
-                                        <input type="number" step="0.01" id="salPt" value="200" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Labour Welfare Fund</label>
+                                        <input type="number" step="0.01" id="salLabourWelfareFund" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">TDS (Monthly Tax) *</label>
-                                        <input type="number" step="0.01" id="salTds" value="0.00" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Professional Tax</label>
+                                        <input type="number" step="0.01" id="salProfessionalTax" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
-                                </div>
-                                
-                                <!-- Repeatable Deduction rows -->
-                                <div id="repeatableDeductionsContainer" style="margin-top: 20px;">
-                                    <label style="font-weight: 700; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Other Deductions</label>
-                                    <div id="deductionRowsList" style="display:flex; flex-direction:column; gap:10px; margin-top:10px;"></div>
-                                    <button type="button" class="btn" onclick="addDeductionRow()" style="font-size:11px; padding:6px 12px; border-radius:6px; margin-top:10px; background-color: var(--bg-main); border: 1.5px solid var(--border-accent); color: var(--text-secondary);">+ Add Custom Deduction</button>
+                                    <div>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Other Deductions</label>
+                                        <input type="number" step="0.01" id="salOtherDeductions" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -102,29 +102,29 @@ def get_letter_context(employee, custom_context=None):
         'signatory_designation': custom_context.get('signatory_designation', getattr(settings, 'LETTER_SIGNATORY_DESIGNATION', 'Authorized Signatory')),
     }
     
-    # Populate salary details
-    basic = custom_context.get('basic', str(salary_struct.basic) if salary_struct else '0.00')
-    hra = custom_context.get('hra', str(salary_struct.hra) if salary_struct else '0.00')
-    conveyance = custom_context.get('conveyance', str(salary_struct.conveyance) if salary_struct else '0.00')
-    medical = custom_context.get('medical', str(salary_struct.medical) if salary_struct else '0.00')
-    special = custom_context.get('special', str(salary_struct.special) if salary_struct else '0.00')
-    monthly_bonus = custom_context.get('monthly_bonus', str(salary_struct.monthly_bonus) if salary_struct else '0.00')
+    # Populate salary details safely
+    basic = custom_context.get('basic', str(getattr(salary_struct, 'basic', '0.00')) if salary_struct else '0.00')
+    hra = custom_context.get('hra', str(getattr(salary_struct, 'hra', '0.00')) if salary_struct else '0.00')
+    conveyance = custom_context.get('conveyance', str(getattr(salary_struct, 'conveyance', '0.00')) if salary_struct else '0.00')
+    medical = custom_context.get('medical', str(getattr(salary_struct, 'medical', '0.00')) if salary_struct else '0.00')
+    special = custom_context.get('special', str(getattr(salary_struct, 'special', '0.00')) if salary_struct else '0.00')
+    monthly_bonus = custom_context.get('monthly_bonus', str(getattr(salary_struct, 'monthly_bonus', '0.00')) if salary_struct else '0.00')
     
-    pf = custom_context.get('pf', str(salary_struct.pf) if salary_struct else '0.00')
-    pt = custom_context.get('professional_tax', str(salary_struct.professional_tax) if salary_struct else '200.00')
-    tds = custom_context.get('tds', str(salary_struct.tds) if salary_struct else '0.00')
+    pf = custom_context.get('pf', str(getattr(salary_struct, 'pf_contribution', getattr(salary_struct, 'pf', '0.00'))) if salary_struct else '0.00')
+    pt = custom_context.get('professional_tax', str(getattr(salary_struct, 'professional_tax', '200.00')) if salary_struct else '200.00')
+    tds = custom_context.get('tds', str(getattr(salary_struct, 'tds', '0.00')) if salary_struct else '0.00')
     
-    gross_salary = custom_context.get('gross_salary', str(salary_struct.gross_salary) if salary_struct else '0.00')
-    total_deductions = custom_context.get('total_deductions', str(salary_struct.total_deductions) if salary_struct else '0.00')
-    net_salary = custom_context.get('net_salary', str(salary_struct.net_salary) if salary_struct else '0.00')
+    gross_salary = custom_context.get('gross_salary', str(getattr(salary_struct, 'gross_salary', '0.00')) if salary_struct else '0.00')
+    total_deductions = custom_context.get('total_deductions', str(getattr(salary_struct, 'total_deductions', '0.00')) if salary_struct else '0.00')
+    net_salary = custom_context.get('net_salary', str(getattr(salary_struct, 'net_salary', '0.00')) if salary_struct else '0.00')
     
     # Extra breakup fields requested
-    ctc = custom_context.get('ctc', str(salary_struct.gross_salary) if salary_struct else '0.00')
+    ctc = custom_context.get('ctc', str(getattr(salary_struct, 'gross_salary', '0.00')) if salary_struct else '0.00')
     esi_employer = custom_context.get('esi_employer', '0.00')
     pf_employer = custom_context.get('pf_employer', '0.00')
     pf_employee = custom_context.get('pf_employee', pf)
-    esi_employee = custom_context.get('esi_employee', '0.00')
-    lwf = custom_context.get('lwf', '0.00')
+    esi_employee = custom_context.get('esi_employee', str(getattr(salary_struct, 'esi', '0.00')) if salary_struct else '0.00')
+    lwf = custom_context.get('lwf', str(getattr(salary_struct, 'labour_welfare_fund', '0.00')) if salary_struct else '0.00')
     in_hand = custom_context.get('in_hand', net_salary)
     
     context.update({
@@ -148,7 +148,6 @@ def get_letter_context(employee, custom_context=None):
         'pf_employee': pf_employee,
         'esi_employee': esi_employee,
         'lwf': lwf,
-        'professional_tax': pt,
         'in_hand': in_hand,
         
         'bond_period': custom_emp['bond_period_months'],
@@ -156,8 +155,12 @@ def get_letter_context(employee, custom_context=None):
         'notice_period': custom_emp['notice_period_days'],
         'penalty_salary': 'two months’ salary',
         
-        'other_allowances': salary_struct.other_allowances if salary_struct else [],
-        'other_deductions': salary_struct.other_deductions if salary_struct else [],
+        'other_allowances': getattr(salary_struct, 'other_allowances', []),
+        'other_deductions': [
+            {'label': 'ESI', 'amount': getattr(salary_struct, 'esi', 0)},
+            {'label': 'Labour Welfare Fund', 'amount': getattr(salary_struct, 'labour_welfare_fund', 0)},
+            {'label': 'Other Deductions', 'amount': getattr(salary_struct, 'other_deductions', 0)},
+        ] if salary_struct else [],
     })
     
     return context
