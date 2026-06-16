@@ -6,6 +6,17 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    # Configure DLL path for WeasyPrint/GTK on Windows
+    import os
+    tess_path = r"C:\Program Files\Tesseract-OCR"
+    if os.path.exists(tess_path):
+        os.environ["PATH"] = tess_path + os.pathsep + os.environ.get("PATH", "")
+        if hasattr(os, "add_dll_directory"):
+            try:
+                os.add_dll_directory(tess_path)
+            except Exception:
+                pass
+
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     try:
         from django.core.management import execute_from_command_line

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exit Clearance Questionnaire</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+            padding: 35px;
+            text-align: center;
+            color: #ffffff;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+        }
+        .header p {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px 35px;
+        }
+        .salutation {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 15px;
+        }
+        .body-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #334155;
+            margin-bottom: 25px;
+        }
+        .info-card {
+            background-color: #f1f5f9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+        .info-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+        .info-value {
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .cta-container {
+            text-align: center;
+            margin: 35px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #7c3aed;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 14px 30px;
+            font-size: 15px;
+            font-weight: 700;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+            transition: all 0.2s;
+        }
+        .cta-button:hover {
+            background-color: #6d28d9;
+            box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35);
+        }
+        .warning-box {
+            background-color: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 30px;
+            font-size: 13.5px;
+            color: #78350f;
+            line-height: 1.5;
+        }
+        .footer {
+            background-color: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            padding: 30px 35px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        .footer a {
+            color: #7c3aed;
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Exit Clearance Form</h1>
+            <p>MTLV Solutions Private Limited</p>
+        </div>
+        <div class="content">
+            <div class="salutation">Dear {{ employee.first_name }},</div>
+            <div class="body-text">
+                Your offboarding and exit clearance process has been initiated in the HR Portal. As part of this workflow, please complete your secure exit clearance questionnaire and verify the return details of any company assets assigned to you.
+            </div>
+            
+            <div class="info-card">
+                <div class="info-row">
+                    <span class="info-label">Employee Name:</span>
+                    <span class="info-value">{{ employee.first_name }} {{ employee.last_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Employee ID:</span>
+                    <span class="info-value">{{ employee.emp_id }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Last Working Day:</span>
+                    <span class="info-value">{{ exit_request.last_working_day|date:"d M Y" }}</span>
+                </div>
+            </div>
+
+            <div class="warning-box">
+                <strong>Important Notice:</strong> This link is secure, unique to your profile, and will expire on <strong>{{ exit_request.secure_link_expires_at|date:"d M Y, h:i A" }}</strong> ({{ expiry_days }} days). Please submit the form before this date to prevent delays in your Full & Final Settlement processing.
+            </div>
+
+            <div class="cta-container">
+                <a href="{{ url }}" class="cta-button" target="_blank">Complete Exit Questionnaire</a>
+            </div>
+
+            <div class="body-text" style="font-size: 13.5px; color: #64748b; margin-top: 25px;">
+                If the button above does not work, copy and paste the following link into your web browser:<br>
+                <a href="{{ url }}" style="color: #4f46e5; word-break: break-all;">{{ url }}</a>
+            </div>
+        </div>
+        <div class="footer">
+            This is an automated system email from the MTLV HR Portal.<br>
+            For any queries regarding your offboarding or F&F settlement, contact us at <a href="mailto:hr@mtlvsolutions.com">hr@mtlvsolutions.com</a>.
+        </div>
+    </div>
+</body>
+</html>

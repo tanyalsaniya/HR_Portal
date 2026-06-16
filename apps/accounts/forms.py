@@ -1,0 +1,2 @@
+# apps/accounts/forms.py
+from django import forms

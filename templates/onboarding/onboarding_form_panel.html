@@ -1,0 +1,133 @@
+<!-- VIEW 2b: ONBOARD NEW EMPLOYEE (FORM PAGE) -->
+<div id="onboardingFormView" class="view-panel" style="display: none;">
+    <div class="flex-row-header">
+        <h2>Onboard New Employee</h2>
+        <button class="btn" style="background-color: var(--border-color); color: var(--text-color);" onclick="switchView('onboardingView')">Back to Directory</button>
+    </div>
+    <div class="card" style="background-color: var(--card-bg); border-radius: 8px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-top: 20px;">
+        <form id="onboardForm">
+            <!-- Profile Photo Upload -->
+            <div style="display: flex; gap: 30px; margin-bottom: 25px; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 25px;">
+                <div style="position: relative; width: 120px; height: 150px; border: 2px dashed #cbd5e1; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8fafc; overflow: hidden; cursor: pointer;" onclick="document.getElementById('empProfilePhoto').click()">
+                    <img id="empPhotoPreview" style="display: none; width: 100%; height: 100%; object-fit: cover;" />
+                    <div id="empPhotoPlaceholder" style="text-align: center; color: #64748b; padding: 10px; font-size: 8.5pt;">
+                        <svg style="margin: 0 auto 8px; display: block; color: #94a3b8;" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                        Upload Photo<br>(Passport Size)
+                    </div>
+                </div>
+                <div>
+                    <h4 style="margin: 0 0 5px; color: var(--text-main);">Passport Size Photo</h4>
+                    <p style="margin: 0 0 10px; font-size: 8.5pt; color: #64748b;">JPG or PNG, max 2MB. Portrait aspect ratio recommended.</p>
+                    <input type="file" id="empProfilePhoto" accept="image/*" style="display: none;" onchange="previewProfilePhoto(this)">
+                    <button type="button" class="btn" style="font-size: 8.5pt; padding: 5px 12px;" onclick="document.getElementById('empProfilePhoto').click()">Choose File</button>
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div>
+                    <label>First Name*</label>
+                    <input type="text" id="empFirstName" required>
+                </div>
+                <div>
+                    <label>Last Name*</label>
+                    <input type="text" id="empLastName" required>
+                </div>
+                <div>
+                    <label>Email Address*</label>
+                    <input type="email" id="empEmail" required>
+                </div>
+                <div>
+                    <label>Phone Number*</label>
+                    <input type="text" id="empPhone" placeholder="10-digit Indian mobile" required>
+                </div>
+                <div>
+                    <label>Date of Birth*</label>
+                    <input type="date" id="empDob" required>
+                </div>
+                <div>
+                    <label>Gender*</label>
+                    <select id="empGender" required>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                <div class="form-group-full">
+                    <label>Address Line 1*</label>
+                    <input type="text" id="empAddr1" required>
+                </div>
+                <div>
+                    <label>City*</label>
+                    <input type="text" id="empCity" required>
+                </div>
+                <div>
+                    <label>State*</label>
+                    <select id="empState" required></select>
+                </div>
+                <div>
+                    <label>PIN Code*</label>
+                    <input type="text" id="empPin" required>
+                </div>
+                <div>
+                    <label>Department*</label>
+                    <select id="empDept" required></select>
+                </div>
+                <div>
+                    <label>Designation*</label>
+                    <input type="text" id="empDesignation" required>
+                </div>
+                <div>
+                    <label>Employment Type*</label>
+                    <select id="empType" required>
+                        <option value="FULL_TIME">Full-time</option>
+                        <option value="PART_TIME">Part-time</option>
+                        <option value="CONTRACT">Contract</option>
+                        <option value="INTERN">Intern</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Joining Date*</label>
+                    <input type="date" id="empJoining" required>
+                </div>
+                <div>
+                    <label>Notice Period (Days)*</label>
+                    <input type="number" id="empNotice" value="30" required>
+                </div>
+                <div>
+                    <label>Bond Period (Months)</label>
+                    <input type="number" id="empBond" value="0">
+                </div>
+                <div>
+                    <label>Aadhaar Number (12 digit)</label>
+                    <input type="text" id="empAadhaar" placeholder="12-digit numeric">
+                </div>
+                <div>
+                    <label>PAN Number (10 character)</label>
+                    <input type="text" id="empPan" placeholder="ABCDE1234F">
+                </div>
+                <div>
+                    <label>Emergency Contact Name*</label>
+                    <input type="text" id="empEmergencyName" required>
+                </div>
+                <div>
+                    <label>Emergency Relationship*</label>
+                    <select id="empEmergencyRel" required>
+                        <option value="PARENT">Parent</option>
+                        <option value="SPOUSE">Spouse</option>
+                        <option value="SIBLING">Sibling</option>
+                        <option value="FRIEND">Friend</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Emergency Phone*</label>
+                    <input type="text" id="empEmergencyPhone" required>
+                </div>
+            </div>
+            <div style="margin-top: 25px; text-align: right;">
+                <button type="button" class="btn" style="margin-right: 10px; background-color: var(--border-color); color: var(--text-color);" onclick="switchView('onboardingView')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+            </div>
+        </form>
+    </div>
+</div>

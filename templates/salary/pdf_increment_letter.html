@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Salary Increment Letter</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .company-name {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 10pt;
+            color: #555;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 25px;
+        }
+        .salutation {
+            margin-bottom: 15px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .details-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        .details-table td.label {
+            font-weight: bold;
+            background-color: #f9f9f9;
+            width: 40%;
+        }
+        .signature-section {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+        .signature-line {
+            width: 200px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR & Payroll Division • Secure Corporate Node</div>
+    </div>
+    
+    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
+    
+    <div class="salutation">Dear {{ employee.first_name }} {{ employee.last_name }},</div>
+    
+    <div class="subject">Subject: Confirmation of Salary Revision</div>
+    
+    <div class="content">
+        <p>We are pleased to inform you that following the review of your performance and service anniversary milestones, the management has approved a revision to your annual compensation structure.</p>
+        
+        <p>Your revised salary structure details are listed below, effective from <strong>{{ approval.effective_date|date:"F d, Y" }}</strong>:</p>
+        
+        <table class="details-table">
+            <tr>
+                <td class="label">Employee ID</td>
+                <td>{{ employee.emp_id }}</td>
+            </tr>
+            <tr>
+                <td class="label">Designation</td>
+                <td>{{ employee.designation }}</td>
+            </tr>
+            <tr>
+                <td class="label">Previous Net Salary (Monthly)</td>
+                <td>Rs. {{ approval.old_net }}</td>
+            </tr>
+            <tr>
+                <td class="label">New Basic Salary (Monthly)</td>
+                <td>Rs. {{ approval.new_basic }}</td>
+            </tr>
+            <tr>
+                <td class="label">New HRA (Monthly)</td>
+                <td>Rs. {{ approval.new_hra }}</td>
+            </tr>
+            <tr>
+                <td class="label">New Special Allowances (Monthly)</td>
+                <td>Rs. {{ approval.new_allowances }}</td>
+            </tr>
+            <tr>
+                <td class="label">New Net Salary (Monthly)</td>
+                <td><strong>Rs. {{ approval.new_net }}</strong></td>
+            </tr>
+            <tr>
+                <td class="label">Increment Amount (Monthly)</td>
+                <td>Rs. {{ approval.increment_amount }}</td>
+            </tr>
+            <tr>
+                <td class="label">Increment Percentage</td>
+                <td><strong>{{ approval.increment_pct }}%</strong></td>
+            </tr>
+        </table>
+        
+        <p><strong>Reason for Revision:</strong><br>
+        {{ approval.reason }}</p>
+        
+        <p>All other terms and conditions of your employment contract remain unchanged. We appreciate your dedication and contribution to <strong>{{ company_name }}</strong> and look forward to your continued valuable contributions in the future.</p>
+    </div>
+    
+    <div class="signature-section">
+        <p>For <strong>{{ company_name }}</strong>,</p>
+        <div class="signature-line">Authorized Signatory</div>
+    </div>
+</body>
+</html>

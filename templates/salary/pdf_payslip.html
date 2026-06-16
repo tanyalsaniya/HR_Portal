@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Salary Payslip - {{ employee.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #000000;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 100%;
+            border: 1px solid #000000;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #000000;
+            padding: 10px;
+        }
+        .company-name {
+            font-size: 13pt;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .company-address {
+            font-size: 9.5pt;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+        .slip-title {
+            font-size: 11pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-bottom: 1px solid #000000;
+        }
+        .meta-table td {
+            border: 1px solid #000000;
+            padding: 6px 10px;
+            font-size: 9.5pt;
+        }
+        .meta-table td.label {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .meta-table td.val {
+            text-align: left;
+        }
+        .meta-table td.num-val {
+            text-align: right;
+        }
+        .main-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .main-table th {
+            border: 1px solid #000000;
+            padding: 8px 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10pt;
+            text-align: center;
+        }
+        .main-table td {
+            border: 1px solid #000000;
+            padding: 6px 10px;
+            vertical-align: top;
+            font-size: 9.5pt;
+        }
+        .main-table td.amount {
+            text-align: right;
+            font-weight: bold;
+        }
+        .main-table .total-row td {
+            font-weight: bold;
+            border-top: 1px solid #000000;
+            border-bottom: 1px solid #000000;
+        }
+        .main-table .net-pay-row td {
+            font-weight: bold;
+            border-top: 1px solid #000000;
+            border-bottom: 1px solid #000000;
+        }
+        .main-table .net-pay-row td.amount {
+            font-size: 11pt;
+        }
+        .words-row td {
+            text-align: center;
+            font-weight: bold;
+            padding: 8px;
+            border-top: 1px solid #000000;
+        }
+        .footer-note {
+            text-align: center;
+            font-style: italic;
+            font-size: 9pt;
+            padding: 8px;
+            border-top: 1px solid #000000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="company-name">DEVEX HUB PVT. LTD.</div>
+            <div class="company-address">GR TOWER THIRD FLOOR  PLOT NO. D-258 INDUSTRIAL AREA PHASE 8-A MOHALI</div>
+            <div class="slip-title">
+                SALARY SLIP FOR THE MONTH OF 
+                {% if slip.month == 1 %}JANUARY{% elif slip.month == 2 %}FEBRUARY{% elif slip.month == 3 %}MARCH{% elif slip.month == 4 %}APRIL{% elif slip.month == 5 %}MAY{% elif slip.month == 6 %}JUNE{% elif slip.month == 7 %}JULY{% elif slip.month == 8 %}AUGUST{% elif slip.month == 9 %}SEPTEMBER{% elif slip.month == 10 %}OCTOBER{% elif slip.month == 11 %}NOVEMBER{% elif slip.month == 12 %}DECEMBER{% endif %} {{ slip.year }}
+            </div>
+        </div>
+
+        <!-- META TABLE -->
+        <table class="meta-table">
+            <tr>
+                <td class="label" style="width: 25%;">EMPLOYEE NAME</td>
+                <td class="val" style="width: 25%;">{{ employee.name }}</td>
+                <td class="label" style="width: 35%;">NO. OF LEAVES AVAIL</td>
+                <td class="num-val" style="width: 15%;">{{ slip.leaves_available }}</td>
+            </tr>
+            <tr>
+                <td class="label">EMPLOYEE DESIGNATION</td>
+                <td class="val">{{ employee.designation }}</td>
+                <td class="label">NO. OF DAYS</td>
+                <td class="num-val">{{ slip.working_days }}</td>
+            </tr>
+            <tr>
+                <td class="label">LOCATION</td>
+                <td class="val">{{ slip.location }}</td>
+                <td class="label">LEAVE ENCASHMENT /EXTRA DAYS</td>
+                <td class="num-val">{{ slip.extra_days }}</td>
+            </tr>
+        </table>
+
+        <!-- MAIN PAYROLL TABLE -->
+        <table class="main-table">
+            <thead>
+                <tr>
+                    <th style="width: 35%; border-left: none;">EARNINGS</th>
+                    <th style="width: 15%;">AMOUNT RS.</th>
+                    <th style="width: 35%;">DEDUCTIONS</th>
+                    <th style="width: 15%; border-right: none;">AMOUNT RS.</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Row 1 -->
+                <tr>
+                    <td style="border-left: none;">GROSS SALARY</td>
+                    <td class="amount">{{ slip.gross_salary }}</td>
+                    <td>PF CONTRIBUTION</td>
+                    <td class="amount" style="border-right: none;">{{ slip.pf_contribution }}</td>
+                </tr>
+                <!-- Row 2 -->
+                <tr>
+                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-bottom: none;"></td>
+                    <td>ESI</td>
+                    <td class="amount" style="border-right: none;">{{ slip.esi }}</td>
+                </tr>
+                <!-- Row 3 -->
+                <tr>
+                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-bottom: none;"></td>
+                    <td>LABOUR WELFARE FUND</td>
+                    <td class="amount" style="border-right: none;">{{ slip.labour_welfare_fund }}</td>
+                </tr>
+                <!-- Row 4 -->
+                <tr>
+                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-bottom: none;"></td>
+                    <td>PROFESSIONAL TAX</td>
+                    <td class="amount" style="border-right: none;">{{ slip.professional_tax }}</td>
+                </tr>
+                <!-- Row 5 -->
+                <tr>
+                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-bottom: none;"></td>
+                    <td style="border-bottom: none;">Other DEDUCTIONS</td>
+                    <td class="amount" style="border-right: none; border-bottom: none;">{{ slip.other_deductions }}</td>
+                </tr>
+                
+                <!-- TOTAL ROW -->
+                <tr class="total-row">
+                    <td style="border-left: none;">TOTAL</td>
+                    <td class="amount">{{ slip.gross_salary }}</td>
+                    <td>TOTAL</td>
+                    <td class="amount" style="border-right: none;">{{ slip.total_deductions }}</td>
+                </tr>
+                
+                <!-- NET PAY ROW -->
+                <tr class="net-pay-row">
+                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-bottom: none;"></td>
+                    <td>NET. PAY</td>
+                    <td class="amount" style="border-right: none; border-bottom: none; color: #000;">{{ slip.net_credited_amount }}</td>
+                </tr>
+                
+                <!-- NET PAY IN WORDS -->
+                <tr class="words-row">
+                    <td colspan="4" style="border-left: none; border-right: none;">{{ net_pay_words }}</td>
+                </tr>
+                
+                <!-- FOOTER NOTE -->
+                <tr class="footer-note">
+                    <td colspan="4" style="border-left: none; border-right: none; border-bottom: none;">
+                        This is a automated pay slip and does not need a signature for verification
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

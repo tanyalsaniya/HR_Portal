@@ -1,0 +1,203 @@
+<!-- VIEW 7: ROLES & PERMISSIONS -->
+<div id="rolesView" class="view-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h2 style="margin:0;">Roles & Permissions Control</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="openAddRoleModal()">+ Add Custom Role</button>
+        </div>
+    </div>
+
+    <!-- Custom styled tabs -->
+    <div style="display: flex; gap: 20px; border-bottom: 2px solid var(--border-color); margin-bottom: 30px; padding-bottom: 10px;">
+        <a id="tabCategoryRoles" class="active-tab" onclick="switchRolesTab('roles-categories')" style="font-weight: 600; cursor: pointer; color: var(--primary-color); padding-bottom: 10px; margin-bottom: -12px;">Category Roles</a>
+        <a id="tabGlobalPermissions" onclick="switchRolesTab('roles-permissions')" style="font-weight: 600; cursor: pointer; color: var(--text-color); padding-bottom: 10px; transition: color 0.2s;">Global Database Permissions</a>
+        <a id="tabPortalUsers" onclick="switchRolesTab('portal-users')" style="font-weight: 600; cursor: pointer; color: var(--text-color); padding-bottom: 10px; transition: color 0.2s;">Portal Users & HRs</a>
+    </div>
+
+    <!-- Tab 1: Category Roles Grid -->
+    <div id="rolesCategoriesTab" style="display: block;">
+        <div class="roles-grid" id="rolesGridContainer">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+
+    <!-- Tab 2: Global Permissions Module List -->
+    <div id="rolesPermissionsTab" style="display: none;">
+        <div class="flex-row-header">
+            <h3>Global Database Permissions</h3>
+            <button class="btn btn-primary" onclick="openAddPermissionModal()">+ Add Global Permission</button>
+        </div>
+        <div class="roles-grid" id="permissionsGridContainer">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 8: ADD NEW ROLE -->
+<div class="modal" id="addRoleModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Add Custom Role</h3>
+            <button onclick="closeAddRoleModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="addRoleForm" onsubmit="submitAddRole(event)">
+            <div>
+                <label>Role Name*</label>
+                <input type="text" id="roleNameInput" placeholder="e.g. Junior HR Analyst" required>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Role Code (Uppercase, No Spaces)*</label>
+                <input type="text" id="roleCodeInput" placeholder="e.g. JUNIOR_HR" required>
+            </div>
+            <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="roleActiveInput" checked style="width: auto; cursor: pointer;">
+                <label for="roleActiveInput" style="margin: 0; cursor: pointer;">Role is Active</label>
+            </div>
+            <div style="margin-top: 25px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Create Role</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 9: ADD NEW PERMISSION -->
+<div class="modal" id="addPermissionModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Add Global Permission</h3>
+            <button onclick="closeAddPermissionModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="addPermissionForm" onsubmit="submitAddPermission(event)">
+            <div>
+                <label>Permission Name*</label>
+                <input type="text" id="permNameInput" placeholder="e.g. Publish Slips to Portal" required>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Permission Codename (format: module.action)*</label>
+                <input type="text" id="permCodenameInput" placeholder="e.g. salary.publish" required>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Module*</label>
+                <select id="permModuleSelect" required>
+                    <option value="onboarding">onboarding</option>
+                    <option value="salary">salary</option>
+                    <option value="exit">exit</option>
+                    <option value="student">student</option>
+                    <option value="audit">audit</option>
+                    <option value="roles">roles</option>
+                </select>
+            </div>
+            <div style="margin-top: 25px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Create Permission</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tab 3: Portal Users Management -->
+<div id="rolesPortalUsersTab" style="display: none;">
+    <div class="flex-row-header" style="margin-bottom: 20px;">
+        <h3>Registered HRs & Portal Users</h3>
+        <button class="btn btn-primary" onclick="openAddUserModal()">+ Register Portal User / HR</button>
+    </div>
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="background: var(--bg-main); border-bottom: 2px solid var(--border-color); font-weight: 600; font-size: 10pt; text-transform: uppercase; color: var(--text-secondary);">
+                    <th style="padding: 15px 20px;">Name</th>
+                    <th style="padding: 15px 20px;">Username</th>
+                    <th style="padding: 15px 20px;">Email</th>
+                    <th style="padding: 15px 20px;">Phone</th>
+                    <th style="padding: 15px 20px;">Role</th>
+                    <th style="padding: 15px 20px;">Status</th>
+                    <th style="padding: 15px 20px; text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="portalUsersTableBody">
+                <!-- Populated dynamically via users.js -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL 10: REGISTER PORTAL USER / HR -->
+<div class="modal" id="addUserModal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Register Portal User / HR</h3>
+            <button onclick="closeAddUserModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="addUserForm" onsubmit="submitAddUser(event)" style="margin-top: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">First Name*</label>
+                    <input type="text" id="userFirstNameInput" placeholder="Rahul" required style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px;">
+                </div>
+                <div>
+                    <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Last Name*</label>
+                    <input type="text" id="userLastNameInput" placeholder="Sharma" required style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px;">
+                </div>
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Username (Unique)*</label>
+                <input type="text" id="userUsernameInput" placeholder="rahul_hr" required style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px;">
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Email Address*</label>
+                <input type="email" id="userEmailInput" placeholder="rahul@company.com" required style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px;">
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Phone Number</label>
+                <input type="text" id="userPhoneInput" placeholder="9876543210" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px;">
+            </div>
+            <div style="margin-top: 12px;">
+                <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Role / Permissions Group*</label>
+                <select id="userRoleSelect" required style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background: var(--bg-card); color: var(--text-main);">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <div style="margin-top: 15px; background: var(--bg-main); padding: 15px; border-radius: 8px; border: 1.5px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="userAutoPasswordInput" checked onchange="toggleManualPasswordFields()" style="width: auto; cursor: pointer;">
+                    <label for="userAutoPasswordInput" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 13px;">Auto-generate secure password</label>
+                </div>
+                <div id="manualPasswordFields" style="display: none; margin-top: 12px;">
+                    <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Manual Password*</label>
+                    <input type="password" id="userManualPasswordInput" placeholder="Min 8 characters" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px;">
+                </div>
+            </div>
+            <div style="margin-top: 25px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Register & Generate Credentials</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 11: USER CREDENTIALS DISPLAY -->
+<div class="modal" id="userCredentialsModal">
+    <div class="modal-content" style="max-width: 450px;">
+        <div class="flex-row-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+            <h3 style="margin:0; color: #10b981;">✔ Registration Successful</h3>
+            <button onclick="closeCredentialsModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <div style="margin-top: 20px;">
+            <p style="font-size: 10.5pt; color: var(--text-secondary); margin-bottom: 20px;">
+                The user account has been registered successfully. The following credentials can now be used to log in:
+            </p>
+            <div style="background: var(--bg-main); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); font-family: monospace; font-size: 10pt; line-height: 1.6;">
+                <div><strong>Email:</strong> <span id="credEmailText"></span></div>
+                <div><strong>Username:</strong> <span id="credUsernameText"></span></div>
+                <div><strong>Password:</strong> <span id="credPasswordText" style="color: #4f46e5; font-weight: bold;"></span></div>
+            </div>
+            <div style="margin-top: 20px; font-size: 9pt; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3Z"/></svg>
+                An invitation email has also been sent to the user with these details.
+            </div>
+            <div style="margin-top: 25px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="copyCredentialsToClipboard()">Copy Credentials</button>
+                <button class="btn btn-primary" onclick="closeCredentialsModal()">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+

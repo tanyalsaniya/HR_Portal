@@ -1,0 +1,163 @@
+<!-- templates/salary/employee_salary_history_panel.html -->
+<div id="salaryHistoryView" class="view-panel" style="display: none;">
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs" style="display: flex; gap: 8px; align-items: center; font-size: 9.5pt; color: #64748b; margin-bottom: 20px; font-family: 'Inter', sans-serif;">
+        <a href="#" onclick="switchView('dashboardView'); return false;" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">Dashboard</a>
+        <span>&gt;</span>
+        <a href="#" onclick="switchView('salaryView'); return false;" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">Salaries &amp; Payroll</a>
+        <span>&gt;</span>
+        <span style="color: #94a3b8; font-weight: 500;">Employee Salary History</span>
+    </div>
+
+    <!-- Page Title Header -->
+    <div class="flex-row-header" style="margin-bottom: 24px;">
+        <h2 id="historyPageTitle" style="margin: 0; font-weight: 800; letter-spacing: -0.025em; color: var(--text-color);">Employee Salary History</h2>
+    </div>
+
+    <!-- EMPLOYEE PROFILE DETAIL CARD -->
+    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <!-- Initials Avatar -->
+            <div id="historyEmployeeAvatar" style="width: 64px; height: 64px; border-radius: 50%; background-color: rgba(124, 58, 237, 0.1); color: var(--primary-color); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16pt; border: 1.5px solid rgba(124, 58, 237, 0.2);">--</div>
+            
+            <div style="flex-grow: 1; min-width: 200px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <h3 id="historyEmployeeName" style="margin: 0; font-size: 16pt; font-weight: 800; color: var(--text-color);">--</h3>
+                    <span id="historyEmployeeStatus" class="status-pill synced" style="padding: 3px 10px; font-size: 8.5pt; font-weight: 700;">--</span>
+                </div>
+                <div style="font-size: 9.5pt; color: #64748b; margin-top: 4px; display: flex; gap: 15px; flex-wrap: wrap; font-family: monospace;">
+                    <span>Employee ID: <strong id="historyEmployeeId" style="color: var(--text-color);">--</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+            <div>
+                <span style="display: block; font-size: 8.5pt; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 2px;">Department</span>
+                <strong id="historyEmployeeDept" style="color: var(--text-color);">--</strong>
+            </div>
+            <div>
+                <span style="display: block; font-size: 8.5pt; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 2px;">Designation</span>
+                <strong id="historyEmployeeDesg" style="color: var(--text-color);">--</strong>
+            </div>
+            <div>
+                <span style="display: block; font-size: 8.5pt; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 2px;">Current Net Salary</span>
+                <strong id="historyEmployeeSalary" style="color: var(--primary-color);">--</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUMMARY METRICS CARDS -->
+    <div class="dashboard-grid" style="margin-bottom: 24px;">
+        <div class="widget-card" style="border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);">
+            <span style="font-size: 9pt; font-weight: 600; color: #64748b; text-transform: uppercase; tracking: 0.05em;">Total Salary Credited</span>
+            <div class="widget-value" id="historyCardCredited" style="margin-top: 8px; font-weight: 800; font-size: 18pt; color: #16a34a;">Rs. 0.00</div>
+        </div>
+        <div class="widget-card" style="border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);">
+            <span style="font-size: 9pt; font-weight: 600; color: #64748b; text-transform: uppercase; tracking: 0.05em;">Total Deductions</span>
+            <div class="widget-value" id="historyCardDeductions" style="margin-top: 8px; font-weight: 800; font-size: 18pt; color: #ef4444;">Rs. 0.00</div>
+        </div>
+        <div class="widget-card" style="border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);">
+            <span style="font-size: 9pt; font-weight: 600; color: #64748b; text-transform: uppercase; tracking: 0.05em;">Total Payslips</span>
+            <div class="widget-value" id="historyCardPayslips" style="margin-top: 8px; font-weight: 800; font-size: 18pt; color: var(--primary-color);">0</div>
+        </div>
+        <div class="widget-card" style="border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);">
+            <span style="font-size: 9pt; font-weight: 600; color: #64748b; text-transform: uppercase; tracking: 0.05em;">Last Payment Date</span>
+            <div class="widget-value" id="historyCardLastPayment" style="margin-top: 8px; font-weight: 800; font-size: 18pt; color: #0891b2;">-</div>
+        </div>
+    </div>
+
+    <!-- FILTER PANEL CARD -->
+    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <h3 style="margin-top: 0; color: var(--primary-color); font-weight: 700; margin-bottom: 15px;">Filters</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; align-items: end;">
+            <div>
+                <label style="font-weight: 600; font-size: 9pt; color: var(--text-color);">From Month</label>
+                <select id="historyPageFromMonth" style="margin-top: 5px; font-size: 9.5pt; padding: 8px 10px; border-radius: 6px;">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6" selected>June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-weight: 600; font-size: 9pt; color: var(--text-color);">From Year</label>
+                <input type="number" id="historyPageFromYear" value="2026" style="margin-top: 5px; font-size: 9.5pt; padding: 8px 10px; border-radius: 6px;">
+            </div>
+            <div>
+                <label style="font-weight: 600; font-size: 9pt; color: var(--text-color);">To Month</label>
+                <select id="historyPageToMonth" style="margin-top: 5px; font-size: 9.5pt; padding: 8px 10px; border-radius: 6px;">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6" selected>June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-weight: 600; font-size: 9pt; color: var(--text-color);">To Year</label>
+                <input type="number" id="historyPageToYear" value="2026" style="margin-top: 5px; font-size: 9.5pt; padding: 8px 10px; border-radius: 6px;">
+            </div>
+            <div>
+                <label style="font-weight: 600; font-size: 9pt; color: var(--text-color);">Payment Status</label>
+                <select id="historyPagePaymentStatus" style="margin-top: 5px; font-size: 9.5pt; padding: 8px 10px; border-radius: 6px;">
+                    <option value="">All Statuses</option>
+                    <option value="paid">Paid</option>
+                    <option value="pending">Pending</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button class="btn btn-primary" onclick="loadDedicatedEmployeeSalaryHistoryData()" style="padding: 10px 16px; border-radius: 6px; font-weight: 700; width: 100%;">Apply Filters</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DATA TABLE -->
+    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <!-- Table Header Actions & Title -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap;">
+            <h3 style="margin: 0; font-weight: 800; color: var(--text-color);">Payslips Registry</h3>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary" style="font-size: 9pt; padding: 8px 14px; background-color: #0f766e; border-radius: 6px;" onclick="downloadSelectedPayslips()">Download Selected</button>
+                <button class="btn btn-primary" style="font-size: 9pt; padding: 8px 14px; background-color: #475569; border-radius: 6px;" onclick="downloadHistoryZIPRange()">Download Date Range ZIP</button>
+                <button class="btn btn-primary" style="font-size: 9pt; padding: 8px 14px; background-color: #2563eb; border-radius: 6px;" onclick="exportHistoryExcel()">Export Excel</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="padding: 12px 20px; width: 40px;"><input type="checkbox" id="selectAllHistorySlips" style="cursor: pointer; width: 16px; height: 16px;" onclick="toggleSelectAllHistorySlips(this)"></th>
+                        <th style="padding: 12px 20px;">Month/Year</th>
+                        <th style="padding: 12px 20px;">Gross Salary</th>
+                        <th style="padding: 12px 20px;">Total Deductions</th>
+                        <th style="padding: 12px 20px;">Net Salary</th>
+                        <th style="padding: 12px 20px;">Net Credited</th>
+                        <th style="padding: 12px 20px;">Payment Status</th>
+                        <th style="padding: 12px 20px;">Workflow Status</th>
+                        <th style="padding: 12px 20px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="historyPageTableBody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
