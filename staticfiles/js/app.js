@@ -137,6 +137,7 @@ const viewToPath = {
     'onboardingFormView': '/employees/onboard/',
     'employeeDetailView': '/employees/detail/',
     'salaryView': '/salaries/',
+    'salaryHistoryView': '/salaries/employee/',
     'exitView': '/exits/',
     'studentView': '/students/',
     'logsView': '/logs/',
@@ -163,6 +164,7 @@ const views = [
     'onboardingFormView',
     'employeeDetailView',
     'salaryView',
+    'salaryHistoryView',
     'exitView',
     'exitDetailView',
     'studentView',
@@ -172,7 +174,12 @@ const views = [
     'exitTemplateEditor'
 ];
 
-function switchView(viewId, pushState = true) {
+function getEmployeeIdFromUrl() {
+    const match = window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/);
+    return match ? parseInt(match[1]) : null;
+}
+
+function switchView(viewId, pushState = true, extraParams = {}) {
     views.forEach(v => {
         const el = document.getElementById(v);
         if (el) el.style.display = v === viewId ? 'block' : 'none';
@@ -192,6 +199,12 @@ function switchView(viewId, pushState = true) {
     else if (viewId === 'onboardingView') loadOnboardingData();
     else if (viewId === 'onboardingFormView') loadOnboardingFormPage();
     else if (viewId === 'salaryView') loadSalaryData();
+    else if (viewId === 'salaryHistoryView') {
+        const empId = extraParams.employeeId || getEmployeeIdFromUrl();
+        if (empId) {
+            loadDedicatedEmployeeSalaryHistory(empId);
+        }
+    }
     else if (viewId === 'exitView') loadExitData();
     else if (viewId === 'studentView') loadStudentData();
     else if (viewId === 'logsView') loadLogsData();
@@ -199,17 +212,25 @@ function switchView(viewId, pushState = true) {
 
     // Update URL without page reload
     if (pushState) {
-        const path = viewToPath[viewId] || '/';
-        history.pushState({ viewId: viewId }, '', path);
+        let path = viewToPath[viewId] || '/';
+        if (viewId === 'salaryHistoryView' && extraParams.employeeId) {
+            path = `/salaries/employee/${extraParams.employeeId}/`;
+        }
+        history.pushState({ viewId: viewId, employeeId: extraParams.employeeId || null }, '', path);
     }
 }
 
 // Handle browser Back/Forward navigation
 window.addEventListener('popstate', (event) => {
     if (event.state && event.state.viewId) {
-        switchView(event.state.viewId, false);
+        switchView(event.state.viewId, false, { employeeId: event.state.employeeId });
     } else {
-        const viewId = pathToView[window.location.pathname] || 'dashboardView';
+        let viewId = 'dashboardView';
+        if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
+            viewId = 'salaryHistoryView';
+        } else {
+            viewId = pathToView[window.location.pathname] || 'dashboardView';
+        }
         switchView(viewId, false);
     }
 });

@@ -618,6 +618,7 @@
             {% include "onboarding/onboarding_form_panel.html" %}
             {% include "onboarding/employee_detail_panel.html" %}
             {% include "salary/salary_panel.html" %}
+            {% include "salary/employee_salary_history_panel.html" %}
             {% include "exit/exit_panel.html" %}
             {% include "student/student_panel.html" %}
             {% include "audit/audit_panel.html" %}
@@ -651,7 +652,7 @@
     <script src="{% static 'js/features/common_utils.js' %}?v=3.1"></script>
     <script src="{% static 'js/features/dashboard.js' %}?v=3.0"></script>
     <script src="{% static 'js/features/onboarding.js' %}?v=3.1"></script>
-    <script src="{% static 'js/features/salary.js' %}?v=3.0"></script>
+    <script src="{% static 'js/features/salary.js' %}?v=3.5"></script>
     <script src="{% static 'js/features/exit.js' %}?v=3.2"></script>
     <script src="{% static 'js/features/student.js' %}?v=3.0"></script>
     <script src="{% static 'js/features/audit.js' %}?v=3.0"></script>
@@ -690,7 +691,12 @@
                     
                     // Initialize view based on current URL path (support reloading and deep-linking)
                     const pathMap = typeof pathToView !== 'undefined' ? pathToView : {};
-                    const initialView = pathMap[window.location.pathname] || 'dashboardView';
+                    let initialView = 'dashboardView';
+                    if (window.location.pathname.match(/\/salaries\/employee\/\d+\/?/)) {
+                        initialView = 'salaryHistoryView';
+                    } else {
+                        initialView = pathMap[window.location.pathname] || 'dashboardView';
+                    }
                     if (typeof switchView === 'function') {
                         switchView(initialView, false);
                     } else {

@@ -51,6 +51,8 @@ class Employee(models.Model):
     
     aadhaar_encrypted = EncryptedCharField(blank=True, null=True)
     pan_encrypted = EncryptedCharField(blank=True, null=True)
+    bank_account = models.CharField(max_length=50, blank=True, null=True)
+    pan_no = models.CharField(max_length=20, blank=True, null=True)
     profile_photo = models.ImageField(upload_to='employees/profile_photos/', blank=True, null=True)
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Active')
@@ -77,6 +79,7 @@ class Employee(models.Model):
         if not self.emp_id:
             # Generate employee ID using the joining year instead of today's year
             from django.apps import apps
+            import datetime
             year = self.joining_date.year if self.joining_date else datetime.date.today().year
             prefix = f"EMP-{year}-"
             Employee = apps.get_model('employee_onboarding', 'Employee')
@@ -91,6 +94,10 @@ class Employee(models.Model):
                 new_sequence = 1
             self.emp_id = f"{prefix}{new_sequence:04d}"
         super().save(*args, **kwargs)
+
+    @property
+    def name(self):
+        return f"{self.first_name} {self.last_name}"
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.emp_id})"

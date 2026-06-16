@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 from employee_onboarding.views import SecureDocumentServeView
 
 urlpatterns = [
+    path('', include('salary.urls')),
     path('admin/', admin.site.urls),
     
     # Secure document serving interceptor
@@ -15,7 +16,6 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('', include('employee_onboarding.urls')),
     path('', include('exit_formality.urls')),
-    path('', include('salary.urls')),
     path('', include('student_certificate.urls')),
     path('', include('notifications.urls')),
     path('', include('audit_logs.urls')),

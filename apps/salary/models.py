@@ -1,7 +1,33 @@
 from django.db import models
 from django.conf import settings
 from decimal import Decimal
-from common.fields import EncryptedDecimalField
+
+class SalaryImportBatch(models.Model):
+    STATUS_CHOICES = (
+        ('success', 'Success'),
+        ('partial', 'Partial'),
+        ('failed', 'Failed'),
+        ('processing', 'Processing'),
+    )
+    month = models.PositiveIntegerField()
+    year = models.PositiveIntegerField()
+    file_name = models.CharField(max_length=255)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='salary_batches'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    total_records = models.IntegerField(default=0)
+    success_count = models.IntegerField(default=0)
+    failed_count = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
+    error_report_path = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"Batch {self.id} ({self.month}/{self.year}) - {self.status}"
+
 
 class SalaryStructure(models.Model):
     employee = models.ForeignKey(
@@ -9,63 +35,28 @@ class SalaryStructure(models.Model):
         on_delete=models.CASCADE,
         related_name='salary_structures'
     )
+    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    pf_contribution = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    esi = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    labour_welfare_fund = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    professional_tax = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    other_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     effective_from = models.DateField()
-    
-    # Encrypted salary earnings components
-    basic = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    hra = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    conveyance = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    medical = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    special = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    monthly_bonus = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    
-    # Repeatable rows stored as JSON
-    other_allowances = models.JSONField(default=list, blank=True)
-    
-    # Encrypted salary deductions components
-    pf = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    professional_tax = EncryptedDecimalField(max_length=255, default=Decimal('200.00'))
-    tds = EncryptedDecimalField(max_length=255, default=Decimal('0.00'))
-    
-    # Repeatable deductions stored as JSON
-    other_deductions = models.JSONField(default=list, blank=True)
-    
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='created_salaries'
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
 
     @property
-    def gross_salary(self):
-        basic = Decimal(self.basic or 0)
-        hra = Decimal(self.hra or 0)
-        conveyance = Decimal(self.conveyance or 0)
-        medical = Decimal(self.medical or 0)
-        special = Decimal(self.special or 0)
-        monthly_bonus = Decimal(self.monthly_bonus or 0)
-        total = basic + hra + conveyance + medical + special + monthly_bonus
-        for allowance in self.other_allowances:
-            try:
-                total += Decimal(str(allowance.get('amount', 0)))
-            except (ValueError, TypeError):
-                pass
-        return total
+    def basic(self):
+        # Fallback helper for any legacy views referencing basic
+        return self.gross_salary
 
     @property
     def total_deductions(self):
-        pf = Decimal(self.pf or 0)
-        pt = Decimal(self.professional_tax or 0)
-        tds = Decimal(self.tds or 0)
-        total = pf + pt + tds
-        for deduction in self.other_deductions:
-            try:
-                total += Decimal(str(deduction.get('amount', 0)))
-            except (ValueError, TypeError):
-                pass
-        return total
+        return (
+            self.pf_contribution +
+            self.esi +
+            self.labour_welfare_fund +
+            self.professional_tax +
+            self.other_deductions
+        )
 
     @property
     def net_salary(self):
@@ -76,42 +67,81 @@ class SalaryStructure(models.Model):
 
 
 class SalarySlip(models.Model):
-    PAYMENT_MODE_CHOICES = (
-        ('BANK_TRANSFER', 'Bank Transfer'),
-        ('CHEQUE', 'Cheque'),
-        ('CASH', 'Cash'),
+    PAYMENT_STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
     )
-
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+    )
     employee = models.ForeignKey(
         'employee_onboarding.Employee',
         on_delete=models.CASCADE,
         related_name='salary_slips'
     )
-    payslip_no = models.CharField(max_length=30, unique=True)
     month = models.PositiveIntegerField()
     year = models.PositiveIntegerField()
-    working_days = models.PositiveIntegerField()
-    days_worked = models.PositiveIntegerField()
-    lop_days = models.PositiveIntegerField(default=0)
-    
-    one_time_bonus = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    one_time_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    
-    gross = models.DecimalField(max_digits=10, decimal_places=2)
-    total_deductions = models.DecimalField(max_digits=10, decimal_places=2)
-    net_pay = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    payment_date = models.DateField()
-    payment_mode = models.CharField(max_length=20, choices=PAYMENT_MODE_CHOICES, default='BANK_TRANSFER')
-    pdf_file = models.FileField(upload_to='salary_slips/')
-    
-    generated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    location = models.CharField(max_length=100, default='Mohali')
+
+    # Attendance
+    leaves_available = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    working_days = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    extra_days = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+
+    # Earnings
+    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+    # Deductions
+    pf_contribution = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    esi = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    labour_welfare_fund = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    professional_tax = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    other_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    total_deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+    # Net Pay
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    net_credited_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+    # Metadata & Status
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    payment_date = models.DateField(null=True, blank=True)
+    transaction_ref = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    uploaded_batch = models.ForeignKey(
+        SalaryImportBatch,
         on_delete=models.SET_NULL,
         null=True,
-        related_name='generated_slips'
+        blank=True,
+        related_name='slips'
     )
-    generated_at = models.DateTimeField(auto_now_add=True)
+    payslip_no = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    pdf_file = models.FileField(upload_to='salary_slips/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('employee', 'month', 'year')
+
+    def save(self, *args, **kwargs):
+        # Auto calculate gross, deductions, net salary
+        self.total_deductions = (
+            Decimal(self.pf_contribution or 0) +
+            Decimal(self.esi or 0) +
+            Decimal(self.labour_welfare_fund or 0) +
+            Decimal(self.professional_tax or 0) +
+            Decimal(self.other_deductions or 0)
+        )
+        self.net_salary = Decimal(self.gross_salary or 0) - self.total_deductions
+        self.net_credited_amount = self.net_salary
+
+        if not self.payslip_no:
+            # Generate temporary unique payslip number if none set
+            from common.utils import generate_payslip_number
+            self.payslip_no = generate_payslip_number(self.year, self.month)
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Payslip {self.payslip_no} for {self.employee.emp_id}"
@@ -161,7 +191,7 @@ class SalaryIncrementApproval(models.Model):
     increment_amount = models.DecimalField(max_digits=10, decimal_places=2)
     increment_pct = models.DecimalField(max_digits=5, decimal_places=2)
     effective_date = models.DateField()
-    reason = models.TextField()  # min 20 chars validation in serializer
+    reason = models.TextField()
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
