@@ -147,3 +147,50 @@ class OnboardingModuleTests(APITestCase):
         self.client.force_authenticate(user=self.admin_user)
         res = self.client.get(url)
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch('requests.post')
+    @patch('common.bitrix_client.BitrixClient.get_user_detail')
+    @patch('common.bitrix_client.BitrixClient.get_all_users')
+    @patch('employee_onboarding.tasks.send_onboarding_welcome_email.delay')
+    def test_welcome_email_triggered_on_creation(self, mock_email_delay, mock_get_all, mock_get_detail, mock_post):
+        # Mock requests.post response for Bitrix contact creation
+        class MockResponse:
+            ok = True
+            def json(self):
+                return {'result': 123}
+        mock_post.return_value = MockResponse()
+        
+        # Mock user details returned from BitrixClient
+        mock_get_detail.return_value = {
+            'id': 123,
+            'first_name': 'Test',
+            'last_name': 'Employee',
+            'work_email': 'test@test.com',
+            'personal_email': 'test_personal@test.com',
+            'phone': '1234567890',
+            'designation': 'QA Engineer',
+            'department': 'Engineering',
+            'joining_date': '2026-06-01',
+            'status': 'Active'
+        }
+        
+        self.client.force_authenticate(user=self.hr_user)
+        payload = {
+            'first_name': 'Test',
+            'last_name': 'Employee',
+            'work_email': 'test@test.com',
+            'personal_email': 'test_personal@test.com',
+            'phone': '1234567890',
+            'designation': 'QA Engineer',
+            'joining_date': '2026-06-01'
+        }
+        
+        url = reverse('employee-list')
+        res = self.client.post(url, payload, format='json')
+        
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        # Verify the Celery task delay method was called once
+        mock_email_delay.assert_called_once()
+        called_args = mock_email_delay.call_args[0][0]
+        self.assertEqual(called_args['first_name'], 'Test')
+        self.assertEqual(called_args['work_email'], 'test@test.com')

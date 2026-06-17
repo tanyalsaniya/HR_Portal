@@ -84,6 +84,19 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         users = BitrixClient.get_all_users()
         mocks = [BitrixEmployeeMock(u) for u in users]
+        
+        # Decorate mock users with local exit_request_id if an exit request exists
+        try:
+            from exit_formality.models import ExitRequest
+            exit_requests_map = {str(er.bitrix_user_id): er.id for er in ExitRequest.objects.all()}
+            for u in mocks:
+                bitrix_id_str = str(u.id)
+                if bitrix_id_str in exit_requests_map:
+                    u.exit_request_id = exit_requests_map[bitrix_id_str]
+                    u._data['exit_request_id'] = exit_requests_map[bitrix_id_str]
+        except Exception:
+            pass
+            
         return mocks
 
     def get_object(self):
@@ -91,7 +104,19 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         user = BitrixClient.get_user_detail(pk)
         if not user:
             raise Http404("Employee not found in Bitrix24.")
-        return BitrixEmployeeMock(user)
+        mock = BitrixEmployeeMock(user)
+        
+        # Decorate mock user with local exit_request_id if an exit request exists
+        try:
+            from exit_formality.models import ExitRequest
+            exit_req = ExitRequest.objects.filter(bitrix_user_id=str(mock.id)).first()
+            if exit_req:
+                mock.exit_request_id = exit_req.id
+                mock._data['exit_request_id'] = exit_req.id
+        except Exception:
+            pass
+            
+        return mock
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -179,40 +204,80 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         employee = self.get_object()
         serializer = self.get_serializer(employee._data)
         return Response(serializer.data)
-
     def create(self, request, *args, **kwargs):
         data = request.data
         webhook = BitrixClient.get_webhook_url()
-        create_url = f"{webhook}/crm.contact.add"
         
-        emails = []
-        email_val = data.get('work_email') or data.get('email')
-        if email_val:
-            emails.append({'VALUE': email_val, 'VALUE_TYPE': 'WORK'})
-        if data.get('personal_email'):
-            emails.append({'VALUE': data.get('personal_email'), 'VALUE_TYPE': 'HOME'})
-            
-        payload = {
-            'fields': {
-                'NAME': data.get('first_name'),
-                'LAST_NAME': data.get('last_name'),
-                'EMAIL': emails,
-                'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
-                'POST': data.get('designation'),
-                'UF_ONBOARDING_STATUS': 'Pending',
-                'UF_CRM_ONBOARDING_STATUS': 'Pending',
-                'UF_PERSONAL_EMAIL': data.get('personal_email'),
-                'PERSONAL_MAILBOX': data.get('personal_email')
-            }
+        gender_code = 'M'
+        if data.get('gender') == 'FEMALE':
+            gender_code = 'F'
+        elif data.get('gender') == 'OTHER':
+            gender_code = 'O'
+
+        dept_list = [1]
+        if data.get('department'):
+            try:
+                dept_list = [int(data.get('department'))]
+            except (ValueError, TypeError):
+                pass
+
+        user_payload = {
+            'EMAIL': data.get('work_email') or data.get('email'),
+            'NAME': data.get('first_name'),
+            'LAST_NAME': data.get('last_name'),
+            'PERSONAL_MOBILE': data.get('phone'),
+            'WORK_POSITION': data.get('designation'),
+            'UF_DEPARTMENT': dept_list,
+            'PERSONAL_BIRTHDAY': data.get('dob') or '',
+            'PERSONAL_GENDER': gender_code,
+            'UF_PERSONAL_EMAIL': data.get('personal_email'),
+            'PERSONAL_MAILBOX': data.get('personal_email')
         }
         
         try:
             import requests
-            res = requests.post(create_url, json=payload, timeout=10)
+            # Attempt to create as user profile first
+            res = requests.post(f"{webhook}/user.add.json", json=user_payload, timeout=10)
+            
+            # Fallback to CRM contact creation if user scope fails or fails otherwise
+            if not res.ok:
+                emails = []
+                email_val = data.get('work_email') or data.get('email')
+                if email_val:
+                    emails.append({'VALUE': email_val, 'VALUE_TYPE': 'WORK'})
+                if data.get('personal_email'):
+                    emails.append({'VALUE': data.get('personal_email'), 'VALUE_TYPE': 'HOME'})
+                    
+                crm_payload = {
+                    'fields': {
+                        'NAME': data.get('first_name'),
+                        'LAST_NAME': data.get('last_name'),
+                        'EMAIL': emails,
+                        'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
+                        'POST': data.get('designation'),
+                        'UF_ONBOARDING_STATUS': 'Pending',
+                        'UF_CRM_ONBOARDING_STATUS': 'Pending',
+                        'UF_PERSONAL_EMAIL': data.get('personal_email'),
+                        'PERSONAL_MAILBOX': data.get('personal_email')
+                    }
+                }
+                res = requests.post(f"{webhook}/crm.contact.add", json=crm_payload, timeout=10)
+                
             if res.ok:
                 contact_id = str(res.json().get('result'))
                 BitrixClient.get_all_users(force_refresh=True)
                 mock_user = BitrixClient.get_user_detail(contact_id)
+                
+                # Trigger welcome email task asynchronously
+                try:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    from .tasks import send_onboarding_welcome_email
+                    send_onboarding_welcome_email.delay(mock_user)
+                except Exception as mail_err:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to queue welcome email task: {mail_err}")
+                
                 # Write to audit logs
                 from audit_logs.signals import log_action
                 log_action(request.user, "CREATE", None, f"Created Bitrix24 employee contact {data.get('first_name')} {data.get('last_name')} (ID: {contact_id}).")
@@ -221,7 +286,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
     def update(self, request, pk=None, *args, **kwargs):
         data = request.data
         webhook = BitrixClient.get_webhook_url()
