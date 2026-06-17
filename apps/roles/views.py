@@ -25,6 +25,7 @@ class PermissionViewSet(viewsets.ModelViewSet):
     queryset = Permission.objects.all().order_by('module', 'name')
     serializer_class = PermissionSerializer
     permission_classes = [IsAuthenticated, HasModelPermission]
+    pagination_class = None
 
     @action(detail=False, methods=['POST'], url_path='add-permission')
     def add_permission(self, request):

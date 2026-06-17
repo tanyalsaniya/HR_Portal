@@ -718,133 +718,183 @@ function viewEmployeeSalaryHistory(employeeId, employeeName) {
 }
 
 async function loadDedicatedEmployeeSalaryHistory(employeeId) {
-    currentHistoryEmployeeId = employeeId;
-
-    // Fetch employee details
     try {
-        const empRes = await apiFetch(`/employees/${employeeId}/`);
-        if (empRes.ok) {
-            const emp = await empRes.json();
-            currentHistoryEmployeeName = emp.name;
-            
-            document.getElementById('historyEmployeeName').textContent = emp.name;
-            document.getElementById('historyEmployeeId').textContent = emp.emp_id;
-            document.getElementById('historyEmployeeDept').textContent = emp.department_details ? emp.department_details.name : (emp.department || 'N/A');
-            document.getElementById('historyEmployeeDesg').textContent = emp.designation || 'N/A';
-            document.getElementById('historyEmployeeStatus').textContent = emp.status;
-            
-            // Status color adjustment
-            const statusEl = document.getElementById('historyEmployeeStatus');
-            statusEl.className = `status-pill ${emp.status === 'Active' ? 'synced' : 'action-needed'}`;
+        currentHistoryEmployeeId = employeeId;
 
-            // Avatar Initials
-            const initials = emp.name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().substring(0, 2);
-            document.getElementById('historyEmployeeAvatar').textContent = initials || '--';
+        // Explicitly update the page title in the navbar
+        const pageTitleEl = document.getElementById('pageTitle');
+        if (pageTitleEl) {
+            pageTitleEl.textContent = 'Employee Salary History';
+        }
 
-            // Current Salary
-            let currentSalaryStr = "Not Setup";
-            if (emp.salary_structures && emp.salary_structures.length > 0) {
-                const sorted = emp.salary_structures.sort((a, b) => new Date(b.effective_from) - new Date(a.effective_from));
-                currentSalaryStr = `Rs. ${sorted[0].net_salary}`;
+        // Fetch employee details
+        try {
+            const empRes = await apiFetch(`/employees/${employeeId}/`);
+            if (empRes.ok) {
+                const emp = await empRes.json();
+                currentHistoryEmployeeName = emp.name || "";
+                
+                const nameEl = document.getElementById('historyEmployeeName');
+                if (nameEl) nameEl.textContent = emp.name || "--";
+                
+                const idEl = document.getElementById('historyEmployeeId');
+                if (idEl) idEl.textContent = emp.emp_id || "--";
+                
+                const deptEl = document.getElementById('historyEmployeeDept');
+                if (deptEl) {
+                    deptEl.textContent = emp.department_details ? emp.department_details.name : (emp.department_name || emp.department || 'N/A');
+                }
+                
+                const desgEl = document.getElementById('historyEmployeeDesg');
+                if (desgEl) desgEl.textContent = emp.designation || 'N/A';
+                
+                const statusEl = document.getElementById('historyEmployeeStatus');
+                if (statusEl) {
+                    statusEl.textContent = emp.status || "--";
+                    statusEl.className = `status-pill ${emp.status === 'Active' ? 'synced' : 'action-needed'}`;
+                }
+
+                // Avatar Initials
+                const initialsEl = document.getElementById('historyEmployeeAvatar');
+                if (initialsEl) {
+                    const initials = emp.name ? emp.name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().substring(0, 2) : '--';
+                    initialsEl.textContent = initials || '--';
+                }
+
+                // Current Salary
+                let currentSalaryStr = "Not Setup";
+                if (emp.salary_structures && emp.salary_structures.length > 0) {
+                    const sorted = emp.salary_structures.sort((a, b) => new Date(b.effective_from) - new Date(a.effective_from));
+                    currentSalaryStr = `Rs. ${sorted[0].net_salary}`;
+                }
+                const salaryEl = document.getElementById('historyEmployeeSalary');
+                if (salaryEl) salaryEl.textContent = currentSalaryStr;
             }
-            document.getElementById('historyEmployeeSalary').textContent = currentSalaryStr;
+        } catch (e) {
+            console.error("Error loading employee details for history view:", e);
         }
-    } catch (e) {
-        console.error("Error loading employee details for history view:", e);
-    }
 
-    // Fetch employee summary statistics
-    try {
-        const sumRes = await apiFetch(`/salary/employee/${employeeId}/summary`);
-        if (sumRes.ok) {
-            const sumData = await sumRes.json();
-            document.getElementById('historyCardCredited').textContent = `Rs. ${sumData.total_salary_credited}`;
-            document.getElementById('historyCardDeductions').textContent = `Rs. ${sumData.total_deductions}`;
-            document.getElementById('historyCardPayslips').textContent = sumData.total_payslips;
-            document.getElementById('historyCardLastPayment').textContent = sumData.last_payment_date;
+        // Fetch employee summary statistics
+        try {
+            const sumRes = await apiFetch(`/salary/employee/${employeeId}/summary`);
+            if (sumRes.ok) {
+                const sumData = await sumRes.json();
+                const credEl = document.getElementById('historyCardCredited');
+                if (credEl) credEl.textContent = `Rs. ${sumData.total_salary_credited || '0.00'}`;
+                
+                const dedEl = document.getElementById('historyCardDeductions');
+                if (dedEl) dedEl.textContent = `Rs. ${sumData.total_deductions || '0.00'}`;
+                
+                const paysEl = document.getElementById('historyCardPayslips');
+                if (paysEl) paysEl.textContent = sumData.total_payslips ?? 0;
+                
+                const lastPayEl = document.getElementById('historyCardLastPayment');
+                if (lastPayEl) lastPayEl.textContent = sumData.last_payment_date || '-';
+            }
+        } catch (e) {
+            console.error("Error loading employee salary summary statistics:", e);
         }
+
+        // Set default filter values
+        const today = new Date();
+        const fromMonthEl = document.getElementById('historyPageFromMonth');
+        if (fromMonthEl) fromMonthEl.value = "1";
+        
+        const fromYearEl = document.getElementById('historyPageFromYear');
+        if (fromYearEl) fromYearEl.value = today.getFullYear();
+        
+        const toMonthEl = document.getElementById('historyPageToMonth');
+        if (toMonthEl) toMonthEl.value = today.getMonth() + 1;
+        
+        const toYearEl = document.getElementById('historyPageToYear');
+        if (toYearEl) toYearEl.value = today.getFullYear();
+        
+        const payStatEl = document.getElementById('historyPagePaymentStatus');
+        if (payStatEl) payStatEl.value = "";
+
+        // Clear select all checkbox
+        const selectAllBox = document.getElementById('selectAllHistorySlips');
+        if (selectAllBox) selectAllBox.checked = false;
+
+        // Load dynamic list data
+        await loadDedicatedEmployeeSalaryHistoryData();
     } catch (e) {
-        console.error("Error loading employee salary summary statistics:", e);
+        console.error("Fatal error in loadDedicatedEmployeeSalaryHistory:", e);
     }
-
-    // Set default filter values
-    const today = new Date();
-    document.getElementById('historyPageFromMonth').value = "1";
-    document.getElementById('historyPageFromYear').value = today.getFullYear();
-    document.getElementById('historyPageToMonth').value = today.getMonth() + 1;
-    document.getElementById('historyPageToYear').value = today.getFullYear();
-    document.getElementById('historyPagePaymentStatus').value = "";
-
-    // Clear select all checkbox
-    const selectAllBox = document.getElementById('selectAllHistorySlips');
-    if (selectAllBox) selectAllBox.checked = false;
-
-    // Load dynamic list data
-    await loadDedicatedEmployeeSalaryHistoryData();
 }
 
 async function loadDedicatedEmployeeSalaryHistoryData() {
-    if (!currentHistoryEmployeeId) return;
-
-    const fromMonth = document.getElementById('historyPageFromMonth').value;
-    const fromYear = document.getElementById('historyPageFromYear').value;
-    const toMonth = document.getElementById('historyPageToMonth').value;
-    const toYear = document.getElementById('historyPageToYear').value;
-    const paymentStatus = document.getElementById('historyPagePaymentStatus').value;
-
-    const tbody = document.getElementById('historyPageTableBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">Loading history records...</td></tr>`;
-
-    let url = `/salary/history?employee_id=${currentHistoryEmployeeId}&from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
-    if (paymentStatus) {
-        url += `&payment_status=${paymentStatus}`;
-    }
-
     try {
-        const res = await apiFetch(url);
-        if (res.ok) {
-            const slipsData = await res.json();
-            const slips = slipsData.results || slipsData;
+        if (!currentHistoryEmployeeId) return;
 
-            if (slips.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">No salary slips found for this selection.</td></tr>`;
-                return;
+        const fromMonthEl = document.getElementById('historyPageFromMonth');
+        const fromYearEl = document.getElementById('historyPageFromYear');
+        const toMonthEl = document.getElementById('historyPageToMonth');
+        const toYearEl = document.getElementById('historyPageToYear');
+        const paymentStatusEl = document.getElementById('historyPagePaymentStatus');
+
+        const fromMonth = fromMonthEl ? fromMonthEl.value : "1";
+        const fromYear = fromYearEl ? fromYearEl.value : new Date().getFullYear();
+        const toMonth = toMonthEl ? toMonthEl.value : new Date().getMonth() + 1;
+        const toYear = toYearEl ? toYearEl.value : new Date().getFullYear();
+        const paymentStatus = paymentStatusEl ? paymentStatusEl.value : "";
+
+        const tbody = document.getElementById('historyPageTableBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">Loading history records...</td></tr>`;
+
+        let url = `/salary/history?employee_id=${currentHistoryEmployeeId}&from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
+        if (paymentStatus) {
+            url += `&payment_status=${paymentStatus}`;
+        }
+
+        try {
+            const res = await apiFetch(url);
+            if (res.ok) {
+                const slipsData = await res.json();
+                const slips = slipsData.results || slipsData;
+
+                if (!Array.isArray(slips) || slips.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">No salary slips found for this selection.</td></tr>`;
+                    return;
+                }
+
+                const isAdmin = currentUser && currentUser.role === 'ADMIN';
+
+                tbody.innerHTML = slips.map(s => {
+                    const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const period = `${monthNames[s.month]} ${s.year}`;
+                    
+                    const actions = `
+                        <div style="display:flex; gap:5px; justify-content: flex-end;">
+                            <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#7c3aed; border-radius: 4px;" onclick="viewPayslipSingle(${s.employee_id}, ${s.month}, ${s.year})">View Payslip</button>
+                            <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#10b981; border-radius: 4px;" onclick="downloadSlipSingle(${s.employee_id}, ${s.month}, ${s.year})">Download PDF</button>
+                            ${isAdmin ? `<button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#475569; border-radius: 4px;" onclick="openEditSlipModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">Edit</button>` : ''}
+                        </div>
+                    `;
+
+                    return `
+                        <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
+                            <td style="padding: 12px 20px;"><input type="checkbox" class="history-slip-checkbox" data-id="${s.id}" style="cursor: pointer; width: 16px; height: 16px;"></td>
+                            <td style="padding: 12px 20px;"><strong>${period}</strong></td>
+                            <td style="padding: 12px 20px;">Rs. ${s.gross_salary}</td>
+                            <td style="padding: 12px 20px;">Rs. ${s.total_deductions}</td>
+                            <td style="padding: 12px 20px;"><strong>Rs. ${s.net_salary}</strong></td>
+                            <td style="padding: 12px 20px;">Rs. ${s.net_credited_amount}</td>
+                            <td style="padding: 12px 20px;"><span style="font-weight:bold; color:${s.payment_status === 'paid' ? '#16a34a' : '#ea580c'}; text-transform: capitalize;">${s.payment_status}</span></td>
+                            <td style="padding: 12px 20px;"><span style="font-weight:bold; color:${s.status === 'published' ? '#2563eb' : '#eab308'}; text-transform: capitalize;">${s.status}</span></td>
+                            <td style="padding: 12px 20px; text-align: right;">${actions}</td>
+                        </tr>
+                    `;
+                }).join('');
             }
-
-            const isAdmin = currentUser.role === 'ADMIN';
-
-            tbody.innerHTML = slips.map(s => {
-                const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                const period = `${monthNames[s.month]} ${s.year}`;
-                
-                const actions = `
-                    <div style="display:flex; gap:5px; justify-content: flex-end;">
-                        <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#7c3aed; border-radius: 4px;" onclick="viewPayslipSingle(${s.employee_id}, ${s.month}, ${s.year})">View Payslip</button>
-                        <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#10b981; border-radius: 4px;" onclick="downloadSlipSingle(${s.employee_id}, ${s.month}, ${s.year})">Download PDF</button>
-                        ${isAdmin ? `<button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#475569; border-radius: 4px;" onclick="openEditSlipModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">Edit</button>` : ''}
-                    </div>
-                `;
-
-                return `
-                    <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
-                        <td style="padding: 12px 20px;"><input type="checkbox" class="history-slip-checkbox" data-id="${s.id}" style="cursor: pointer; width: 16px; height: 16px;"></td>
-                        <td style="padding: 12px 20px;"><strong>${period}</strong></td>
-                        <td style="padding: 12px 20px;">Rs. ${s.gross_salary}</td>
-                        <td style="padding: 12px 20px;">Rs. ${s.total_deductions}</td>
-                        <td style="padding: 12px 20px;"><strong>Rs. ${s.net_salary}</strong></td>
-                        <td style="padding: 12px 20px;">Rs. ${s.net_credited_amount}</td>
-                        <td style="padding: 12px 20px;"><span style="font-weight:bold; color:${s.payment_status === 'paid' ? '#16a34a' : '#ea580c'}; text-transform: capitalize;">${s.payment_status}</span></td>
-                        <td style="padding: 12px 20px;"><span style="font-weight:bold; color:${s.status === 'published' ? '#2563eb' : '#eab308'}; text-transform: capitalize;">${s.status}</span></td>
-                        <td style="padding: 12px 20px; text-align: right;">${actions}</td>
-                    </tr>
-                `;
-            }).join('');
+        } catch (e) {
+            console.error("Error loading slips data:", e);
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 20px;">Error loading history data.</td></tr>`;
         }
     } catch (e) {
-        console.error("Error loading slips data:", e);
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #ef4444; padding: 20px;">Error loading history data.</td></tr>`;
+        console.error("Fatal error in loadDedicatedEmployeeSalaryHistoryData:", e);
     }
 }
 

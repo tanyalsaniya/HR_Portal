@@ -30,6 +30,7 @@ async function apiFetch(endpoint, options = {}) {
     if (endpoint.startsWith('http')) {
         url = endpoint;
     } else if (
+        endpoint.startsWith('/api') ||
         endpoint.startsWith('/dashboard') ||
         endpoint.startsWith('/employees') ||
         endpoint.startsWith('/salaries') ||
@@ -151,6 +152,7 @@ const pathToView = {
     '/employees/detail/': 'employeeDetailView',
     '/salaries/': 'salaryView',
     '/exits/': 'exitView',
+    '/exits/detail/': 'exitDetailView',
     '/students/': 'studentView',
     '/logs/': 'logsView',
     '/roles/': 'rolesView'
@@ -164,9 +166,12 @@ const views = [
     'salaryView',
     'salaryHistoryView',
     'exitView',
+    'exitDetailView',
     'studentView',
     'logsView',
-    'rolesView'
+    'rolesView',
+    'exitLetterWorkspace',
+    'exitTemplateEditor'
 ];
 
 function getEmployeeIdFromUrl() {

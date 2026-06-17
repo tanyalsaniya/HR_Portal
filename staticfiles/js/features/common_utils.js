@@ -86,4 +86,48 @@ function applyPermissionsToUI() {
 
     const addStudBtn = document.getElementById('addStudentBtn');
     if (addStudBtn) addStudBtn.style.display = hasPermission('student.create') ? 'block' : 'none';
+
+    // Exit template management (Admin or exit.manage_templates permission)
+    const manageExitTemplatesBtn = document.getElementById('manageExitTemplatesBtn');
+    if (manageExitTemplatesBtn) {
+        const isAdmin = currentUser.role_code === 'ADMIN' || currentUser.role === 'ADMIN' || currentUser.is_superuser;
+        const hasTemplatePerm = hasPermission('exit.manage_templates');
+        manageExitTemplatesBtn.style.display = (isAdmin || hasTemplatePerm) ? 'inline-block' : 'none';
+    }
+
+    // Exit email documents permission check
+    const chkSendEmailOnExit = document.getElementById('chkSendEmailOnExit');
+    const lblSendEmailOnExit = document.getElementById('lblSendEmailOnExit');
+    if (chkSendEmailOnExit || lblSendEmailOnExit) {
+        const isAdmin = currentUser.role_code === 'ADMIN' || currentUser.role === 'ADMIN' || currentUser.is_superuser;
+        const hasEmailPerm = hasPermission('exit.send_email');
+        const canSend = isAdmin || hasEmailPerm;
+        if (lblSendEmailOnExit) {
+            lblSendEmailOnExit.style.display = canSend ? 'inline-flex' : 'none';
+        }
+        if (chkSendEmailOnExit && !canSend) {
+            chkSendEmailOnExit.checked = false;
+        }
+    }
+
+    // Onboarding templates/letters tabs visibility (Admin or specific permission)
+    const pTabLettersBtn = document.getElementById('pTabLettersBtn');
+    const subTabGenerateBtn = document.getElementById('subTabGenerateBtn');
+    const subTabTemplateBtn = document.getElementById('subTabTemplateBtn');
+
+    if (pTabLettersBtn || subTabGenerateBtn || subTabTemplateBtn) {
+        const isAdmin = currentUser.role_code === 'ADMIN' || currentUser.role === 'ADMIN' || currentUser.is_superuser;
+        const hasGenPerm = hasPermission('onboarding.generate_letters');
+        const hasTemplatePerm = hasPermission('onboarding.manage_templates');
+
+        if (pTabLettersBtn) {
+            pTabLettersBtn.style.display = (isAdmin || hasGenPerm || hasTemplatePerm) ? 'inline-block' : 'none';
+        }
+        if (subTabGenerateBtn) {
+            subTabGenerateBtn.style.display = (isAdmin || hasGenPerm) ? 'inline-block' : 'none';
+        }
+        if (subTabTemplateBtn) {
+            subTabTemplateBtn.style.display = (isAdmin || hasTemplatePerm) ? 'inline-block' : 'none';
+        }
+    }
 }

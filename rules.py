@@ -53,6 +53,12 @@ VALID_DOC_TYPES = (
     ('EDU_CERT', 'Educational Certificates'),
     ('EXP_LETTER', 'Previous Experience Letter'),
     ('BANK_DETAILS', 'Bank Account Details / Cancelled Cheque'),
+    ('RELIEVING_LETTER', 'Relieving Letter'),
+    ('EXPERIENCE_LETTER', 'Experience Letter'),
+    ('NOTICE_LETTER', 'Notice Period Letter'),
+    ('NOC_LETTER', 'No-Objection Certificate'),
+    ('FF_SETTLEMENT_LETTER', 'Full & Final Settlement Letter'),
+    ('FF_SALARY_SLIP', 'Final Month Salary Slip'),
     ('OTHER', 'Other (custom label)'),
 )
 
@@ -78,6 +84,18 @@ EXIT_STATUS_CHOICES = (
     ('PENDING', 'Pending'),
     ('IN_PROGRESS', 'In Progress'),
     ('COMPLETED', 'Completed'),
+    ('OVERRIDDEN', 'Overridden'),
+    ('CLEARANCES_DONE', 'Clearances Done'),
+    ('FF_PROCESSED', 'F&F Processed'),
+    ('FULLY_EXITED', 'Fully Exited'),
+    ('CANCELLED', 'Cancelled'),
+    ('REOPENED', 'Reopened'),
+)
+
+CLEARANCE_STATUS = (
+    ('PENDING', 'Pending'),
+    ('CLEARED', 'Cleared'),
+    ('NA', 'Not Applicable'),
 )
 
 # ---------- SALARY INCREMENT NOTIFICATIONS ----------

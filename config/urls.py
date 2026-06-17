@@ -6,7 +6,6 @@ from django.conf.urls.static import static
 from employee_onboarding.views import SecureDocumentServeView
 
 urlpatterns = [
-    # Delegate routing to respective app-level urls.py configurations
     path('', include('accounts.urls')),
     path('', include('salary.urls')),
     path('admin/', admin.site.urls),

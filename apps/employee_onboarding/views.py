@@ -14,9 +14,32 @@ from django.http import FileResponse, Http404
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+class QueryParamJWTAuthentication(JWTAuthentication):
+    def authenticate(self, request):
+        # Check header first using parent implementation
+        header_auth = super().authenticate(request)
+        if header_auth is not None:
+            return header_auth
+            
+        # Check query parameter
+        raw_token = request.query_params.get('token')
+        if not raw_token:
+            return None
+            
+        try:
+            validated_token = self.get_validated_token(raw_token)
+            return self.get_user(validated_token), validated_token
+        except Exception:
+            raise AuthenticationFailed("Invalid or expired token.")
 
 class SecureDocumentServeView(APIView):
+    authentication_classes = [QueryParamJWTAuthentication]
     permission_classes = [IsAuthenticated]
+
 
     def get(self, request, emp_id, filename):
         user = request.user
@@ -970,7 +993,34 @@ class LetterTemplateViewSet(viewsets.ModelViewSet):
                 if obj and t['name'] == 'BOND_LETTER':
                     obj.html_content = t['html_content']
                     obj.save()
+                    
+        # Automatically seed exit templates if they do not exist
+        exit_templates_seeding = [
+            ('RELIEVING_LETTER', 'Relieving Letter Template', 'pdf_relieving_letter.html'),
+            ('EXPERIENCE_LETTER', 'Experience Letter Template', 'pdf_experience_letter.html'),
+            ('NOTICE_LETTER', 'Notice Period Letter Template', 'pdf_notice_letter.html'),
+            ('NOC_LETTER', 'NOC Letter Template', 'pdf_noc_letter.html'),
+            ('FF_SETTLEMENT_LETTER', 'F&F Settlement Letter Template', 'pdf_ff_settlement_letter.html'),
+            ('FF_SALARY_SLIP', 'Final Month Payslip Template', 'pdf_ff_salary_slip.html'),
+        ]
+        
+        for name, title, filename in exit_templates_seeding:
+            if not LetterTemplate.objects.filter(name=name).exists():
+                try:
+                    file_path = os.path.join(settings.BASE_DIR, 'templates', 'exit', filename)
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                    LetterTemplate.objects.create(
+                        name=name,
+                        title=title,
+                        html_content=html_content,
+                        allow_hr_edit=False
+                    )
+                except Exception as e:
+                    pass
+                    
         return LetterTemplate.objects.all().order_by('name')
+
 
     def update(self, request, *args, **kwargs):
         obj = self.get_object()
@@ -979,12 +1029,23 @@ class LetterTemplateViewSet(viewsets.ModelViewSet):
         
         if not is_admin:
             user_perms = list(user.role.permissions.values_list('codename', flat=True)) if user.role else []
-            has_manage_perm = 'onboarding.manage_templates' in user_perms
             is_hr = user.role and user.role.code == 'HR'
             
-            if not has_manage_perm:
-                if not is_hr or not obj.allow_hr_edit:
-                    raise PermissionDenied("You do not have permission to edit this template.")
+            is_exit_template = obj.name in [
+                'RELIEVING_LETTER', 'EXPERIENCE_LETTER', 'NOTICE_LETTER', 
+                'NOC_LETTER', 'FF_SETTLEMENT_LETTER', 'FF_SALARY_SLIP'
+            ]
+            
+            if is_exit_template:
+                has_manage_perm = 'exit.manage_templates' in user_perms
+                if not has_manage_perm:
+                    raise PermissionDenied("You do not have permission to edit this exit template.")
+            else:
+                has_manage_perm = 'onboarding.manage_templates' in user_perms
+                if not has_manage_perm:
+                    if not is_hr or not obj.allow_hr_edit:
+                        raise PermissionDenied("You do not have permission to edit this template.")
                 
         return super().update(request, *args, **kwargs)
+
 

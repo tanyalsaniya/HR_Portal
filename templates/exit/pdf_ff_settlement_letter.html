@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Full and Final Settlement Statement</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .company-name {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .company-sub {
+            font-size: 9pt;
+            color: #555;
+        }
+        .title {
+            font-size: 14pt;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #0056b3;
+            text-decoration: underline;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .info-table td {
+            padding: 5px;
+            vertical-align: top;
+            font-size: 9pt;
+        }
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .ledger-table th, .ledger-table td {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            text-align: left;
+        }
+        .ledger-table th {
+            background-color: #f1f5f9;
+            font-weight: bold;
+        }
+        .number-col {
+            text-align: right;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #f8fafc;
+        }
+        .net-row {
+            font-size: 11pt;
+            font-weight: bold;
+            background-color: #e2e8f0;
+            border-top: 2px solid #0056b3;
+            border-bottom: 2px solid #0056b3;
+        }
+        .signature-section {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            page-break-inside: avoid;
+        }
+        .sig-block {
+            text-align: center;
+            width: 45%;
+        }
+        .sig-line {
+            border-top: 1px solid #333;
+            margin-top: 40px;
+            padding-top: 5px;
+            font-size: 9pt;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    </div>
+    
+    <div class="title">FULL & FINAL SETTLEMENT STATEMENT</div>
+    
+    <table class="info-table">
+        <tr>
+            <td style="width: 15%;"><strong>Employee Name:</strong></td>
+            <td style="width: 35%;">{{ employee.first_name }} {{ employee.last_name }}</td>
+            <td style="width: 15%;"><strong>Employee ID:</strong></td>
+            <td style="width: 35%;">{{ employee.emp_id }}</td>
+        </tr>
+        <tr>
+            <td><strong>Department:</strong></td>
+            <td>{{ employee.department.name }}</td>
+            <td><strong>Designation:</strong></td>
+            <td>{{ employee.designation }}</td>
+        </tr>
+        <tr>
+            <td><strong>Joining Date:</strong></td>
+            <td>{{ employee.joining_date|date:"F d, Y" }}</td>
+            <td><strong>Last Working Day:</strong></td>
+            <td>{{ exit_request.last_working_day|date:"F d, Y" }}</td>
+        </tr>
+        <tr>
+            <td><strong>Exit Type:</strong></td>
+            <td>{{ exit_request.get_exit_type_display }}</td>
+            <td><strong>Settlement Date:</strong></td>
+            <td>{{ today|date:"F d, Y" }}</td>
+        </tr>
+    </table>
+    
+    <table class="ledger-table">
+        <thead>
+            <tr>
+                <th style="width: 50%;">Earnings & Additions</th>
+                <th style="width: 50%;" class="number-col">Amount (INR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Basic Proportional Salary ({{ ff.salary_worked_days }} / {{ ff.salary_month_days }} days)</td>
+                <td class="number-col">{{ ff.salary_proportional }}</td>
+            </tr>
+            {% if ff.leave_encashment_days > 0 %}
+            <tr>
+                <td>Leave Encashment ({{ ff.leave_encashment_days }} days @ {{ ff.leave_encashment_rate }}/day)</td>
+                <td class="number-col">{{ ff.leave_encashment_amount }}</td>
+            </tr>
+            {% endif %}
+            {% if ff.bonus_arrears > 0 %}
+            <tr>
+                <td>Bonus & Arrears</td>
+                <td class="number-col">{{ ff.bonus_arrears }}</td>
+            </tr>
+            {% endif %}
+            {% if ff.gratuity_amount > 0 %}
+            <tr>
+                <td>Gratuity Amount</td>
+                <td class="number-col">{{ ff.gratuity_amount }}</td>
+            </tr>
+            {% endif %}
+            {% for reimb in reimbursements %}
+            <tr>
+                <td>Reimbursement: {{ reimb.title }}</td>
+                <td class="number-col">{{ reimb.amount }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td>Total Earnings (A)</td>
+                <td class="number-col">{{ ff.total_earnings }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table class="ledger-table">
+        <thead>
+            <tr>
+                <th style="width: 50%;">Recoveries & Deductions</th>
+                <th style="width: 50%;" class="number-col">Amount (INR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if ff.notice_shortfall_days > 0 %}
+            <tr>
+                <td>Notice Shortfall Recovery ({{ ff.notice_shortfall_days }} days @ {{ ff.notice_shortfall_rate }}/day)</td>
+                <td class="number-col">{{ ff.notice_shortfall_amount }}</td>
+            </tr>
+            {% endif %}
+            {% if ff.salary_advance_outstanding > 0 %}
+            <tr>
+                <td>Outstanding Salary Advance</td>
+                <td class="number-col">{{ ff.salary_advance_outstanding }}</td>
+            </tr>
+            {% endif %}
+            {% if ff.bond_penalty > 0 %}
+            <tr>
+                <td>Bond Penalty / Liability</td>
+                <td class="number-col">{{ ff.bond_penalty }}</td>
+            </tr>
+            {% endif %}
+            {% if ff.tds_deduction > 0 %}
+            <tr>
+                <td>TDS Deduction</td>
+                <td class="number-col">{{ ff.tds_deduction }}</td>
+            </tr>
+            {% endif %}
+            {% for ded in other_deductions %}
+            <tr>
+                <td>Deduction: {{ ded.title }}</td>
+                <td class="number-col">{{ ded.amount }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td>Total Deductions (B)</td>
+                <td class="number-col">{{ ff.total_deductions }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table class="ledger-table">
+        <tr class="net-row">
+            <td style="width: 50%;">Net Payable (A - B)</td>
+            <td style="width: 50%;" class="number-col">INR {{ ff.net_payable }}</td>
+        </tr>
+    </table>
+
+    <p style="font-size: 9pt; color: #555;">
+        <strong>Payment Information:</strong><br>
+        Payment Mode: {{ ff.get_payment_mode_display }}<br>
+        {% if ff.expected_payment_date %}Expected Payment Date: {{ ff.expected_payment_date|date:"F d, Y" }}<br>{% endif %}
+        {% if ff.payment_reference %}Payment Reference / Txn ID: {{ ff.payment_reference }}<br>{% endif %}
+    </p>
+
+    <div class="signature-section">
+        <div class="sig-block" style="float: left;">
+            <div class="sig-line">Prepared & Approved By (HR/Admin)</div>
+        </div>
+        <div class="sig-block" style="float: right;">
+            <div class="sig-line">Employee Acknowledgement</div>
+        </div>
+        <div style="clear: both;"></div>
+    </div>
+</body>
+</html>
