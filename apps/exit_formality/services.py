@@ -27,7 +27,7 @@ def get_exit_letter_context(exit_request, custom_context=None):
     
     # Overrides for employee
     emp_overrides = {}
-    for field in ['first_name', 'last_name', 'designation']:
+    for field in ['first_name', 'last_name', 'designation', 'emp_id']:
         if field in custom_context:
             emp_overrides[field] = custom_context[field]
     if 'joining_date' in custom_context:

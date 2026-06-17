@@ -62,17 +62,29 @@ class EmployeeSerializer(serializers.Serializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     name = serializers.CharField()
-    email = serializers.EmailField()
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    work_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    personal_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     phone = serializers.CharField()
     designation = serializers.CharField()
     department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    department_name = serializers.CharField()
+    department_name = serializers.SerializerMethodField()
+    department_details = serializers.SerializerMethodField()
     joining_date = serializers.CharField()
     dob = serializers.CharField()
     gender = serializers.CharField()
     profile_photo = serializers.CharField(allow_blank=True, required=False)
     status = serializers.CharField()
     onboarding_complete = serializers.BooleanField()
+    employment_type = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    address_line1 = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    state = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pin_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    emergency_contact_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    emergency_relationship = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    emergency_phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    bitrix_contact_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     # Relational documents and structures
     documents = serializers.SerializerMethodField()
@@ -94,6 +106,31 @@ class EmployeeSerializer(serializers.Serializer):
         from salary.models import SalaryStructure
         structures = SalaryStructure.objects.filter(bitrix_user_id=obj.get('id'))
         return EmployeeSalaryStructureSerializer(structures, many=True, context=self.context).data
+
+    def get_department_name(self, obj):
+        dept_id = obj.get('department')
+        if dept_id:
+            try:
+                dept = Department.objects.filter(id=dept_id).first()
+                if dept:
+                    return dept.name
+            except Exception:
+                pass
+        return "Engineering"
+
+    def get_department_details(self, obj):
+        dept_id = obj.get('department')
+        if dept_id:
+            try:
+                dept = Department.objects.filter(id=dept_id).first()
+                if dept:
+                    return {
+                        'id': dept.id,
+                        'name': dept.name
+                    }
+            except Exception:
+                pass
+        return None
 
 
 class LetterTemplateSerializer(serializers.ModelSerializer):

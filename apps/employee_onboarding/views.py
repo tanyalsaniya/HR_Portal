@@ -185,15 +185,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         webhook = BitrixClient.get_webhook_url()
         create_url = f"{webhook}/crm.contact.add"
         
+        emails = []
+        email_val = data.get('work_email') or data.get('email')
+        if email_val:
+            emails.append({'VALUE': email_val, 'VALUE_TYPE': 'WORK'})
+        if data.get('personal_email'):
+            emails.append({'VALUE': data.get('personal_email'), 'VALUE_TYPE': 'HOME'})
+            
         payload = {
             'fields': {
                 'NAME': data.get('first_name'),
                 'LAST_NAME': data.get('last_name'),
-                'EMAIL': [{'VALUE': data.get('email'), 'VALUE_TYPE': 'WORK'}],
+                'EMAIL': emails,
                 'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
                 'POST': data.get('designation'),
                 'UF_ONBOARDING_STATUS': 'Pending',
-                'UF_CRM_ONBOARDING_STATUS': 'Pending'
+                'UF_CRM_ONBOARDING_STATUS': 'Pending',
+                'UF_PERSONAL_EMAIL': data.get('personal_email'),
+                'PERSONAL_MAILBOX': data.get('personal_email')
             }
         }
         
@@ -216,28 +225,63 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def update(self, request, pk=None, *args, **kwargs):
         data = request.data
         webhook = BitrixClient.get_webhook_url()
-        update_url = f"{webhook}/crm.contact.update"
         
+        gender_code = 'M'
+        if data.get('gender') == 'FEMALE':
+            gender_code = 'F'
+        elif data.get('gender') == 'OTHER':
+            gender_code = 'O'
+            
         payload = {
-            'id': pk,
-            'fields': {
-                'NAME': data.get('first_name'),
-                'LAST_NAME': data.get('last_name'),
-                'EMAIL': [{'VALUE': data.get('email'), 'VALUE_TYPE': 'WORK'}],
-                'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
-                'POST': data.get('designation'),
-            }
+            'ID': pk,
+            'NAME': data.get('first_name'),
+            'LAST_NAME': data.get('last_name'),
+            'EMAIL': data.get('work_email') or data.get('email'),
+            'PERSONAL_MOBILE': data.get('phone'),
+            'WORK_POSITION': data.get('designation'),
+            'PERSONAL_BIRTHDAY': data.get('dob'),
+            'PERSONAL_CITY': data.get('city') or data.get('address_line1'),
+            'PERSONAL_STATE': data.get('state'),
+            'PERSONAL_ZIP': data.get('pin_code'),
+            'PERSONAL_GENDER': gender_code,
+            'UF_PERSONAL_EMAIL': data.get('personal_email'),
+            'PERSONAL_MAILBOX': data.get('personal_email')
         }
         
         try:
             import requests
-            res = requests.post(update_url, json=payload, timeout=10)
+            res = requests.post(f"{webhook}/user.update.json", json=payload, timeout=10)
+            
+            # If the token lacks scope for user.update or fails, fallback to CRM contact update
+            if not res.ok:
+                update_url_crm = f"{webhook}/crm.contact.update"
+                emails_crm = []
+                email_val = data.get('work_email') or data.get('email')
+                if email_val:
+                    emails_crm.append({'VALUE': email_val, 'VALUE_TYPE': 'WORK'})
+                if data.get('personal_email'):
+                    emails_crm.append({'VALUE': data.get('personal_email'), 'VALUE_TYPE': 'HOME'})
+                    
+                payload_crm = {
+                    'id': pk,
+                    'fields': {
+                        'NAME': data.get('first_name'),
+                        'LAST_NAME': data.get('last_name'),
+                        'EMAIL': emails_crm,
+                        'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
+                        'POST': data.get('designation'),
+                        'UF_PERSONAL_EMAIL': data.get('personal_email'),
+                        'PERSONAL_MAILBOX': data.get('personal_email')
+                    }
+                }
+                res = requests.post(update_url_crm, json=payload_crm, timeout=10)
+                
             if res.ok:
                 BitrixClient.get_all_users(force_refresh=True)
                 user = BitrixClient.get_user_detail(pk)
                 # Log action
                 from audit_logs.signals import log_action
-                log_action(request.user, "UPDATE", None, f"Updated Bitrix24 employee contact (ID: {pk}).")
+                log_action(request.user, "UPDATE", None, f"Updated Bitrix24 employee details (ID: {pk}).")
                 return Response(user)
             else:
                 return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)

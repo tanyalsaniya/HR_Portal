@@ -3,6 +3,9 @@
 
 let currentExits = [];
 let activeExitRequest = null;
+let exitCurrentPage = 1;
+let exitTotalCount = 0;
+let exitFilteredList = [];
 
 // Helper to check if current user is admin
 function isAdminUser() {
@@ -15,11 +18,12 @@ function isAdminUser() {
 async function loadExitData() {
     document.getElementById('pageTitle').textContent = 'Employee exit manager';
     try {
-        const res = await apiFetch('/api/exit/requests/');
+        const res = await apiFetch('/api/exit/requests/?no_pagination=true');
         if (res.ok) {
             const exits = await res.json();
             currentExits = exits.results || exits;
-            renderExitTable(currentExits);
+            exitCurrentPage = 1;
+            filterExitTable();
         } else {
             showToast('Failed to fetch exit records.', 'error');
         }
@@ -67,7 +71,7 @@ function filterExitTable() {
     const searchVal = document.getElementById('exitSearchInput').value.toLowerCase();
     const statusVal = document.getElementById('exitStatusFilter').value;
 
-    const filtered = currentExits.filter(x => {
+    exitFilteredList = currentExits.filter(x => {
         const empName = x.employee_details ? `${x.employee_details.first_name} ${x.employee_details.last_name}`.toLowerCase() : '';
         const empId = x.employee_details ? x.employee_details.emp_id.toLowerCase() : '';
         const matchesSearch = empName.includes(searchVal) || empId.includes(searchVal);
@@ -75,7 +79,52 @@ function filterExitTable() {
         return matchesSearch && matchesStatus;
     });
 
-    renderExitTable(filtered);
+    exitTotalCount = exitFilteredList.length;
+    
+    // Reset page if it exceeds maximum pages
+    const maxPage = Math.ceil(exitTotalCount / 10) || 1;
+    if (exitCurrentPage > maxPage) {
+        exitCurrentPage = maxPage;
+    }
+
+    const paginationFooter = document.getElementById('exitPaginationFooter');
+    if (paginationFooter) {
+        paginationFooter.style.display = 'flex';
+        updateExitPaginationControls(exitCurrentPage, exitTotalCount);
+    }
+
+    const startIdx = (exitCurrentPage - 1) * 10;
+    const paginatedList = exitFilteredList.slice(startIdx, startIdx + 10);
+    renderExitTable(paginatedList);
+}
+
+function changeExitPage(direction) {
+    const maxPage = Math.ceil(exitTotalCount / 10) || 1;
+    exitCurrentPage = Math.max(1, Math.min(maxPage, exitCurrentPage + direction));
+    
+    const startIdx = (exitCurrentPage - 1) * 10;
+    const paginatedList = exitFilteredList.slice(startIdx, startIdx + 10);
+    renderExitTable(paginatedList);
+    
+    updateExitPaginationControls(exitCurrentPage, exitTotalCount);
+}
+
+function updateExitPaginationControls(currentPage, totalCount) {
+    const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * 10 + 1;
+    const pageEnd = Math.min(currentPage * 10, totalCount);
+    
+    const startEl = document.getElementById('exitPageStart');
+    const endEl = document.getElementById('exitPageEnd');
+    const totalEl = document.getElementById('exitTotalCount');
+    const prevBtn = document.getElementById('exitPrevBtn');
+    const nextBtn = document.getElementById('exitNextBtn');
+    
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (totalEl) totalEl.textContent = totalCount;
+    
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
 }
 
 // Initiate Exit modal
@@ -96,7 +145,7 @@ async function loadActiveEmployeesSelect(selectId) {
     const select = document.getElementById(selectId);
     if (!select) return;
     try {
-        const res = await apiFetch('/employees/?type=all');
+        const res = await apiFetch('/employees/?type=all&no_pagination=true');
         if (res.ok) {
             const employees = await res.json();
             const list = employees.results || employees;
@@ -169,17 +218,33 @@ function populateExitDetails(x) {
 
     // Update Timeline status
     const steps = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CLEARANCES_DONE', 'FF_PROCESSED', 'FULLY_EXITED'];
-    let curIndex = steps.indexOf(x.status);
     
+    // Map status to active step index (0 to 5, or 6 for fully completed)
+    const statusToActiveIndex = {
+        'PENDING': 0,
+        'IN_PROGRESS': 1,
+        'COMPLETED': 3,        // Questionnaire done, Clearances in progress (Step 4 is active)
+        'CLEARANCES_DONE': 4,  // Clearances done, F&F in progress (Step 5 is active)
+        'FF_PROCESSED': 5,     // F&F done, final exit mark in progress (Step 6 is active)
+        'FULLY_EXITED': 6      // All steps completed
+    };
+
+    let activeIndex = statusToActiveIndex[x.status];
+    if (x.status === 'REOPENED') {
+        activeIndex = x.form_response ? 3 : 1;
+    }
+
     // Handle CANCELLED / OVERRIDDEN timeline override
     if (x.status === 'CANCELLED' || x.status === 'OVERRIDDEN') {
-        curIndex = -1; // hide normal progress
+        activeIndex = -1;
     }
     
     // Calculate progress line width
     let progressWidth = 0;
-    if (curIndex >= 0) {
-        progressWidth = (curIndex / (steps.length - 1)) * 90; // max width 90%
+    if (activeIndex >= 0) {
+        // Line should extend to the active step. If fully completed, extend to the end (index 5)
+        const lineTargetIndex = Math.min(activeIndex, steps.length - 1);
+        progressWidth = (lineTargetIndex / (steps.length - 1)) * 90; // max width 90%
     }
     document.getElementById('timelineProgress').style.width = `${progressWidth}%`;
 
@@ -196,9 +261,12 @@ function populateExitDetails(x) {
             dot.style.backgroundColor = '#f87171'; // red
         } else if (x.status === 'OVERRIDDEN') {
             dot.style.backgroundColor = '#f59e0b'; // orange
-        } else if (idx <= curIndex) {
-            dot.style.backgroundColor = '#22c55e'; // green
-            if (idx === curIndex) dot.style.backgroundColor = '#3b82f6'; // active blue
+        } else {
+            if (idx < activeIndex) {
+                dot.style.backgroundColor = '#22c55e'; // green (completed)
+            } else if (idx === activeIndex) {
+                dot.style.backgroundColor = '#3b82f6'; // active blue
+            }
         }
     });
 
@@ -748,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exitForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const data = {
-                employee: document.getElementById('exitEmployeeSelect').value,
+                bitrix_user_id: document.getElementById('exitEmployeeSelect').value,
                 resignation_date: document.getElementById('exitResignationDate').value,
                 exit_type: document.getElementById('exitTypeSelect').value,
                 mode_of_resignation: document.getElementById('exitModeSelect').value,
@@ -823,6 +891,7 @@ function openExitLetterWorkspace(docType) {
     // Employee fields
     document.getElementById('wsFirstName').value = emp.first_name || '';
     document.getElementById('wsLastName').value = emp.last_name || '';
+    document.getElementById('wsEmpId').value = emp.emp_id || '';
     document.getElementById('wsDesignation').value = emp.designation || '';
     document.getElementById('wsJoiningDate').value = emp.joining_date || '';
     document.getElementById('wsLwd').value = x.last_working_day || '';
@@ -876,6 +945,9 @@ function getWorkspaceCustomContext() {
     
     const lastName = document.getElementById('wsLastName').value.trim();
     if (lastName) ctx.last_name = lastName;
+
+    const empId = document.getElementById('wsEmpId').value.trim();
+    if (empId) ctx.emp_id = empId;
     
     const designation = document.getElementById('wsDesignation').value.trim();
     if (designation) ctx.designation = designation;

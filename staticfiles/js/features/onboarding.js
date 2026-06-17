@@ -312,7 +312,7 @@ function renderOnboardingTrackerTable(list) {
                     </div>
                 </td>
                 <td style="padding: 12px 20px; font-weight: 600; color: #1e293b; font-family: 'Inter', sans-serif;">${e.emp_id}</td>
-                <td style="padding: 12px 20px; color: #475569;">${e.department_details ? e.department_details.name : e.department}</td>
+                <td style="padding: 12px 20px; color: #475569;">${e.department}</td>
                 <td style="padding: 12px 20px; color: #475569;">${e.designation}</td>
                 <td style="padding: 12px 20px; font-weight: 500; color: #1e293b;">${formatSimpleDate(e.joining_date)}</td>
                 <td style="padding: 12px 20px;">
@@ -388,7 +388,7 @@ function renderActiveDirectoryTable(list) {
                     </div>
                 </td>
                 <td style="padding: 12px 20px; font-weight: 600; color: #1e293b; font-family: 'Inter', sans-serif;">${e.emp_id}</td>
-                <td style="padding: 12px 20px; color: #475569;">${e.department_details ? e.department_details.name : e.department}</td>
+                <td style="padding: 12px 20px; color: #475569;">${e.department}</td>
                 <td style="padding: 12px 20px; color: #475569;">${e.designation}</td>
                 <td style="padding: 12px 20px; color: #475569;">${e.employment_type}</td>
                 <td style="padding: 12px 20px; font-weight: 500; color: #1e293b;">${formatSimpleDate(e.joining_date)}</td>
@@ -487,7 +487,7 @@ async function loadDepartmentsSelect(selectId) {
             if (select) {
                 const hasAll = select.firstElementChild && select.firstElementChild.value === '';
                 select.innerHTML = (hasAll ? `<option value="">All Departments</option>` : '') + 
-                    deptList.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                    deptList.map(d => `<option value="${d.id}">${d.id}</option>`).join('');
             }
         }
     } catch (e) {
@@ -598,7 +598,7 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
             document.getElementById('detailProfileName').textContent = `${emp.first_name} ${emp.last_name}`;
             document.getElementById('detailProfileDesignation').textContent = emp.designation;
             document.getElementById('detailProfileEmpId').textContent = emp.emp_id;
-            document.getElementById('detailProfileDept').textContent = emp.department_details ? emp.department_details.name : emp.department;
+            document.getElementById('detailProfileDept').textContent = emp.department;
             
             const statusBadge = document.getElementById('detailProfileStatusBadge');
             statusBadge.textContent = emp.status;
@@ -623,34 +623,104 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
                 fallback.style.display = 'block';
             }
 
-            document.getElementById('editEmpFirstName').value = emp.first_name;
-            document.getElementById('editEmpLastName').value = emp.last_name;
-            document.getElementById('editEmpEmail').value = emp.email;
-            document.getElementById('editEmpPhone').value = emp.phone;
-            document.getElementById('editEmpAltPhone').value = emp.alternate_phone || '';
-            document.getElementById('editEmpDob').value = emp.dob;
-            document.getElementById('editEmpGender').value = emp.gender;
+            document.getElementById('editEmpFirstName').value = emp.first_name || '';
+            document.getElementById('editEmpLastName').value = emp.last_name || '';
             
-            document.getElementById('editEmpAddr1').value = emp.address_line1;
+            const workEmailInput = document.getElementById('editEmpWorkEmail');
+            const personalEmailInput = document.getElementById('editEmpPersonalEmail');
+            if (workEmailInput) {
+                workEmailInput.value = emp.work_email || emp.email || '';
+            }
+            if (personalEmailInput) {
+                personalEmailInput.value = emp.personal_email || '';
+            }
+            
+            // Enable/disable based on role
+            const canEditEmail = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR');
+            if (workEmailInput) {
+                if (canEditEmail) {
+                    workEmailInput.removeAttribute('disabled');
+                    workEmailInput.style.backgroundColor = 'var(--bg-card)';
+                    workEmailInput.style.cursor = 'text';
+                } else {
+                    workEmailInput.setAttribute('disabled', 'true');
+                    workEmailInput.style.backgroundColor = 'var(--bg-main)';
+                    workEmailInput.style.cursor = 'not-allowed';
+                }
+            }
+            if (personalEmailInput) {
+                if (canEditEmail) {
+                    personalEmailInput.removeAttribute('disabled');
+                    personalEmailInput.style.backgroundColor = 'var(--bg-card)';
+                    personalEmailInput.style.cursor = 'text';
+                } else {
+                    personalEmailInput.setAttribute('disabled', 'true');
+                    personalEmailInput.style.backgroundColor = 'var(--bg-main)';
+                    personalEmailInput.style.cursor = 'not-allowed';
+                }
+            }
+            document.getElementById('editEmpPhone').value = emp.phone || '';
+            document.getElementById('editEmpAltPhone').value = emp.alternate_phone || '';
+            document.getElementById('editEmpDob').value = emp.dob || '';
+            
+            // Normalize Gender Select
+            let genderVal = (emp.gender || '').toUpperCase();
+            document.getElementById('editEmpGender').value = ['MALE', 'FEMALE', 'OTHER'].includes(genderVal) ? genderVal : 'MALE';
+            
+            document.getElementById('editEmpAddr1').value = emp.address_line1 || '';
             document.getElementById('editEmpAddr2').value = emp.address_line2 || '';
-            document.getElementById('editEmpCity').value = emp.city;
+            document.getElementById('editEmpCity').value = emp.city || '';
             
             populateStatesDropdown('editEmpState');
-            document.getElementById('editEmpState').value = emp.state;
-            document.getElementById('editEmpPin').value = emp.pin_code;
+            // Normalize State select (check name or code)
+            let stateVal = emp.state || '';
+            if (stateVal) {
+                const selectState = document.getElementById('editEmpState');
+                let optFound = Array.from(selectState.options).some(o => o.value === stateVal);
+                if (!optFound) {
+                    let optTextMatch = Array.from(selectState.options).find(o => o.text.toLowerCase() === stateVal.toLowerCase());
+                    if (optTextMatch) {
+                        stateVal = optTextMatch.value;
+                    }
+                }
+            }
+            document.getElementById('editEmpState').value = stateVal;
+            document.getElementById('editEmpPin').value = emp.pin_code || '';
             
-            document.getElementById('editEmpDept').value = emp.department;
-            document.getElementById('editEmpDesignation').value = emp.designation;
-            document.getElementById('editEmpType').value = emp.employment_type;
-            document.getElementById('editEmpNotice').value = emp.notice_period_days;
-            document.getElementById('editEmpBond').value = emp.bond_period_months;
+            // Normalize Department Select (append if missing)
+            const selectDept = document.getElementById('editEmpDept');
+            if (selectDept && emp.department) {
+                let deptFound = Array.from(selectDept.options).some(o => o.value === String(emp.department));
+                if (!deptFound) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = emp.department;
+                    newOpt.text = emp.department;
+                    selectDept.appendChild(newOpt);
+                }
+            }
+            if (selectDept) {
+                selectDept.value = emp.department || '';
+            }
+
+            document.getElementById('editEmpDesignation').value = emp.designation || '';
+            
+            // Normalize Employment Type Select
+            let empTypeVal = (emp.employment_type || '').toUpperCase().replace(' ', '_');
+            document.getElementById('editEmpType').value = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN'].includes(empTypeVal) ? empTypeVal : 'FULL_TIME';
+            
+            document.getElementById('editEmpNotice').value = emp.notice_period_days !== undefined ? emp.notice_period_days : 30;
+            document.getElementById('editEmpBond').value = emp.bond_period_months !== undefined ? emp.bond_period_months : 0;
             
             document.getElementById('editEmpAadhaar').value = emp.aadhaar_masked || '';
             document.getElementById('editEmpPan').value = emp.pan_masked || '';
             
-            document.getElementById('editEmpEmergencyName').value = emp.emergency_contact_name;
-            document.getElementById('editEmpEmergencyRel').value = emp.emergency_relationship;
-            document.getElementById('editEmpEmergencyPhone').value = emp.emergency_phone;
+            document.getElementById('editEmpEmergencyName').value = emp.emergency_contact_name || '';
+            
+            // Normalize Emergency Relationship Select
+            let emergencyRelVal = (emp.emergency_relationship || '').toUpperCase();
+            document.getElementById('editEmpEmergencyRel').value = ['PARENT', 'SPOUSE', 'SIBLING', 'FRIEND', 'OTHER'].includes(emergencyRelVal) ? emergencyRelVal : 'OTHER';
+            
+            document.getElementById('editEmpEmergencyPhone').value = emp.emergency_phone || '';
 
             const joinInput = document.getElementById('editEmpJoining');
             joinInput.value = emp.joining_date;
@@ -740,6 +810,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('first_name', document.getElementById('editEmpFirstName').value);
             formData.append('last_name', document.getElementById('editEmpLastName').value);
+            
+            const workEmailEl = document.getElementById('editEmpWorkEmail');
+            if (workEmailEl) formData.append('work_email', workEmailEl.value);
+            const personalEmailEl = document.getElementById('editEmpPersonalEmail');
+            if (personalEmailEl) formData.append('personal_email', personalEmailEl.value);
+            
             formData.append('phone', document.getElementById('editEmpPhone').value);
             formData.append('alternate_phone', document.getElementById('editEmpAltPhone').value);
             formData.append('dob', document.getElementById('editEmpDob').value);
@@ -807,7 +883,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('first_name', document.getElementById('empFirstName').value);
             formData.append('last_name', document.getElementById('empLastName').value);
-            formData.append('email', document.getElementById('empEmail').value);
+            formData.append('work_email', document.getElementById('empWorkEmail').value);
+            formData.append('personal_email', document.getElementById('empPersonalEmail').value);
             formData.append('phone', document.getElementById('empPhone').value);
             formData.append('dob', document.getElementById('empDob').value);
             formData.append('gender', document.getElementById('empGender').value);
@@ -1270,6 +1347,7 @@ async function openLetterWorkspace(type) {
             document.getElementById('custJoiningDate').value = emp.joining_date || '';
             document.getElementById('custFirstName').value = emp.first_name || '';
             document.getElementById('custLastName').value = emp.last_name || '';
+            document.getElementById('custEmpId').value = emp.emp_id || '';
             document.getElementById('custDesignation').value = emp.designation || '';
             document.getElementById('custAddress1').value = emp.address_line1 || '';
             document.getElementById('custCity').value = emp.city || '';
@@ -1340,6 +1418,7 @@ async function updateLetterPreview() {
         date: document.getElementById('custLetterDate').value,
         first_name: document.getElementById('custFirstName').value,
         last_name: document.getElementById('custLastName').value,
+        emp_id: document.getElementById('custEmpId').value,
         designation: document.getElementById('custDesignation').value,
         joining_date: document.getElementById('custJoiningDate').value,
         notice_period_days: document.getElementById('custNoticePeriod').value,
