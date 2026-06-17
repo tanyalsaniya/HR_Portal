@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 
-from employee_onboarding.models import Employee
+from common.bitrix_client import BitrixClient, BitrixEmployeeMock
 from .models import SalaryStructure, SalarySlip, SalaryImportBatch, SalaryIncrementReminder, SalaryIncrementApproval
 from .serializers import (
     SalaryStructureSerializer, SalarySlipSerializer, SalaryImportBatchSerializer,
@@ -87,8 +87,8 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         if reminder.status == 'Actioned':
             return Response({'error': 'This increment reminder has already been actioned.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        employee = reminder.employee
-        active_structure = SalaryStructure.objects.filter(employee=employee).order_by('-effective_from').first()
+        bitrix_user_id = reminder.bitrix_user_id
+        active_structure = SalaryStructure.objects.filter(bitrix_user_id=bitrix_user_id).order_by('-effective_from').first()
         if not active_structure:
             return Response({'error': 'Active salary structure not found.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -104,7 +104,7 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         old_net = active_structure.net_salary
 
         new_structure = SalaryStructure.objects.create(
-            employee=employee,
+            bitrix_user_id=bitrix_user_id,
             effective_from=effective_date,
             gross_salary=new_basic,
             pf_contribution=active_structure.pf_contribution,
@@ -119,7 +119,7 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         increment_pct = (increment_amount / old_net) * 100 if old_net > 0 else 0
 
         approval = serializer.save(
-            employee=employee,
+            bitrix_user_id=bitrix_user_id,
             reminder=reminder,
             old_net=old_net,
             new_net=new_net,
@@ -182,15 +182,24 @@ class SalaryExportView(APIView):
         unlocked_style = Protection(locked=False)
 
         # Check if salary slips already exist
-        slips = SalarySlip.objects.filter(month=month, year=year).select_related('employee', 'employee__department')
+        slips = SalarySlip.objects.filter(month=month, year=year)
         
+        # Resolve employees for all slips
+        user_map = {}
+        for u in BitrixClient.get_all_users():
+            user_map[str(u['id'])] = BitrixEmployeeMock(u)
+            
         row_idx = 2
         if slips.exists():
             for slip in slips:
+                emp = user_map.get(str(slip.bitrix_user_id))
+                emp_id = emp.emp_id if emp else f"BITRIX-{slip.bitrix_user_id}"
+                emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
+                dept_name = emp.department_name if emp else ""
                 row_data = [
-                    slip.employee.emp_id,
-                    slip.employee.name,
-                    slip.employee.department.name if slip.employee.department else "",
+                    emp_id,
+                    emp_name,
+                    dept_name,
                     slip.location,
                     float(slip.gross_salary),
                     float(slip.pf_contribution),
@@ -214,12 +223,13 @@ class SalaryExportView(APIView):
                 row_idx += 1
         else:
             # Export empty template using active employees & structures
-            employees = Employee.objects.filter(status='Active', is_deleted=False).select_related('department')
+            users = BitrixClient.get_all_users()
+            employees = [BitrixEmployeeMock(u) for u in users if BitrixEmployeeMock(u).status != 'Exited']
             for emp in employees:
-                struct = SalaryStructure.objects.filter(employee=emp, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
+                struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
                 if not struct:
                     # Fallback to absolute latest if none effective yet
-                    struct = SalaryStructure.objects.filter(employee=emp).order_by('-effective_from').first()
+                    struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id).order_by('-effective_from').first()
 
                 row_data = [
                     emp.emp_id,
@@ -329,11 +339,15 @@ class SalaryImportView(APIView):
                     sid = transaction.savepoint()
                     try:
                         # Validate Employee
-                        employee = Employee.objects.filter(emp_id=emp_id, is_deleted=False).first()
-                        if not employee:
-                            raise ValueError("Employee ID not found")
-                        if employee.status != 'Active':
-                            raise ValueError("Employee is inactive")
+                        bitrix_users = BitrixClient.get_all_users()
+                        employee = None
+                        for u in bitrix_users:
+                            mock_emp = BitrixEmployeeMock(u)
+                            if mock_emp.emp_id == emp_id or str(mock_emp.bitrix_id) == str(emp_id):
+                                employee = mock_emp
+                                break
+                        if not employee or employee.status == 'Exited':
+                            raise ValueError("Employee is exited or not found in Bitrix24")
 
                         # Parse data
                         location = str(ws.cell(row=r_idx, column=4).value or "Mohali").strip()
@@ -348,7 +362,7 @@ class SalaryImportView(APIView):
                         extra_days = parse_decimal(ws.cell(row=r_idx, column=13).value, "Leave Encashment / Extra Days")
 
                         # Save SalarySlip
-                        slip = SalarySlip.objects.filter(employee=employee, month=month, year=year).first()
+                        slip = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, month=month, year=year).first()
                         if slip:
                             slip.location = location
                             slip.gross_salary = gross_salary
@@ -365,7 +379,7 @@ class SalaryImportView(APIView):
                             slip.save()
                         else:
                             slip = SalarySlip.objects.create(
-                                employee=employee,
+                                bitrix_user_id=employee.bitrix_id,
                                 month=month,
                                 year=year,
                                 location=location,
@@ -522,15 +536,16 @@ class SalaryHistoryView(APIView):
         # Scoped logic
         if role == 'employee':
             # Force self
-            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
-            if not employee:
-                return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-            slips = SalarySlip.objects.filter(employee=employee, status='published').order_by('-year', '-month')
+            user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
+            if not user_data:
+                return Response({'error': 'Employee profile not found in Bitrix24.'}, status=status.HTTP_404_NOT_FOUND)
+            employee = BitrixEmployeeMock(user_data)
+            slips = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, status='published').order_by('-year', '-month')
         else:
             # Admin / HR
-            employee_id = request.query_params.get('employee_id') or kwargs.get('employee_id')
+            employee_id = request.query_params.get('employee_id') or kwargs.get('employee_id') or request.query_params.get('bitrix_user_id')
             if employee_id:
-                slips = SalarySlip.objects.filter(employee_id=employee_id).order_by('-year', '-month')
+                slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id)).order_by('-year', '-month')
             else:
                 # Paginate all employees slips
                 slips = SalarySlip.objects.all().order_by('-year', '-month')
@@ -566,13 +581,17 @@ class SalaryHistoryView(APIView):
         paginator = StandardResultsSetPagination()
         page = paginator.paginate_queryset(slips, request, view=self)
         
+        bitrix_users = {str(u['id']): BitrixEmployeeMock(u) for u in BitrixClient.get_all_users()}
         data = []
         target_list = page if page is not None else slips
         for s in target_list:
+            emp = bitrix_users.get(str(s.bitrix_user_id))
+            emp_id = emp.id if emp else 0
+            emp_name = emp.name if emp else f"User {s.bitrix_user_id}"
             data.append({
                 'id': s.id,
-                'employee_id': s.employee.id,
-                'employee_name': s.employee.name,
+                'employee_id': emp_id,
+                'employee_name': emp_name,
                 'month': s.month,
                 'year': s.year,
                 'location': s.location,
@@ -609,12 +628,13 @@ class SalarySlipDownloadView(APIView):
         download_type = request.query_params.get('type') # single | last3 | last4 | range | bulk_month | selected
 
         if role == 'employee':
-            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
-            if not employee:
+            user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
+            if not user_data:
                 return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-            employee_id = employee.id
+            employee = BitrixEmployeeMock(user_data)
+            employee_id = employee.bitrix_id
             # Employees can only download published slips
-            slips_qs = SalarySlip.objects.filter(employee_id=employee_id, status='published')
+            slips_qs = SalarySlip.objects.filter(bitrix_user_id=employee_id, status='published')
         else:
             # Admin/HR
             if download_type in ['bulk_month', 'selected'] and not employee_id:
@@ -622,7 +642,7 @@ class SalarySlipDownloadView(APIView):
             else:
                 if not employee_id:
                     return Response({'error': 'employee_id parameter is required for Admin/HR.'}, status=status.HTTP_400_BAD_REQUEST)
-                slips_qs = SalarySlip.objects.filter(employee_id=employee_id)
+                slips_qs = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
 
         # Filters
         slips = []

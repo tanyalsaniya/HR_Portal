@@ -10,11 +10,7 @@ from rules import (
 )
 
 class ExitRequest(models.Model):
-    employee = models.ForeignKey(
-        'employee_onboarding.Employee',
-        on_delete=models.PROTECT,
-        related_name='exit_requests'
-    )
+    bitrix_user_id = models.CharField(max_length=50, db_index=True, null=True, blank=True)
     resignation_date = models.DateField()
     last_working_day = models.DateField()
     exit_type = models.CharField(max_length=20, choices=EXIT_TYPE_CHOICES)
@@ -76,7 +72,15 @@ class ExitRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Exit for {self.employee.emp_id} ({self.status})"
+        return f"Exit for User {self.bitrix_user_id} ({self.status})"
+
+    @property
+    def employee(self):
+        from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+        user = BitrixClient.get_user_detail(self.bitrix_user_id)
+        if user:
+            return BitrixEmployeeMock(user)
+        return None
 
 class ExitSecureLink(models.Model):
     exit_request = models.OneToOneField(
@@ -107,7 +111,7 @@ class ExitSecureLink(models.Model):
         return f"{frontend_url}/exit/form/{self.token}/"
 
     def __str__(self):
-        return f"Link for {self.exit_request.employee.emp_id} (Expired: {not self.is_valid()})"
+        return f"Link for User {self.exit_request.bitrix_user_id} (Expired: {not self.is_valid()})"
 
 class ExitFormResponse(models.Model):
     exit_request = models.OneToOneField(
@@ -164,7 +168,7 @@ class ExitFormResponse(models.Model):
     submitted_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Response for {self.exit_request.employee.emp_id}"
+        return f"Response for User {self.exit_request.bitrix_user_id}"
 
 class ExitFFSettlement(models.Model):
     exit_request = models.OneToOneField(
@@ -245,4 +249,4 @@ class ExitFFSettlement(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"F&F Settlement for {self.exit_request.employee.emp_id}"
+        return f"F&F Settlement for User {self.exit_request.bitrix_user_id}"

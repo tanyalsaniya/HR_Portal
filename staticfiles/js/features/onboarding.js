@@ -103,34 +103,82 @@ async function loadOnboardingData() {
     switchOnboardingSubTab(activeOnboardingSubTab);
 }
 
+// Pagination state variables
+let onboardingCurrentPage = 1;
+let directoryCurrentPage = 1;
+let onboardingTotalCount = 0;
+let directoryTotalCount = 0;
+
 // Load filtered employee datasets based on selected active tab
 async function loadFilteredEmployeeData() {
-    let endpoint = '/employees/';
+    const page = activeOnboardingSubTab === 'onboarding' ? onboardingCurrentPage : directoryCurrentPage;
     
+    let params = new URLSearchParams();
+    params.append('page', page);
+    params.append('page_size', 10);
+    
+    // Pass sub-tab type
     if (activeOnboardingSubTab === 'onboarding') {
-        endpoint = '/employees/?type=onboarding';
+        params.append('type', 'onboarding');
     } else if (activeOnboardingSubTab === 'all') {
-        endpoint = '/employees/?type=all';
+        params.append('type', 'all');
+    } else if (activeOnboardingSubTab === 'offboarding') {
+        params.append('type', 'offboarding');
+    } else if (activeOnboardingSubTab === 'dismissed') {
+        params.append('type', 'dismissed');
     }
+
+    // Search query
+    const searchVal = document.getElementById('onboardingSearchInput').value;
+    if (searchVal) {
+        params.append('search', searchVal);
+    }
+
+    // Dropdown filters
+    const dept = document.getElementById('onboardingDeptFilter').value;
+    const type = document.getElementById('onboardingTypeFilter').value;
+    const fromDate = document.getElementById('onboardingFromDateFilter').value;
+    const toDate = document.getElementById('onboardingToDateFilter').value;
+    
+    if (dept) {
+        params.append('department', dept);
+    }
+    if (type) {
+        params.append('employment_type', type);
+    }
+    if (fromDate) {
+        params.append('from_date', fromDate);
+    }
+    if (toDate) {
+        params.append('to_date', toDate);
+    }
+
+    // Sort order
+    const sortBy = document.getElementById('onboardingSortSelect').value;
+    if (sortBy) {
+        params.append('sort', sortBy);
+    }
+    
+    let endpoint = `/employees/?${params.toString()}`;
     
     try {
         const res = await apiFetch(endpoint);
         if (res.ok) {
             const data = await res.json();
+            
+            // Server returns {count: X, results: [...]} under pagination, or raw array if pagination is bypassed
             let rawList = data.results || data;
+            let total = data.count || rawList.length;
             
-            // Local filters for other mock states (offboarding, dismissed)
-            if (activeOnboardingSubTab === 'offboarding') {
-                rawList = rawList.filter(e => e.status === 'Exited' || e.exit_request_id !== undefined);
-            } else if (activeOnboardingSubTab === 'dismissed') {
-                rawList = rawList.filter(e => e.is_deleted === true || e.status === 'Exited');
-            } else if (activeOnboardingSubTab === 'all') {
-                // Active directory filters out exited employees by default
-                rawList = rawList.filter(e => e.status !== 'Exited');
+            if (activeOnboardingSubTab === 'onboarding') {
+                onboardingTotalCount = total;
+                updatePaginationControls('onboarding', onboardingCurrentPage, onboardingTotalCount);
+                renderOnboardingTrackerTable(rawList);
+            } else {
+                directoryTotalCount = total;
+                updatePaginationControls('all', directoryCurrentPage, directoryTotalCount);
+                renderActiveDirectoryTable(rawList);
             }
-            
-            currentOnboardingData = rawList;
-            applySearchSortAndFilter();
         }
     } catch (e) {
         console.error(e);
@@ -140,61 +188,58 @@ async function loadFilteredEmployeeData() {
 
 // Apply client-side search query, dropdown filters and sort orders
 function filterOnboardingTables() {
-    applySearchSortAndFilter();
+    onboardingCurrentPage = 1;
+    directoryCurrentPage = 1;
+    loadFilteredEmployeeData();
 }
 
 function sortOnboardingTables() {
-    applySearchSortAndFilter();
+    onboardingCurrentPage = 1;
+    directoryCurrentPage = 1;
+    loadFilteredEmployeeData();
 }
 
-function applySearchSortAndFilter() {
-    let list = [...currentOnboardingData];
-    
-    // 1. Search filter
-    const query = document.getElementById('onboardingSearchInput').value.toLowerCase();
-    if (query) {
-        list = list.filter(e => 
-            e.first_name.toLowerCase().includes(query) ||
-            e.last_name.toLowerCase().includes(query) ||
-            e.email.toLowerCase().includes(query) ||
-            e.emp_id.toLowerCase().includes(query)
-        );
-    }
-    
-    // 2. Dropdown filters
-    const dept = document.getElementById('onboardingDeptFilter').value;
-    const type = document.getElementById('onboardingTypeFilter').value;
-    const fromDate = document.getElementById('onboardingFromDateFilter').value;
-    const toDate = document.getElementById('onboardingToDateFilter').value;
-    
-    if (dept) {
-        list = list.filter(e => String(e.department) === String(dept));
-    }
-    if (type) {
-        list = list.filter(e => e.employment_type === type);
-    }
-    if (fromDate) {
-        list = list.filter(e => e.joining_date >= fromDate);
-    }
-    if (toDate) {
-        list = list.filter(e => e.joining_date <= toDate);
-    }
-    
-    // 3. Sort ordering
-    const sortBy = document.getElementById('onboardingSortSelect').value;
-    if (sortBy === 'name') {
-        list.sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
-    } else if (sortBy === 'date') {
-        list.sort((a, b) => new Date(a.joining_date) - new Date(b.joining_date));
-    } else if (sortBy === 'id') {
-        list.sort((a, b) => a.emp_id.localeCompare(b.emp_id));
-    }
-    
-    // Render to correct tab tbody
-    if (activeOnboardingSubTab === 'onboarding') {
-        renderOnboardingTrackerTable(list);
+function changeOnboardingPage(tab, direction) {
+    if (tab === 'onboarding') {
+        const maxPage = Math.ceil(onboardingTotalCount / 10) || 1;
+        onboardingCurrentPage = Math.max(1, Math.min(maxPage, onboardingCurrentPage + direction));
     } else {
-        renderActiveDirectoryTable(list);
+        const maxPage = Math.ceil(directoryTotalCount / 10) || 1;
+        directoryCurrentPage = Math.max(1, Math.min(maxPage, directoryCurrentPage + direction));
+    }
+    loadFilteredEmployeeData();
+}
+
+function updatePaginationControls(tab, currentPage, totalCount) {
+    const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * 10 + 1;
+    const pageEnd = Math.min(currentPage * 10, totalCount);
+    
+    if (tab === 'onboarding') {
+        const startEl = document.getElementById('onboardingPageStart');
+        const endEl = document.getElementById('onboardingPageEnd');
+        const totalEl = document.getElementById('onboardingTotalCount');
+        const prevBtn = document.getElementById('onboardingPrevBtn');
+        const nextBtn = document.getElementById('onboardingNextBtn');
+        
+        if (startEl) startEl.textContent = pageStart;
+        if (endEl) endEl.textContent = pageEnd;
+        if (totalEl) totalEl.textContent = totalCount;
+        
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
+    } else {
+        const startEl = document.getElementById('directoryPageStart');
+        const endEl = document.getElementById('directoryPageEnd');
+        const totalEl = document.getElementById('directoryTotalCount');
+        const prevBtn = document.getElementById('directoryPrevBtn');
+        const nextBtn = document.getElementById('directoryNextBtn');
+        
+        if (startEl) startEl.textContent = pageStart;
+        if (endEl) endEl.textContent = pageEnd;
+        if (totalEl) totalEl.textContent = totalCount;
+        
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
     }
 }
 

@@ -76,6 +76,16 @@
                 </tbody>
             </table>
         </div>
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" id="salarySlipsPaginationFooter" style="display: none; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent, #e2e8f0); background: #fafafa; margin-top: 15px; border-radius: 0 0 8px 8px;">
+            <div style="font-size: 9pt; color: var(--text-secondary, #64748b);">
+                Showing <span id="salaryPageStart">0</span> to <span id="salaryPageEnd">0</span> of <span id="salaryTotalCount">0</span> entries
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="salaryPrevBtn" onclick="changeSalaryPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="salaryNextBtn" onclick="changeSalaryPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;" disabled>Next</button>
+            </div>
+        </div>
     </div>
 
     <!-- TAB 2: STRUCTURES -->

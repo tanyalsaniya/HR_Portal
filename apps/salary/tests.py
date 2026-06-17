@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 
 # Python 3.14 compatibility patch for django template context copy
 from django.template.context import BaseContext
@@ -18,14 +19,44 @@ def patch_copy(self):
 BaseContext.__copy__ = patch_copy
 
 from roles.models import Role
-from employee_onboarding.models import Department, Employee
+from employee_onboarding.models import Department
 from salary.models import SalaryStructure, SalarySlip, SalaryImportBatch
+from common.bitrix_client import BitrixEmployeeMock
 
 User = get_user_model()
 
 class SalaryModuleTests(APITestCase):
 
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        # Setup mock patchers
+        self.get_all_users_patcher = patch('common.bitrix_client.BitrixClient.get_all_users')
+        self.mock_get_all = self.get_all_users_patcher.start()
+        
+        self.get_user_detail_patcher = patch('common.bitrix_client.BitrixClient.get_user_detail')
+        self.mock_get_detail = self.get_user_detail_patcher.start()
+
+        user_dict = {
+            'id': '10',
+            'emp_id': 'BITRIX-10',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'name': 'John Doe',
+            'email': 'emp@test.com',
+            'phone': '9876543210',
+            'designation': 'Software Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': '2026-06-01',
+            'status': 'Active'
+        }
+        self.mock_get_all.return_value = [user_dict]
+        self.mock_get_detail.return_value = user_dict
+
+        self.employee = BitrixEmployeeMock(user_dict)
+
         # Create roles
         self.admin_role = Role.objects.create(name="Admin", code="ADMIN")
         self.hr_role = Role.objects.create(name="HR", code="HR")
@@ -45,30 +76,9 @@ class SalaryModuleTests(APITestCase):
         # Create department
         self.dept = Department.objects.create(name="Engineering")
 
-        # Create active employee
-        self.employee = Employee.objects.create(
-            first_name="John",
-            last_name="Doe",
-            email="emp@test.com",
-            phone="9876543210",
-            dob=datetime.date(1995, 5, 10),
-            gender="MALE",
-            address_line1="123 Street",
-            city="Mumbai",
-            state="MH",
-            pin_code="400001",
-            department=self.dept,
-            designation="Software Engineer",
-            employment_type="FULL_TIME",
-            joining_date=datetime.date(2026, 6, 1),
-            bank_account="1234567890",
-            pan_no="ABCDE1234F",
-            status="Active"
-        )
-
         # Create salary structure
         self.structure = SalaryStructure.objects.create(
-            employee=self.employee,
+            bitrix_user_id=self.employee.bitrix_id,
             gross_salary=Decimal('87000.00'),
             pf_contribution=Decimal('6000.00'),
             esi=Decimal('0.00'),
@@ -77,6 +87,10 @@ class SalaryModuleTests(APITestCase):
             other_deductions=Decimal('0.00'),
             effective_from=datetime.date(2026, 6, 1)
         )
+
+    def tearDown(self):
+        self.get_all_users_patcher.stop()
+        self.get_user_detail_patcher.stop()
 
     def test_admin_salary_export_template(self):
         self.client.force_authenticate(user=self.admin_user)
@@ -92,7 +106,6 @@ class SalaryModuleTests(APITestCase):
         self.assertEqual(ws.cell(row=2, column=2).value, self.employee.name)
 
     def test_unauthorized_salary_export_fails(self):
-        # HR cannot export template
         self.client.force_authenticate(user=self.hr_user)
         url = reverse('salary_export') + "?month=6&year=2026"
         res = self.client.get(url)
@@ -140,7 +153,7 @@ class SalaryModuleTests(APITestCase):
         self.assertEqual(res.data['failed'], 0)
 
         # Check slip is created in DB as draft
-        slip = SalarySlip.objects.get(employee=self.employee, month=6, year=2026)
+        slip = SalarySlip.objects.get(bitrix_user_id=self.employee.bitrix_id, month=6, year=2026)
         self.assertEqual(slip.status, 'draft')
         self.assertEqual(slip.gross_salary, Decimal('87000.00'))
         self.assertEqual(slip.total_deductions, Decimal('6200.00')) # 6000 PF + 200 PT
@@ -199,7 +212,7 @@ class SalaryModuleTests(APITestCase):
     def test_publish_workflow(self):
         # Create draft slip
         slip = SalarySlip.objects.create(
-            employee=self.employee,
+            bitrix_user_id=self.employee.bitrix_id,
             month=6,
             year=2026,
             gross_salary=87000.00,
@@ -217,10 +230,10 @@ class SalaryModuleTests(APITestCase):
     def test_salary_history_scoping(self):
         # Create slips
         slip1 = SalarySlip.objects.create(
-            employee=self.employee, month=5, year=2026, gross_salary=87000.00, status='published'
+            bitrix_user_id=self.employee.bitrix_id, month=5, year=2026, gross_salary=87000.00, status='published'
         )
         slip2 = SalarySlip.objects.create(
-            employee=self.employee, month=6, year=2026, gross_salary=90000.00, status='draft'
+            bitrix_user_id=self.employee.bitrix_id, month=6, year=2026, gross_salary=90000.00, status='draft'
         )
 
         # Test employee request
@@ -241,10 +254,10 @@ class SalaryModuleTests(APITestCase):
     def test_salary_slip_pdf_and_zip_download(self):
         # Create multiple published slips
         slip1 = SalarySlip.objects.create(
-            employee=self.employee, month=4, year=2026, gross_salary=87000.00, status='published'
+            bitrix_user_id=self.employee.bitrix_id, month=4, year=2026, gross_salary=87000.00, status='published'
         )
         slip2 = SalarySlip.objects.create(
-            employee=self.employee, month=5, year=2026, gross_salary=87000.00, status='published'
+            bitrix_user_id=self.employee.bitrix_id, month=5, year=2026, gross_salary=87000.00, status='published'
         )
 
         # Download single month

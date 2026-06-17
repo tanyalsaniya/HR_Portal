@@ -30,11 +30,7 @@ class SalaryImportBatch(models.Model):
 
 
 class SalaryStructure(models.Model):
-    employee = models.ForeignKey(
-        'employee_onboarding.Employee',
-        on_delete=models.CASCADE,
-        related_name='salary_structures'
-    )
+    bitrix_user_id = models.CharField(max_length=50, db_index=True, null=True, blank=True)
     gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     pf_contribution = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     esi = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -63,7 +59,15 @@ class SalaryStructure(models.Model):
         return self.gross_salary - self.total_deductions
 
     def __str__(self):
-        return f"Salary Structure for {self.employee.emp_id} (Net: {self.net_salary})"
+        return f"Salary Structure for User {self.bitrix_user_id} (Net: {self.net_salary})"
+
+    @property
+    def employee(self):
+        from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+        user = BitrixClient.get_user_detail(self.bitrix_user_id)
+        if user:
+            return BitrixEmployeeMock(user)
+        return None
 
 
 class SalarySlip(models.Model):
@@ -75,11 +79,7 @@ class SalarySlip(models.Model):
         ('draft', 'Draft'),
         ('published', 'Published'),
     )
-    employee = models.ForeignKey(
-        'employee_onboarding.Employee',
-        on_delete=models.CASCADE,
-        related_name='salary_slips'
-    )
+    bitrix_user_id = models.CharField(max_length=50, db_index=True, null=True, blank=True)
     month = models.PositiveIntegerField()
     year = models.PositiveIntegerField()
     location = models.CharField(max_length=100, default='Mohali')
@@ -122,7 +122,7 @@ class SalarySlip(models.Model):
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     class Meta:
-        unique_together = ('employee', 'month', 'year')
+        unique_together = ('bitrix_user_id', 'month', 'year')
 
     def save(self, *args, **kwargs):
         # Auto calculate gross, deductions, net salary
@@ -144,15 +144,19 @@ class SalarySlip(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Payslip {self.payslip_no} for {self.employee.emp_id}"
+        return f"Payslip {self.payslip_no} for User {self.bitrix_user_id}"
+
+    @property
+    def employee(self):
+        from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+        user = BitrixClient.get_user_detail(self.bitrix_user_id)
+        if user:
+            return BitrixEmployeeMock(user)
+        return None
 
 
 class SalaryIncrementReminder(models.Model):
-    employee = models.ForeignKey(
-        'employee_onboarding.Employee',
-        on_delete=models.CASCADE,
-        related_name='increment_reminders'
-    )
+    bitrix_user_id = models.CharField(max_length=50, db_index=True, null=True, blank=True)
     anniversary_date = models.DateField()
     reminder_15_sent = models.BooleanField(default=False)
     reminder_7_sent = models.BooleanField(default=False)
@@ -167,15 +171,19 @@ class SalaryIncrementReminder(models.Model):
     actioned_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"Reminder for {self.employee.emp_id} ({self.status})"
+        return f"Reminder for User {self.bitrix_user_id} ({self.status})"
+
+    @property
+    def employee(self):
+        from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+        user = BitrixClient.get_user_detail(self.bitrix_user_id)
+        if user:
+            return BitrixEmployeeMock(user)
+        return None
 
 
 class SalaryIncrementApproval(models.Model):
-    employee = models.ForeignKey(
-        'employee_onboarding.Employee',
-        on_delete=models.CASCADE,
-        related_name='increment_approvals'
-    )
+    bitrix_user_id = models.CharField(max_length=50, db_index=True, null=True, blank=True)
     reminder = models.ForeignKey(
         SalaryIncrementReminder,
         on_delete=models.SET_NULL,
@@ -202,4 +210,12 @@ class SalaryIncrementApproval(models.Model):
     pdf_file = models.FileField(upload_to='salary_increments/')
 
     def __str__(self):
-        return f"Increment for {self.employee.emp_id} (Pct: {self.increment_pct}%)"
+        return f"Increment for User {self.bitrix_user_id} (Pct: {self.increment_pct}%)"
+
+    @property
+    def employee(self):
+        from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+        user = BitrixClient.get_user_detail(self.bitrix_user_id)
+        if user:
+            return BitrixEmployeeMock(user)
+        return None

@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from roles.permissions import HasModelPermission
 from rules import ROLE_ADMIN
-from django.db import models
-from .models import Department, Employee, EmployeeDocument, LetterTemplate
+from .models import Department, EmployeeDocument, LetterTemplate
+from common.bitrix_client import BitrixClient, BitrixEmployeeMock
 from .serializers import DepartmentSerializer, EmployeeSerializer, EmployeeDocumentSerializer, LetterTemplateSerializer
 from .services import generate_offer_letter, generate_appointment_letter, generate_bond_letter
 import os
@@ -69,75 +69,217 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     permission_classes = [HasModelPermission]
 
+from rest_framework.pagination import PageNumberPagination
+
+class EmployeePagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
     permission_classes = [HasModelPermission]
+    pagination_class = EmployeePagination
 
     def get_queryset(self):
-        import datetime
-        queryset = Employee.objects.filter(is_deleted=False).order_by('-created_at')
+        users = BitrixClient.get_all_users()
+        mocks = [BitrixEmployeeMock(u) for u in users]
+        return mocks
+
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        user = BitrixClient.get_user_detail(pk)
+        if not user:
+            raise Http404("Employee not found in Bitrix24.")
+        return BitrixEmployeeMock(user)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
         
-        # Split List logic
-        list_type = self.request.query_params.get('type')
-        today = datetime.date.today()
-        
-        if list_type == 'onboarding':
-            # Day 1-15: onboarding_complete is False
-            queryset = queryset.filter(onboarding_complete=False)
-        elif list_type == 'all':
-            # Day 15: appears in BOTH (so joining_date <= today - 14 days)
-            # Day 16+: onboarding_complete is True
-            # Or manually completed
-            day_14_ago = today - datetime.timedelta(days=14)
-            queryset = queryset.filter(
-                models.Q(onboarding_complete=True) | models.Q(joining_date__lte=day_14_ago)
-            )
+        # 1. Search query
+        search_query = request.query_params.get('search')
+        if search_query:
+            search_query = search_query.lower()
+            queryset = [
+                u for u in queryset 
+                if search_query in u.name.lower() or search_query in u.email.lower() or search_query in u.emp_id.lower()
+            ]
+
+        # 2. Department filter
+        dept_id = request.query_params.get('department')
+        if dept_id:
+            queryset = [
+                u for u in queryset
+                if str(u.department) == str(dept_id) or str(dept_id) in [str(d) for d in getattr(u, 'UF_DEPARTMENT', [])]
+            ]
+
+        # 3. Employment Type filter
+        emp_type = request.query_params.get('employment_type')
+        if emp_type:
+            queryset = [
+                u for u in queryset
+                if u.employment_type.upper().replace(' ', '_').replace('-', '_') == emp_type.upper()
+            ]
+
+        # 4. Date range filters
+        from_date = request.query_params.get('from_date')
+        to_date = request.query_params.get('to_date')
+        if from_date:
+            queryset = [u for u in queryset if str(u.joining_date) >= str(from_date)]
+        if to_date:
+            queryset = [u for u in queryset if str(u.joining_date) <= str(to_date)]
             
-        return queryset
+        # 5. List type split logic
+        list_type = request.query_params.get('type')
+        import datetime
+        today = datetime.date.today()
+        day_14_ago = today - datetime.timedelta(days=14)
+        
+        filtered_users = []
+        for u in queryset:
+            if list_type == 'onboarding':
+                if u.joining_date > day_14_ago:
+                    # Filter out exited users from onboarding list
+                    if u.status != 'Exited':
+                        filtered_users.append(u)
+            elif list_type == 'all':
+                # Filter out exited users from active directory
+                if u.status != 'Exited':
+                    filtered_users.append(u)
+            elif list_type == 'offboarding':
+                if u.status == 'Exited' or getattr(u, 'exit_request_id', None) is not None:
+                    filtered_users.append(u)
+            elif list_type == 'dismissed':
+                if u.status == 'Exited' or getattr(u, 'is_deleted', False) is True:
+                    filtered_users.append(u)
+            else:
+                filtered_users.append(u)
 
-    def perform_create(self, serializer):
-        emp = serializer.save()
-        # Trigger background Bitrix24 contact sync task
-        from .tasks import sync_employee_to_bitrix24
-        sync_employee_to_bitrix24.delay(emp.id)
+        # 6. Sort ordering
+        sort_by = request.query_params.get('sort')
+        if sort_by == 'name':
+            filtered_users.sort(key=lambda u: u.name.lower())
+        elif sort_by == 'date':
+            filtered_users.sort(key=lambda u: str(u.joining_date))
+        elif sort_by == 'id':
+            filtered_users.sort(key=lambda u: u.emp_id.lower())
+                 
+        # Pagination
+        no_pagination = request.query_params.get('no_pagination') == 'true'
+        if not no_pagination:
+            page = self.paginate_queryset(filtered_users)
+            if page is not None:
+                serializer = self.get_serializer([u._data for u in page], many=True)
+                return self.get_paginated_response(serializer.data)
+            
+        serializer = self.get_serializer([u._data for u in filtered_users], many=True)
+        return Response(serializer.data)
 
-    def perform_update(self, serializer):
-        emp = serializer.save()
-        # Trigger background Bitrix24 contact update task
-        from .tasks import sync_employee_to_bitrix24
-        sync_employee_to_bitrix24.delay(emp.id)
+    def retrieve(self, request, *args, **kwargs):
+        employee = self.get_object()
+        serializer = self.get_serializer(employee._data)
+        return Response(serializer.data)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.is_deleted = True
-        instance.save()
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        webhook = BitrixClient.get_webhook_url()
+        create_url = f"{webhook}/crm.contact.add"
+        
+        payload = {
+            'fields': {
+                'NAME': data.get('first_name'),
+                'LAST_NAME': data.get('last_name'),
+                'EMAIL': [{'VALUE': data.get('email'), 'VALUE_TYPE': 'WORK'}],
+                'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
+                'POST': data.get('designation'),
+                'UF_ONBOARDING_STATUS': 'Pending',
+                'UF_CRM_ONBOARDING_STATUS': 'Pending'
+            }
+        }
+        
+        try:
+            import requests
+            res = requests.post(create_url, json=payload, timeout=10)
+            if res.ok:
+                contact_id = str(res.json().get('result'))
+                BitrixClient.get_all_users(force_refresh=True)
+                mock_user = BitrixClient.get_user_detail(contact_id)
+                # Write to audit logs
+                from audit_logs.signals import log_action
+                log_action(request.user, "CREATE", None, f"Created Bitrix24 employee contact {data.get('first_name')} {data.get('last_name')} (ID: {contact_id}).")
+                return Response(mock_user, status=status.HTTP_201_CREATED)
+            else:
+                return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, pk=None, *args, **kwargs):
+        data = request.data
+        webhook = BitrixClient.get_webhook_url()
+        update_url = f"{webhook}/crm.contact.update"
+        
+        payload = {
+            'id': pk,
+            'fields': {
+                'NAME': data.get('first_name'),
+                'LAST_NAME': data.get('last_name'),
+                'EMAIL': [{'VALUE': data.get('email'), 'VALUE_TYPE': 'WORK'}],
+                'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
+                'POST': data.get('designation'),
+            }
+        }
+        
+        try:
+            import requests
+            res = requests.post(update_url, json=payload, timeout=10)
+            if res.ok:
+                BitrixClient.get_all_users(force_refresh=True)
+                user = BitrixClient.get_user_detail(pk)
+                # Log action
+                from audit_logs.signals import log_action
+                log_action(request.user, "UPDATE", None, f"Updated Bitrix24 employee contact (ID: {pk}).")
+                return Response(user)
+            else:
+                return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        return self.update(request, pk, *args, **kwargs)
+
+    def destroy(self, request, pk=None, *args, **kwargs):
+        webhook = BitrixClient.get_webhook_url()
+        delete_url = f"{webhook}/crm.contact.delete"
+        try:
+            import requests
+            requests.post(delete_url, json={'id': pk}, timeout=10)
+        except Exception:
+            pass
+        BitrixClient.get_all_users(force_refresh=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['POST'], url_path='manual-graduate')
     def manual_graduate(self, request, pk=None):
-        employee = self.get_object()
-        if employee.onboarding_complete:
-            return Response({'message': 'Employee is already graduated.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        employee.onboarding_complete = True
-        employee.save()
-        
-        # Trigger Bitrix24 update
-        from .tasks import update_bitrix24_onboarding_status
-        update_bitrix24_onboarding_status.delay(employee.id)
-        
-        # Write to Audit Log
-        from audit_logs.signals import log_action
-        log_action(request.user, "GRADUATE", employee, f"Employee onboarding manually marked complete before Day 15.")
-        
+        webhook = BitrixClient.get_webhook_url()
+        update_url = f"{webhook}/crm.contact.update"
+        payload = {
+            'id': pk,
+            'fields': {
+                'UF_ONBOARDING_STATUS': 'Completed',
+                'UF_CRM_ONBOARDING_STATUS': 'Completed'
+            }
+        }
+        try:
+            import requests
+            requests.post(update_url, json=payload, timeout=10)
+        except Exception:
+            pass
+        BitrixClient.get_all_users(force_refresh=True)
         return Response({'message': 'Employee onboarding completed successfully.'})
 
     @action(detail=True, methods=['POST'], url_path='retry-bitrix-sync')
     def retry_bitrix_sync(self, request, pk=None):
-        employee = self.get_object()
-        from .tasks import sync_employee_to_bitrix24
-        sync_employee_to_bitrix24.delay(employee.id)
-        return Response({'message': 'Bitrix24 sync task queued.'})
+        return Response({'message': 'Project is running in Pure API mode. Sync is always active.'})
 
     @action(detail=True, methods=['POST'], url_path='generate-offer-letter')
     def generate_offer_letter_api(self, request, pk=None):
@@ -217,128 +359,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['POST'], url_path='import-excel')
     def excel_import(self, request):
-        import openpyxl
-        import datetime
-        from django.db import transaction
-        from openpyxl import Workbook
-        from django.http import HttpResponse
-
-        file_obj = request.FILES.get('file')
-        if not file_obj:
-            return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            wb = openpyxl.load_workbook(file_obj)
-            sheet = wb.active
-        except Exception as e:
-            return Response({'error': f"Failed to read file: {e}"}, status=status.HTTP_400_BAD_REQUEST)
-
-        rows = list(sheet.iter_rows(min_row=2, values_only=True))
-        errors_occurred = False
-        parsed_employees = []
-        error_rows = []
-
-        for row_idx, row in enumerate(rows, start=2):
-            if not any(row):
-                continue
-
-            try:
-                first_name, last_name, email, phone, dob, gender, address, city, state, pin, dept_name, designation, emp_type, joining_date, notice_period, bond_period, emergency_name, emergency_rel, emergency_phone = row[:19]
-            except Exception as e:
-                error_rows.append(list(row) + [f"Invalid column count: {e}"])
-                errors_occurred = True
-                continue
-
-            row_errors = {}
-            dept = None
-            if dept_name:
-                try:
-                    dept = Department.objects.get(name__iexact=str(dept_name).strip())
-                except Department.DoesNotExist:
-                    row_errors['department'] = f"Department '{dept_name}' does not exist in master."
-
-            def clean_date(d_val):
-                if isinstance(d_val, datetime.date):
-                    return d_val
-                if isinstance(d_val, str):
-                    for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y', '%Y/%m/%d'):
-                        try:
-                            return datetime.datetime.strptime(d_val.strip(), fmt).date()
-                        except ValueError:
-                            pass
-                return d_val
-
-            clean_dob = clean_date(dob)
-            clean_join = clean_date(joining_date)
-
-            payload = {
-                'first_name': str(first_name).strip() if first_name else '',
-                'last_name': str(last_name).strip() if last_name else '',
-                'email': str(email).strip() if email else '',
-                'phone': str(phone).strip() if phone else '',
-                'dob': clean_dob,
-                'gender': str(gender).strip().upper() if gender else '',
-                'address_line1': str(address).strip() if address else '',
-                'city': str(city).strip() if city else '',
-                'state': str(state).strip().upper() if state else '',
-                'pin_code': str(pin).strip() if pin else '',
-                'department': dept.id if dept else None,
-                'designation': str(designation).strip() if designation else '',
-                'employment_type': str(emp_type).strip().upper() if emp_type else '',
-                'joining_date': clean_join,
-                'notice_period_days': int(notice_period) if notice_period is not None else 30,
-                'bond_period_months': int(bond_period) if bond_period is not None else 0,
-                'emergency_contact_name': str(emergency_name).strip() if emergency_name else '',
-                'emergency_relationship': str(emergency_rel).strip().upper() if emergency_rel else '',
-                'emergency_phone': str(emergency_phone).strip() if emergency_phone else ''
-            }
-
-            serializer = EmployeeSerializer(data=payload, context={'request': request})
-            if not serializer.is_valid():
-                all_errors = {**serializer.errors, **row_errors}
-                error_msg = "; ".join([f"{k}: {', '.join(v) if isinstance(v, list) else v}" for k, v in all_errors.items()])
-                error_rows.append(list(row) + [error_msg])
-                errors_occurred = True
-            else:
-                if row_errors:
-                    error_msg = "; ".join([f"{k}: {v}" for k, v in row_errors.items()])
-                    error_rows.append(list(row) + [error_msg])
-                    errors_occurred = True
-                else:
-                    parsed_employees.append(serializer)
-
-        if errors_occurred:
-            err_wb = Workbook()
-            err_ws = err_wb.active
-            err_ws.title = "Failed Rows"
-            excel_headers = [
-                'First Name', 'Last Name', 'Email', 'Phone', 'DOB', 'Gender', 
-                'Address', 'City', 'State', 'PIN', 'Department', 'Designation', 
-                'Employment Type', 'Joining Date', 'Notice Period', 'Bond Period', 
-                'Emergency Name', 'Emergency Relationship', 'Emergency Phone', 'Error Details'
-            ]
-            err_ws.append(excel_headers)
-            for er_row in error_rows:
-                err_ws.append(er_row)
-
-            response = HttpResponse(
-                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
-            response['Content-Disposition'] = 'attachment; filename="import_errors.xlsx"'
-            err_wb.save(response)
-            return response
-        else:
-            try:
-                with transaction.atomic():
-                    for ser in parsed_employees:
-                        emp = ser.save()
-                        from .tasks import sync_employee_to_bitrix24
-                        sync_employee_to_bitrix24.delay(emp.id)
-                return Response({
-                    'message': f"{len(parsed_employees)} employees imported successfully."
-                }, status=status.HTTP_201_CREATED)
-            except Exception as ex:
-                return Response({'error': f"Failed to save records: {ex}"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'message': 'Direct excel import is disabled in Pure API mode. Please add team members in Bitrix24 directly.'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['GET'], url_path='export-excel')
     def excel_export(self, request):
@@ -350,16 +373,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         from_date = request.query_params.get('from_date')
         to_date = request.query_params.get('to_date')
         
-        if dept_id:
-            queryset = queryset.filter(department_id=dept_id)
         if emp_type:
-            queryset = queryset.filter(employment_type=emp_type)
+            queryset = [emp for emp in queryset if emp.employment_type == emp_type]
         if status_param and status_param != 'All':
-            queryset = queryset.filter(status=status_param)
+            queryset = [emp for emp in queryset if emp.status == status_param]
         if from_date:
-            queryset = queryset.filter(joining_date__gte=from_date)
+            try:
+                import datetime
+                from_dt = datetime.datetime.strptime(from_date, '%Y-%m-%d').date()
+                queryset = [emp for emp in queryset if emp.joining_date >= from_dt]
+            except ValueError:
+                pass
         if to_date:
-            queryset = queryset.filter(joining_date__lte=to_date)
+            try:
+                import datetime
+                to_dt = datetime.datetime.strptime(to_date, '%Y-%m-%d').date()
+                queryset = [emp for emp in queryset if emp.joining_date <= to_dt]
+            except ValueError:
+                pass
 
         import openpyxl
         from openpyxl import Workbook
@@ -392,7 +423,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 emp.city,
                 emp.get_state_display(),
                 emp.pin_code,
-                emp.department.name if emp.department else '',
+                emp.department_name,
                 emp.designation,
                 emp.get_employment_type_display(),
                 emp.joining_date.strftime('%Y-%m-%d') if emp.joining_date else '',

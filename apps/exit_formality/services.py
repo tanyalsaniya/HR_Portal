@@ -190,11 +190,11 @@ def generate_exit_document_pdf(exit_request, doc_type, custom_context=None, user
     html_string = render_exit_letter_to_html(exit_request, doc_type, custom_context)
     pdf_bytes = HTML(string=html_string).write_pdf()
     
-    filename = f"{doc_type.lower()}_{exit_request.employee.emp_id}_{int(datetime.datetime.now().timestamp())}.pdf"
+    filename = f"{doc_type.lower()}_{exit_request.bitrix_user_id}_{int(datetime.datetime.now().timestamp())}.pdf"
     content_file = ContentFile(pdf_bytes, name=filename)
     
     doc = EmployeeDocument.objects.create(
-        employee=exit_request.employee,
+        bitrix_user_id=exit_request.bitrix_user_id,
         doc_type=doc_type,
         file=content_file,
         uploaded_by=user

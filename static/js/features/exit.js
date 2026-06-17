@@ -3,6 +3,9 @@
 
 let currentExits = [];
 let activeExitRequest = null;
+let exitCurrentPage = 1;
+let exitTotalCount = 0;
+let exitFilteredList = [];
 
 // Helper to check if current user is admin
 function isAdminUser() {
@@ -15,11 +18,12 @@ function isAdminUser() {
 async function loadExitData() {
     document.getElementById('pageTitle').textContent = 'Employee exit manager';
     try {
-        const res = await apiFetch('/api/exit/requests/');
+        const res = await apiFetch('/api/exit/requests/?no_pagination=true');
         if (res.ok) {
             const exits = await res.json();
             currentExits = exits.results || exits;
-            renderExitTable(currentExits);
+            exitCurrentPage = 1;
+            filterExitTable();
         } else {
             showToast('Failed to fetch exit records.', 'error');
         }
@@ -67,7 +71,7 @@ function filterExitTable() {
     const searchVal = document.getElementById('exitSearchInput').value.toLowerCase();
     const statusVal = document.getElementById('exitStatusFilter').value;
 
-    const filtered = currentExits.filter(x => {
+    exitFilteredList = currentExits.filter(x => {
         const empName = x.employee_details ? `${x.employee_details.first_name} ${x.employee_details.last_name}`.toLowerCase() : '';
         const empId = x.employee_details ? x.employee_details.emp_id.toLowerCase() : '';
         const matchesSearch = empName.includes(searchVal) || empId.includes(searchVal);
@@ -75,7 +79,52 @@ function filterExitTable() {
         return matchesSearch && matchesStatus;
     });
 
-    renderExitTable(filtered);
+    exitTotalCount = exitFilteredList.length;
+    
+    // Reset page if it exceeds maximum pages
+    const maxPage = Math.ceil(exitTotalCount / 10) || 1;
+    if (exitCurrentPage > maxPage) {
+        exitCurrentPage = maxPage;
+    }
+
+    const paginationFooter = document.getElementById('exitPaginationFooter');
+    if (paginationFooter) {
+        paginationFooter.style.display = 'flex';
+        updateExitPaginationControls(exitCurrentPage, exitTotalCount);
+    }
+
+    const startIdx = (exitCurrentPage - 1) * 10;
+    const paginatedList = exitFilteredList.slice(startIdx, startIdx + 10);
+    renderExitTable(paginatedList);
+}
+
+function changeExitPage(direction) {
+    const maxPage = Math.ceil(exitTotalCount / 10) || 1;
+    exitCurrentPage = Math.max(1, Math.min(maxPage, exitCurrentPage + direction));
+    
+    const startIdx = (exitCurrentPage - 1) * 10;
+    const paginatedList = exitFilteredList.slice(startIdx, startIdx + 10);
+    renderExitTable(paginatedList);
+    
+    updateExitPaginationControls(exitCurrentPage, exitTotalCount);
+}
+
+function updateExitPaginationControls(currentPage, totalCount) {
+    const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * 10 + 1;
+    const pageEnd = Math.min(currentPage * 10, totalCount);
+    
+    const startEl = document.getElementById('exitPageStart');
+    const endEl = document.getElementById('exitPageEnd');
+    const totalEl = document.getElementById('exitTotalCount');
+    const prevBtn = document.getElementById('exitPrevBtn');
+    const nextBtn = document.getElementById('exitNextBtn');
+    
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (totalEl) totalEl.textContent = totalCount;
+    
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
 }
 
 // Initiate Exit modal
@@ -96,7 +145,7 @@ async function loadActiveEmployeesSelect(selectId) {
     const select = document.getElementById(selectId);
     if (!select) return;
     try {
-        const res = await apiFetch('/employees/?type=all');
+        const res = await apiFetch('/employees/?type=all&no_pagination=true');
         if (res.ok) {
             const employees = await res.json();
             const list = employees.results || employees;
