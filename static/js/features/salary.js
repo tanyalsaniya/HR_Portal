@@ -2,8 +2,12 @@
 // Salary, Payroll, Excel Import/Export, and ZIP downloads handlers
 
 let activeSalaryTab = 'slips';
+let salaryCurrentPage = 1;
+let salaryTotalCount = 0;
+let salaryFilteredList = [];
 
 async function loadSalaryData() {
+    salaryCurrentPage = 1;
     document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
     
     // Adjust visual panel options based on role
@@ -175,21 +179,32 @@ async function loadSlipsRegistry() {
         }
     }
 
+    const paginationFooter = document.getElementById('salarySlipsPaginationFooter');
+
     // 2. Load and render rows based on Role
     if (isEmployee) {
         // Employee: Flat month-wise registry for themselves
         try {
-            const res = await apiFetch('/salary/history');
+            const res = await apiFetch('/salary/history?no_pagination=true');
             if (res.ok) {
                 const slipsData = await res.json();
-                const slips = slipsData.results || slipsData;
-                
-                if (slips.length === 0) {
+                salaryFilteredList = slipsData.results || slipsData;
+                salaryTotalCount = salaryFilteredList.length;
+
+                if (paginationFooter) {
+                    paginationFooter.style.display = 'flex';
+                    updateSalaryPaginationControls(salaryCurrentPage, salaryTotalCount);
+                }
+
+                if (salaryFilteredList.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #777; padding: 20px;">No salary slips generated yet.</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = slips.map(s => {
+                const startIdx = (salaryCurrentPage - 1) * 10;
+                const paginatedSlips = salaryFilteredList.slice(startIdx, startIdx + 10);
+
+                tbody.innerHTML = paginatedSlips.map(s => {
                     const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                     const period = `${monthNames[s.month]} ${s.year}`;
                     
@@ -219,17 +234,26 @@ async function loadSlipsRegistry() {
     } else {
         // Admin or HR: Consolidated list of employees (one row per employee)
         try {
-            const res = await apiFetch('/employees/');
+            const res = await apiFetch('/employees/?type=all&no_pagination=true');
             if (res.ok) {
                 const empsData = await res.json();
-                const emps = empsData.results || empsData;
-                
-                if (emps.length === 0) {
+                salaryFilteredList = empsData.results || empsData;
+                salaryTotalCount = salaryFilteredList.length;
+
+                if (paginationFooter) {
+                    paginationFooter.style.display = 'flex';
+                    updateSalaryPaginationControls(salaryCurrentPage, salaryTotalCount);
+                }
+
+                if (salaryFilteredList.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #777; padding: 20px;">No employees found.</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = emps.map(emp => {
+                const startIdx = (salaryCurrentPage - 1) * 10;
+                const paginatedEmps = salaryFilteredList.slice(startIdx, startIdx + 10);
+
+                tbody.innerHTML = paginatedEmps.map(emp => {
                     // Calculate current salary from latest structure
                     let currentSalaryHtml = '<span style="color: #999; font-style: italic;">Not Setup</span>';
                     if (emp.salary_structures && emp.salary_structures.length > 0) {
@@ -261,6 +285,30 @@ async function loadSlipsRegistry() {
             console.error(e);
         }
     }
+}
+
+function changeSalaryPage(direction) {
+    const maxPage = Math.ceil(salaryTotalCount / 10) || 1;
+    salaryCurrentPage = Math.max(1, Math.min(maxPage, salaryCurrentPage + direction));
+    loadSlipsRegistry();
+}
+
+function updateSalaryPaginationControls(currentPage, totalCount) {
+    const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * 10 + 1;
+    const pageEnd = Math.min(currentPage * 10, totalCount);
+    
+    const startEl = document.getElementById('salaryPageStart');
+    const endEl = document.getElementById('salaryPageEnd');
+    const totalEl = document.getElementById('salaryTotalCount');
+    const prevBtn = document.getElementById('salaryPrevBtn');
+    const nextBtn = document.getElementById('salaryNextBtn');
+    
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (totalEl) totalEl.textContent = totalCount;
+    
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
 }
 
 // 5. Load Structures Registry
@@ -402,19 +450,31 @@ function closeRangeDownloadModal() {
 
 // 10. Manual Edit Modals & Handlers
 function recalculateEditSlipNetSalary(shouldUpdateInputField = true) {
-    const gross = parseFloat(document.getElementById('editGrossSalary').value) || 0;
+    const monthDays = parseFloat(document.getElementById('editMonthDays').value) || 0;
+    const workedDays = parseFloat(document.getElementById('editWorkedDays').value) || 0;
+    const weekend = parseFloat(document.getElementById('editWeekend').value) || 0;
+    const cl = parseFloat(document.getElementById('editCl').value) || 0;
+    const extra = parseFloat(document.getElementById('editExtra').value) || 0;
 
-    const pf = parseFloat(document.getElementById('editPfContribution').value) || 0;
-    const esi = parseFloat(document.getElementById('editEsi').value) || 0;
-    const lwf = parseFloat(document.getElementById('editLabourWelfareFund').value) || 0;
-    const pt = parseFloat(document.getElementById('editProfessionalTax').value) || 0;
-    const otherDeductions = parseFloat(document.getElementById('editOtherDeductions').value) || 0;
+    const monthSalary = parseFloat(document.getElementById('editMonthSalary').value) || 0;
+    const extraDaysWorking = parseFloat(document.getElementById('editExtraDaysWorking').value) || 0;
+    const fineAdvance = parseFloat(document.getElementById('editFineAdvance').value) || 0;
 
-    const deductions = pf + esi + lwf + pt + otherDeductions;
-    const net = gross - deductions;
+    const payableDays = workedDays + weekend + cl + extra;
+    let payableSalary = 0;
+    if (monthDays > 0) {
+        payableSalary = (monthSalary / monthDays) * payableDays;
+    } else {
+        payableSalary = monthSalary;
+    }
+    const netPayable = payableSalary + extraDaysWorking - fineAdvance;
+
+    document.getElementById('editPayableDays').value = payableDays.toFixed(2);
+    document.getElementById('editPayableSalary').value = payableSalary.toFixed(2);
+    document.getElementById('editNetPayable').value = netPayable.toFixed(2);
 
     if (shouldUpdateInputField) {
-        document.getElementById('editNetCredited').value = net.toFixed(2);
+        document.getElementById('editNetCredited').value = netPayable.toFixed(2);
     }
 
     // Update Summary card
@@ -423,11 +483,11 @@ function recalculateEditSlipNetSalary(shouldUpdateInputField = true) {
     const sn = document.getElementById('summaryNet');
     const sc = document.getElementById('summaryNetCredited');
 
-    if (sg) sg.textContent = `Rs. ${gross.toFixed(2)}`;
-    if (sd) sd.textContent = `Rs. ${deductions.toFixed(2)}`;
-    if (sn) sn.textContent = `Rs. ${net.toFixed(2)}`;
+    if (sg) sg.textContent = `Rs. ${monthSalary.toFixed(2)}`;
+    if (sd) sd.textContent = `Rs. ${fineAdvance.toFixed(2)}`;
+    if (sn) sn.textContent = `Rs. ${netPayable.toFixed(2)}`;
     if (sc) {
-        const creditedVal = parseFloat(document.getElementById('editNetCredited').value) || net;
+        const creditedVal = parseFloat(document.getElementById('editNetCredited').value) || netPayable;
         sc.textContent = `Rs. ${creditedVal.toFixed(2)}`;
     }
 }
@@ -440,38 +500,47 @@ function openEditSlipModal(slip) {
     document.getElementById('editSlipId').value = slip.id;
 
     // Fill current inputs
-    document.getElementById('editGrossSalary').value = parseFloat(slip.gross_salary || 0).toFixed(2);
-    document.getElementById('editPfContribution').value = parseFloat(slip.pf_contribution || 0).toFixed(2);
-    document.getElementById('editEsi').value = parseFloat(slip.esi || 0).toFixed(2);
-    document.getElementById('editLabourWelfareFund').value = parseFloat(slip.labour_welfare_fund || 0).toFixed(2);
-    document.getElementById('editProfessionalTax').value = parseFloat(slip.professional_tax || 0).toFixed(2);
-    document.getElementById('editOtherDeductions').value = parseFloat(slip.other_deductions || 0).toFixed(2);
+    document.getElementById('editMonthDays').value = parseFloat(slip.month_days || 0).toFixed(2);
+    document.getElementById('editWorkedDays').value = parseFloat(slip.worked_days || 0).toFixed(2);
+    document.getElementById('editWeekend').value = parseFloat(slip.weekend || 0).toFixed(2);
+    document.getElementById('editCl').value = parseFloat(slip.cl || 0).toFixed(2);
+    document.getElementById('editExtra').value = parseFloat(slip.extra || 0).toFixed(2);
+    document.getElementById('editPayableDays').value = parseFloat(slip.payable_days || 0).toFixed(2);
     
-    document.getElementById('editLeavesAvailable').value = parseFloat(slip.leaves_available || 0).toFixed(2);
-    document.getElementById('editWorkingDays').value = parseFloat(slip.working_days || 0).toFixed(2);
-    document.getElementById('editExtraDays').value = parseFloat(slip.extra_days || 0).toFixed(2);
+    document.getElementById('editMonthSalary').value = parseFloat(slip.month_salary || 0).toFixed(2);
+    document.getElementById('editPayableSalary').value = parseFloat(slip.payable_salary || 0).toFixed(2);
+    document.getElementById('editExtraDaysWorking').value = parseFloat(slip.extra_days_working || 0).toFixed(2);
     
+    document.getElementById('editFineAdvance').value = parseFloat(slip.fine_advance || 0).toFixed(2);
+    document.getElementById('editNetPayable').value = parseFloat(slip.net_payable || 0).toFixed(2);
+    
+    document.getElementById('editBankAccountNo').value = slip.bank_account_no || '';
+    document.getElementById('editBankName').value = slip.bank_name || '';
+
     document.getElementById('editLocation').value = slip.location || 'Mohali';
-    document.getElementById('editNetCredited').value = parseFloat(slip.net_credited_amount || slip.net_salary || 0).toFixed(2);
+    document.getElementById('editNetCredited').value = parseFloat(slip.net_credited_amount || slip.net_payable || 0).toFixed(2);
     document.getElementById('editPaymentStatus').value = slip.payment_status || 'pending';
     document.getElementById('editPaymentDate').value = slip.payment_date || '';
     document.getElementById('editTransactionRef').value = slip.transaction_ref || '';
 
     // Populate previous values helper spans
-    const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const period = `${monthNames[slip.month]} ${slip.year}`;
+    document.getElementById('prevMonthDays').textContent = `Was: ${parseFloat(slip.month_days || 0).toFixed(2)} days`;
+    document.getElementById('prevWorkedDays').textContent = `Was: ${parseFloat(slip.worked_days || 0).toFixed(2)} days`;
+    document.getElementById('prevWeekend').textContent = `Was: ${parseFloat(slip.weekend || 0).toFixed(2)} days`;
+    document.getElementById('prevCl').textContent = `Was: ${parseFloat(slip.cl || 0).toFixed(2)} days`;
+    document.getElementById('prevExtra').textContent = `Was: ${parseFloat(slip.extra || 0).toFixed(2)} days`;
+    document.getElementById('prevPayableDays').textContent = `Was: ${parseFloat(slip.payable_days || 0).toFixed(2)} days`;
+    
+    document.getElementById('prevMonthSalary').textContent = `Was: Rs. ${parseFloat(slip.month_salary || 0).toFixed(2)}`;
+    document.getElementById('prevPayableSalary').textContent = `Was: Rs. ${parseFloat(slip.payable_salary || 0).toFixed(2)}`;
+    document.getElementById('prevExtraDaysWorking').textContent = `Was: Rs. ${parseFloat(slip.extra_days_working || 0).toFixed(2)}`;
+    
+    document.getElementById('prevFineAdvance').textContent = `Was: Rs. ${parseFloat(slip.fine_advance || 0).toFixed(2)}`;
+    document.getElementById('prevNetPayable').textContent = `Was: Rs. ${parseFloat(slip.net_payable || 0).toFixed(2)}`;
+    
+    document.getElementById('prevBankAccountNo').textContent = `Was: ${slip.bank_account_no || 'None'}`;
+    document.getElementById('prevBankName').textContent = `Was: ${slip.bank_name || 'None'}`;
 
-    document.getElementById('prevGrossSalary').textContent = `Was: Rs. ${parseFloat(slip.gross_salary || 0).toFixed(2)}`;
-    document.getElementById('prevPfContribution').textContent = `Was: Rs. ${parseFloat(slip.pf_contribution || 0).toFixed(2)}`;
-    document.getElementById('prevEsi').textContent = `Was: Rs. ${parseFloat(slip.esi || 0).toFixed(2)}`;
-    document.getElementById('prevLabourWelfareFund').textContent = `Was: Rs. ${parseFloat(slip.labour_welfare_fund || 0).toFixed(2)}`;
-    document.getElementById('prevProfessionalTax').textContent = `Was: Rs. ${parseFloat(slip.professional_tax || 0).toFixed(2)}`;
-    document.getElementById('prevOtherDeductions').textContent = `Was: Rs. ${parseFloat(slip.other_deductions || 0).toFixed(2)}`;
-    
-    document.getElementById('prevLeavesAvailable').textContent = `Was: ${parseFloat(slip.leaves_available || 0).toFixed(2)} days`;
-    document.getElementById('prevWorkingDays').textContent = `Was: ${parseFloat(slip.working_days || 0).toFixed(2)} days`;
-    document.getElementById('prevExtraDays').textContent = `Was: ${parseFloat(slip.extra_days || 0).toFixed(2)} days`;
-    
     document.getElementById('prevLocation').textContent = `Was: ${slip.location || 'Mohali'}`;
     document.getElementById('prevNetCredited').textContent = `Was: Rs. ${parseFloat(slip.net_credited_amount || 0).toFixed(2)}`;
     document.getElementById('prevPaymentStatus').textContent = `Was: ${slip.payment_status}`;
@@ -502,7 +571,7 @@ function closeSalaryStructureModal() {
 
 async function loadActiveEmployeesSelect(selectId) {
     try {
-        const res = await apiFetch('/employees/');
+        const res = await apiFetch('/employees/?type=all&no_pagination=true');
         if (res.ok) {
             const emps = await res.json();
             const empList = emps.results || emps;
@@ -645,15 +714,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const slipId = document.getElementById('editSlipId').value;
             
             const data = {
-                gross_salary: document.getElementById('editGrossSalary').value,
-                pf_contribution: document.getElementById('editPfContribution').value,
-                esi: document.getElementById('editEsi').value,
-                labour_welfare_fund: document.getElementById('editLabourWelfareFund').value,
-                professional_tax: document.getElementById('editProfessionalTax').value,
-                other_deductions: document.getElementById('editOtherDeductions').value,
-                leaves_available: document.getElementById('editLeavesAvailable').value,
-                working_days: document.getElementById('editWorkingDays').value,
-                extra_days: document.getElementById('editExtraDays').value,
+                month_days: document.getElementById('editMonthDays').value,
+                worked_days: document.getElementById('editWorkedDays').value,
+                weekend: document.getElementById('editWeekend').value,
+                cl: document.getElementById('editCl').value,
+                extra: document.getElementById('editExtra').value,
+                payable_days: document.getElementById('editPayableDays').value,
+                month_salary: document.getElementById('editMonthSalary').value,
+                payable_salary: document.getElementById('editPayableSalary').value,
+                extra_days_working: document.getElementById('editExtraDaysWorking').value,
+                fine_advance: document.getElementById('editFineAdvance').value,
+                net_payable: document.getElementById('editNetPayable').value,
+                bank_account_no: document.getElementById('editBankAccountNo').value,
+                bank_name: document.getElementById('editBankName').value,
                 location: document.getElementById('editLocation').value,
                 net_credited_amount: document.getElementById('editNetCredited').value,
                 payment_status: document.getElementById('editPaymentStatus').value,
@@ -688,7 +761,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add change listeners to edit inputs for auto recalculation
     const inputIds = [
-        'editGrossSalary', 'editPfContribution', 'editEsi', 'editLabourWelfareFund', 'editProfessionalTax', 'editOtherDeductions'
+        'editMonthDays', 'editWorkedDays', 'editWeekend', 'editCl', 'editExtra',
+        'editMonthSalary', 'editExtraDaysWorking', 'editFineAdvance'
     ];
     inputIds.forEach(id => {
         const input = document.getElementById(id);

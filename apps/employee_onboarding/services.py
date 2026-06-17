@@ -53,7 +53,7 @@ def generate_document_pdf(employee, doc_type, template_name, context, user=None)
     
     # Create EmployeeDocument record
     doc = EmployeeDocument.objects.create(
-        employee=employee,
+        bitrix_user_id=employee.id,
         doc_type=doc_type,
         file=content_file,
         uploaded_by=user

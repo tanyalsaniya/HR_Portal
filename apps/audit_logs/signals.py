@@ -5,7 +5,6 @@ from common.middleware import get_current_user
 from .models import AuditLog
 
 # Import models dynamically to avoid import-time dependency loops
-from employee_onboarding.models import Employee
 from salary.models import SalaryStructure, SalarySlip
 from exit_formality.models import ExitRequest
 from student_certificate.models import Student, StudentFeeInstallment
@@ -25,62 +24,13 @@ def log_action(actor, action, instance, description):
         print(f"Error creating audit log: {e}")
 
 
-@receiver(pre_save, sender=Employee)
-def employee_pre_save(sender, instance, **kwargs):
-    if instance.id:
-        try:
-            instance._old_instance = Employee.objects.get(pk=instance.pk)
-        except Employee.DoesNotExist:
-            instance._old_instance = None
-    else:
-        instance._old_instance = None
-
-
-@receiver(post_save, sender=Employee)
-def employee_post_save(sender, instance, created, **kwargs):
-    actor = get_current_user()
-    
-    if created:
-        desc = f"Employee {instance.first_name} {instance.last_name} ({instance.emp_id}) was onboarded."
-        log_action(actor, "CREATE", instance, desc)
-    else:
-        old_inst = getattr(instance, '_old_instance', None)
-        if instance.is_deleted and old_inst and not old_inst.is_deleted:
-            desc = f"Employee {instance.first_name} {instance.last_name} ({instance.emp_id}) was soft-deleted."
-            log_action(actor, "DELETE", instance, desc)
-            return
-
-        if old_inst:
-            changes = []
-            fields_to_compare = [
-                'first_name', 'last_name', 'email', 'phone', 'alternate_phone',
-                'dob', 'gender', 'address_line1', 'address_line2', 'city', 'state', 'pin_code',
-                'department', 'designation', 'employment_type', 'joining_date',
-                'notice_period_days', 'bond_period_months', 'emergency_contact_name',
-                'emergency_relationship', 'emergency_phone', 'aadhaar_encrypted', 'pan_encrypted',
-                'profile_photo', 'status', 'onboarding_complete'
-            ]
-            
-            for field in fields_to_compare:
-                old_val = getattr(old_inst, field)
-                new_val = getattr(instance, field)
-                
-                if old_val != new_val:
-                    if field in ['aadhaar_encrypted', 'pan_encrypted']:
-                        changes.append(f"Sensitive field '{field.replace('_encrypted', '')}' was updated")
-                    else:
-                        changes.append(f"'{field}' changed from '{old_val}' to '{new_val}'")
-            
-            if changes:
-                desc = f"Employee {instance.first_name} {instance.last_name} ({instance.emp_id}) updated: " + ", ".join(changes)
-                log_action(actor, "UPDATE", instance, desc)
-
-
 @receiver(post_save, sender=SalaryStructure)
 def salary_structure_post_save(sender, instance, created, **kwargs):
     actor = get_current_user()
     action = "CREATE" if created else "UPDATE"
-    desc = f"Salary structure for employee {instance.employee.emp_id} was {'created' if created else 'updated'}."
+    emp = instance.employee
+    emp_identifier = emp.emp_id if emp else instance.bitrix_user_id
+    desc = f"Salary structure for employee {emp_identifier} was {'created' if created else 'updated'}."
     log_action(actor, action, instance, desc)
 
 
@@ -88,7 +38,9 @@ def salary_structure_post_save(sender, instance, created, **kwargs):
 def salary_slip_post_save(sender, instance, created, **kwargs):
     actor = get_current_user()
     action = "CREATE" if created else "UPDATE"
-    desc = f"Salary slip {instance.payslip_no} for employee {instance.employee.emp_id} for {instance.month}/{instance.year} was {'generated' if created else 'updated'}."
+    emp = instance.employee
+    emp_identifier = emp.emp_id if emp else instance.bitrix_user_id
+    desc = f"Salary slip {instance.payslip_no} for employee {emp_identifier} for {instance.month}/{instance.year} was {'generated' if created else 'updated'}."
     log_action(actor, action, instance, desc)
 
 
@@ -96,7 +48,9 @@ def salary_slip_post_save(sender, instance, created, **kwargs):
 def exit_request_post_save(sender, instance, created, **kwargs):
     actor = get_current_user()
     action = "CREATE" if created else "UPDATE"
-    desc = f"Exit request for employee {instance.employee.emp_id} was {'initiated' if created else 'updated to ' + instance.status}."
+    emp = instance.employee
+    emp_identifier = emp.emp_id if emp else instance.bitrix_user_id
+    desc = f"Exit request for employee {emp_identifier} was {'initiated' if created else 'updated to ' + instance.status}."
     log_action(actor, action, instance, desc)
 
 

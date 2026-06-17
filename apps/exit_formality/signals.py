@@ -20,18 +20,10 @@ def exit_form_response_post_save(sender, instance, created, **kwargs):
 def exit_request_post_save(sender, instance, created, **kwargs):
     """
     When ExitRequest status is updated to FULLY_EXITED:
-    1. Update employee status to 'Exited'
-    2. Set employee exit_date to last_working_day
-    3. Trigger async Bitrix24 status update & PDF attachments
-    4. Trigger Celery task to email all final documents
+    1. Trigger async Bitrix24 status update & PDF attachments
+    2. Trigger Celery task to email all final documents
     """
     if not created and instance.status == 'FULLY_EXITED':
-        employee = instance.employee
-        if employee.status != 'Exited':
-            employee.status = 'Exited'
-            employee.exit_date = instance.last_working_day
-            employee.save(update_fields=['status', 'exit_date'])
-        
         # Trigger Celery task to update Bitrix24 and send documents
         from .tasks import update_bitrix24_on_exit, send_exit_documents_after_fully_exited
         update_bitrix24_on_exit.delay(instance.id)

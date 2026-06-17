@@ -5,15 +5,96 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 from roles.models import Role, Permission
-from employee_onboarding.models import Department, Employee
+from employee_onboarding.models import Department
 from exit_formality.models import ExitRequest, ExitSecureLink, ExitFormResponse, ExitFFSettlement
+from common.bitrix_client import BitrixEmployeeMock
 
 User = get_user_model()
 
 class ExitModuleTests(APITestCase):
 
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        # Setup mock patchers
+        self.get_all_users_patcher = patch('common.bitrix_client.BitrixClient.get_all_users')
+        self.mock_get_all = self.get_all_users_patcher.start()
+        
+        self.get_user_detail_patcher = patch('common.bitrix_client.BitrixClient.get_user_detail')
+        self.mock_get_detail = self.get_user_detail_patcher.start()
+
+        today_str = str(datetime.date.today())
+        year_ago_str = str(datetime.date.today() - datetime.timedelta(days=365))
+        month_ago_str = str(datetime.date.today() - datetime.timedelta(days=30))
+
+        self.user_dict_10 = {
+            'id': '10',
+            'emp_id': 'BITRIX-10',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'name': 'John Doe',
+            'email': 'john.doe@test.com',
+            'phone': '9876543210',
+            'designation': 'Software Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': year_ago_str,
+            'status': 'Active',
+            'notice_period_days': 30,
+            'bond_period_months': 0
+        }
+
+        self.user_dict_20 = {
+            'id': '20',
+            'emp_id': 'BITRIX-20',
+            'first_name': 'Jane',
+            'last_name': 'Smith',
+            'name': 'Jane Smith',
+            'email': 'jane.smith@test.com',
+            'phone': '9876543211',
+            'designation': 'Manager',
+            'department_name': 'Engineering',
+            'dob': '1996-06-11',
+            'gender': 'Female',
+            'joining_date': today_str,
+            'status': 'Active',
+            'notice_period_days': 60,
+            'bond_period_months': 0
+        }
+
+        self.user_dict_30 = {
+            'id': '30',
+            'emp_id': 'BITRIX-30',
+            'first_name': 'Bonded',
+            'last_name': 'User',
+            'name': 'Bonded User',
+            'email': 'bonded@test.com',
+            'phone': '9876543212',
+            'designation': 'Software Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': month_ago_str,
+            'status': 'Active',
+            'notice_period_days': 30,
+            'bond_period_months': 12
+        }
+
+        self.users = [self.user_dict_10, self.user_dict_20, self.user_dict_30]
+        self.mock_get_all.return_value = self.users
+
+        def get_detail_side_effect(uid, force_refresh=False):
+            for u in self.users:
+                if str(u['id']) == str(uid):
+                    return u
+            return None
+        self.mock_get_detail.side_effect = get_detail_side_effect
+
+        self.emp = BitrixEmployeeMock(self.user_dict_10)
+
         # Create master roles and permissions
         self.admin_role = Role.objects.create(name="Admin", code="ADMIN")
         self.hr_role = Role.objects.create(name="HR", code="HR")
@@ -33,27 +114,10 @@ class ExitModuleTests(APITestCase):
         
         # Create department
         self.dept = Department.objects.create(name="Engineering")
-        
-        # Create active employee
-        self.emp = Employee.objects.create(
-            first_name="John",
-            last_name="Doe",
-            email="john.doe@test.com",
-            phone="9876543210",
-            dob=datetime.date(1995, 5, 10),
-            gender="MALE",
-            address_line1="123 Street",
-            city="Mumbai",
-            state="MH",
-            pin_code="400001",
-            department=self.dept,
-            designation="Software Engineer",
-            employment_type="FULL_TIME",
-            joining_date=datetime.date.today() - datetime.timedelta(days=365),
-            notice_period_days=30,
-            bond_period_months=0,
-            status="Active"
-        )
+
+    def tearDown(self):
+        self.get_all_users_patcher.stop()
+        self.get_user_detail_patcher.stop()
 
     def test_notice_period_waiver(self):
         self.client.force_authenticate(user=self.hr_user)
@@ -61,7 +125,7 @@ class ExitModuleTests(APITestCase):
         # Case 1: Waiver = True
         url = reverse('exitrequest-list')
         data = {
-            "employee": self.emp.id,
+            "bitrix_user_id": self.emp.bitrix_id,
             "resignation_date": str(datetime.date.today()),
             "exit_type": "RESIGNATION",
             "mode_of_resignation": "EMAIL",
@@ -70,20 +134,12 @@ class ExitModuleTests(APITestCase):
         }
         res = self.client.post(url, data, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        exit_req = ExitRequest.objects.get(employee=self.emp)
+        exit_req = ExitRequest.objects.get(bitrix_user_id=self.emp.bitrix_id)
         self.assertEqual(exit_req.last_working_day, datetime.date.today())
 
         # Case 2: Waiver = False
-        # Create another employee
-        emp2 = Employee.objects.create(
-            first_name="Jane", last_name="Smith", email="jane.smith@test.com", phone="9876543211",
-            dob=datetime.date(1996, 6, 11), gender="FEMALE", address_line1="456 Avenue",
-            city="Mumbai", state="MH", pin_code="400001", department=self.dept,
-            designation="Manager", employment_type="FULL_TIME", joining_date=datetime.date.today(),
-            notice_period_days=60, status="Active"
-        )
         data2 = {
-            "employee": emp2.id,
+            "bitrix_user_id": "20",
             "resignation_date": str(datetime.date.today()),
             "exit_type": "RESIGNATION",
             "mode_of_resignation": "EMAIL",
@@ -92,14 +148,14 @@ class ExitModuleTests(APITestCase):
         }
         res2 = self.client.post(url, data2, format='json')
         self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
-        exit_req2 = ExitRequest.objects.get(employee=emp2)
+        exit_req2 = ExitRequest.objects.get(bitrix_user_id="20")
         self.assertEqual(exit_req2.last_working_day, datetime.date.today() + datetime.timedelta(days=60))
 
     def test_absconding_flow(self):
         self.client.force_authenticate(user=self.hr_user)
         url = reverse('exitrequest-list')
         data = {
-            "employee": self.emp.id,
+            "bitrix_user_id": self.emp.bitrix_id,
             "resignation_date": str(datetime.date.today()),
             "exit_type": "ABSCONDING",
             "mode_of_resignation": "VERBAL",
@@ -109,7 +165,7 @@ class ExitModuleTests(APITestCase):
         res = self.client.post(url, data, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         
-        exit_req = ExitRequest.objects.get(employee=self.emp)
+        exit_req = ExitRequest.objects.get(bitrix_user_id=self.emp.bitrix_id)
         # Verify no secure link is created
         self.assertFalse(ExitSecureLink.objects.filter(exit_request=exit_req).exists())
 
@@ -127,7 +183,7 @@ class ExitModuleTests(APITestCase):
         # Initiate
         url = reverse('exitrequest-list')
         data = {
-            "employee": self.emp.id,
+            "bitrix_user_id": self.emp.bitrix_id,
             "resignation_date": str(datetime.date.today()),
             "exit_type": "RESIGNATION",
             "mode_of_resignation": "EMAIL",
@@ -137,7 +193,7 @@ class ExitModuleTests(APITestCase):
         res = self.client.post(url, data, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         
-        exit_req = ExitRequest.objects.get(employee=self.emp)
+        exit_req = ExitRequest.objects.get(bitrix_user_id=self.emp.bitrix_id)
         link = ExitSecureLink.objects.get(exit_request=exit_req)
         old_token = link.token
         
@@ -164,22 +220,10 @@ class ExitModuleTests(APITestCase):
     def test_bond_penalty_validation(self):
         self.client.force_authenticate(user=self.hr_user)
         
-        # Create employee with active bond
-        emp_bonded = Employee.objects.create(
-            first_name="Bonded", last_name="User", email="bonded@test.com", phone="9876543212",
-            dob=datetime.date(1995, 5, 10), gender="MALE", address_line1="123 Street",
-            city="Mumbai", state="MH", pin_code="400001", department=self.dept,
-            designation="Software Engineer", employment_type="FULL_TIME",
-            joining_date=datetime.date.today() - datetime.timedelta(days=30), # joined 1 month ago
-            notice_period_days=30,
-            bond_period_months=12, # 1 year bond
-            status="Active"
-        )
-        
         # Initiate
         url = reverse('exitrequest-list')
         data = {
-            "employee": emp_bonded.id,
+            "bitrix_user_id": "30",
             "resignation_date": str(datetime.date.today()),
             "exit_type": "RESIGNATION",
             "mode_of_resignation": "EMAIL",
@@ -187,7 +231,7 @@ class ExitModuleTests(APITestCase):
             "exit_reason": "Moving on to a better opportunity, thank you."
         }
         self.client.post(url, data, format='json')
-        exit_req = ExitRequest.objects.get(employee=emp_bonded)
+        exit_req = ExitRequest.objects.get(bitrix_user_id="30")
         
         # Save clearances first so we can process F&F
         exit_req.status = 'CLEARANCES_DONE'
@@ -216,7 +260,7 @@ class ExitModuleTests(APITestCase):
         self.client.force_authenticate(user=self.hr_user)
         url = reverse('exitrequest-list')
         data = {
-            "employee": self.emp.id,
+            "bitrix_user_id": self.emp.bitrix_id,
             "resignation_date": str(datetime.date.today()),
             "exit_type": "RESIGNATION",
             "mode_of_resignation": "EMAIL",
@@ -224,7 +268,7 @@ class ExitModuleTests(APITestCase):
             "exit_reason": "Moving on to a better opportunity, thank you."
         }
         self.client.post(url, data, format='json')
-        exit_req = ExitRequest.objects.get(employee=self.emp)
+        exit_req = ExitRequest.objects.get(bitrix_user_id=self.emp.bitrix_id)
         
         # HR tries to approve F&F (should get 403)
         approve_url = reverse('exitrequest-approve-ff', args=[exit_req.id])
@@ -259,7 +303,7 @@ class ExitModuleTests(APITestCase):
         self.client.force_authenticate(user=self.hr_user)
         url = reverse('exitrequest-list')
         data = {
-            "employee": self.emp.id,
+            "bitrix_user_id": self.emp.bitrix_id,
             "resignation_date": str(datetime.date.today()),
             "exit_type": "RESIGNATION",
             "mode_of_resignation": "EMAIL",
@@ -268,7 +312,7 @@ class ExitModuleTests(APITestCase):
         }
         res = self.client.post(url, data, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        exit_req = ExitRequest.objects.get(employee=self.emp)
+        exit_req = ExitRequest.objects.get(bitrix_user_id=self.emp.bitrix_id)
 
         # Set clearance done and process/approve F&F
         exit_req.status = 'CLEARANCES_DONE'
@@ -299,7 +343,6 @@ class ExitModuleTests(APITestCase):
         exit_req.refresh_from_db()
         self.assertEqual(exit_req.status, 'REOPENED')
 
-
         # Approve F&F again
         self.client.post(approve_url)
 
@@ -310,4 +353,3 @@ class ExitModuleTests(APITestCase):
         exit_req.refresh_from_db()
         self.assertEqual(exit_req.status, 'FULLY_EXITED')
         self.assertTrue(exit_req.send_email_on_exit)
-
