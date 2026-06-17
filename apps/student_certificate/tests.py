@@ -7,8 +7,8 @@ import datetime
 
 from employee_onboarding.models import Department
 from roles.models import Role
-from .models import Course, Student, StudentCertificate
-from .services import generate_student_certificate_pdf
+from student_certificate.models import Course, Student, StudentCertificate
+from student_certificate.services import generate_student_certificate_pdf
 
 User = get_user_model()
 
