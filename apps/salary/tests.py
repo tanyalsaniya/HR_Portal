@@ -102,7 +102,7 @@ class SalaryModuleTests(APITestCase):
         # Load exported sheet
         wb = openpyxl.load_workbook(io.BytesIO(res.content))
         ws = wb.active
-        self.assertEqual(ws.cell(row=2, column=1).value, self.employee.emp_id)
+        self.assertEqual(ws.cell(row=2, column=1).value, 1)
         self.assertEqual(ws.cell(row=2, column=2).value, self.employee.name)
 
     def test_unauthorized_salary_export_fails(self):
@@ -120,9 +120,10 @@ class SalaryModuleTests(APITestCase):
         wb = openpyxl.Workbook()
         ws = wb.active
         headers = [
-            "Emp ID", "Emp Name", "Department", "Location", "Gross Salary", 
-            "PF Contribution", "ESI", "Labour Welfare Fund", "Professional Tax", 
-            "Other Deductions", "Leaves Available", "Working Days", "Leave Encashment / Extra Days"
+            "Sr. No.", "Name", "Designation", "Month days", "Worked days", 
+            "Weekend", "CL", "Extra", "Payable Days", "Month Salary", 
+            "Payable Salary", "Extra days working", "Fine/Advance", "Net Payable", 
+            "Bank A/c No.", "Bank"
         ]
         ws.append(headers)
         for row in rows:
@@ -135,7 +136,7 @@ class SalaryModuleTests(APITestCase):
     def test_admin_salary_import_success(self):
         self.client.force_authenticate(user=self.admin_user)
         excel_content = self.create_excel_file([
-            [self.employee.emp_id, "John Doe", "Engineering", "Mohali", 87000.00, 6000.00, 0.00, 0.00, 200.00, 0.00, 0.00, 30.00, 0.00]
+            [1, "John Doe", "Software Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 87000.0, 87000.0, 0.0, 0.0, 87000.0, "123456", "ICICI"]
         ])
         
         uploaded_file = SimpleUploadedFile("salary.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -155,18 +156,18 @@ class SalaryModuleTests(APITestCase):
         # Check slip is created in DB as draft
         slip = SalarySlip.objects.get(bitrix_user_id=self.employee.bitrix_id, month=6, year=2026)
         self.assertEqual(slip.status, 'draft')
-        self.assertEqual(slip.gross_salary, Decimal('87000.00'))
-        self.assertEqual(slip.total_deductions, Decimal('6200.00')) # 6000 PF + 200 PT
-        self.assertEqual(slip.net_salary, Decimal('80800.00'))
+        self.assertEqual(slip.month_salary, Decimal('87000.00'))
+        self.assertEqual(slip.fine_advance, Decimal('0.00'))
+        self.assertEqual(slip.net_payable, Decimal('87000.00'))
         self.assertTrue(slip.pdf_file)
 
     def test_admin_salary_import_partial_failure(self):
         self.client.force_authenticate(user=self.admin_user)
         excel_content = self.create_excel_file([
             # Success row
-            [self.employee.emp_id, "John Doe", "Engineering", "Mohali", 87000.00, 6000.00, 0.00, 0.00, 200.00, 0.00, 0.00, 30.00, 0.00],
-            # Failure row: invalid Employee ID
-            ["EMP-INVALID", "Jane Doe", "Design", "Mohali", 40000.00, 4800.00, 0.00, 0.00, 200.00, 0.00, 0.00, 30.00, 0.00]
+            [1, "John Doe", "Software Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 87000.0, 87000.0, 0.0, 0.0, 87000.0, "123456", "ICICI"],
+            # Failure row: invalid Name
+            [2, "Invalid Name", "Design", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 40000.0, 40000.0, 0.0, 0.0, 40000.0, "654321", "HDFC"]
         ])
         
         uploaded_file = SimpleUploadedFile("salary_partial.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -189,10 +190,10 @@ class SalaryModuleTests(APITestCase):
     def test_admin_salary_import_total_failure_rollback(self):
         self.client.force_authenticate(user=self.admin_user)
         excel_content = self.create_excel_file([
-            # Failure row 1: invalid Employee ID
-            ["EMP-INVALID-1", "Jane Doe", "Design", "Mohali", 40000.00, 4800.00, 0.00, 0.00, 200.00, 0.00, 0.00, 30.00, 0.00],
-            # Failure row 2: invalid gross salary amount (-500)
-            [self.employee.emp_id, "John Doe", "Engineering", "Mohali", -500.00, 6000.00, 0.00, 0.00, 200.00, 0.00, 0.00, 30.00, 0.00]
+            # Failure row 1: invalid Name
+            [1, "Invalid Name", "Design", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 40000.0, 40000.0, 0.0, 0.0, 40000.0, "654321", "HDFC"],
+            # Failure row 2: invalid gross/month salary amount (-500)
+            [2, "John Doe", "Software Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, -500.0, -500.0, 0.0, 0.0, -500.0, "123456", "ICICI"]
         ])
 
         uploaded_file = SimpleUploadedFile("salary_failed.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -215,7 +216,7 @@ class SalaryModuleTests(APITestCase):
             bitrix_user_id=self.employee.bitrix_id,
             month=6,
             year=2026,
-            gross_salary=87000.00,
+            month_salary=87000.00,
             status='draft'
         )
         self.client.force_authenticate(user=self.admin_user)
@@ -230,10 +231,10 @@ class SalaryModuleTests(APITestCase):
     def test_salary_history_scoping(self):
         # Create slips
         slip1 = SalarySlip.objects.create(
-            bitrix_user_id=self.employee.bitrix_id, month=5, year=2026, gross_salary=87000.00, status='published'
+            bitrix_user_id=self.employee.bitrix_id, month=5, year=2026, month_salary=87000.00, status='published'
         )
         slip2 = SalarySlip.objects.create(
-            bitrix_user_id=self.employee.bitrix_id, month=6, year=2026, gross_salary=90000.00, status='draft'
+            bitrix_user_id=self.employee.bitrix_id, month=6, year=2026, month_salary=90000.00, status='draft'
         )
 
         # Test employee request
@@ -254,10 +255,10 @@ class SalaryModuleTests(APITestCase):
     def test_salary_slip_pdf_and_zip_download(self):
         # Create multiple published slips
         slip1 = SalarySlip.objects.create(
-            bitrix_user_id=self.employee.bitrix_id, month=4, year=2026, gross_salary=87000.00, status='published'
+            bitrix_user_id=self.employee.bitrix_id, month=4, year=2026, month_salary=87000.00, status='published'
         )
         slip2 = SalarySlip.objects.create(
-            bitrix_user_id=self.employee.bitrix_id, month=5, year=2026, gross_salary=87000.00, status='published'
+            bitrix_user_id=self.employee.bitrix_id, month=5, year=2026, month_salary=87000.00, status='published'
         )
 
         # Download single month

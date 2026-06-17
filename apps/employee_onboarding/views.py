@@ -172,7 +172,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 if u.status != 'Exited':
                     filtered_users.append(u)
             elif list_type == 'offboarding':
-                if u.status == 'Exited' or getattr(u, 'exit_request_id', None) is not None:
+                is_exited = u.status == 'Exited'
+                has_exit_request = getattr(u, 'exit_request_id', None) is not None
+                is_active_graduate = (u.status != 'Exited' and u.joining_date <= day_14_ago)
+                
+                if is_exited or has_exit_request or is_active_graduate:
                     filtered_users.append(u)
             elif list_type == 'dismissed':
                 if u.status == 'Exited' or getattr(u, 'is_deleted', False) is True:
@@ -268,6 +272,19 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 BitrixClient.get_all_users(force_refresh=True)
                 mock_user = BitrixClient.get_user_detail(contact_id)
                 
+                # Log success in BitrixSyncLog
+                try:
+                    from notifications.models import BitrixSyncLog
+                    BitrixSyncLog.objects.create(
+                        employee_id=contact_id,
+                        employee_name=mock_user.get('name') if mock_user else f"{data.get('first_name')} {data.get('last_name')}".strip(),
+                        action_type='Contact Create',
+                        status='SUCCESS',
+                        retry_count=0
+                    )
+                except Exception:
+                    pass
+
                 # Trigger welcome email task asynchronously
                 try:
                     import logging
@@ -278,11 +295,63 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     import logging
                     logging.getLogger(__name__).error(f"Failed to queue welcome email task: {mail_err}")
                 
+                # Trigger Admin Notification (Trigger 1)
+                try:
+                    from notifications.models import Notification
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    admins = User.objects.filter(role__code='ADMIN')
+                    
+                    hr_name = request.user.username
+                    if request.user.first_name or request.user.last_name:
+                        hr_name = f"{request.user.first_name} {request.user.last_name}".strip()
+                    
+                    notif_msg = f"New employee added – {mock_user.get('name')} ({mock_user.get('emp_id')}) by HR {hr_name}"
+                    for admin in admins:
+                        if admin != request.user:
+                            Notification.objects.create(
+                                recipient=admin,
+                                notif_type='INFO',
+                                message=notif_msg,
+                                link=f"/employees/{mock_user.get('id')}/"
+                            )
+                except Exception as notif_err:
+                    logging.getLogger(__name__).error(f"Failed to trigger Trigger 1 notification: {notif_err}")
+
                 # Write to audit logs
                 from audit_logs.signals import log_action
-                log_action(request.user, "CREATE", None, f"Created Bitrix24 employee contact {data.get('first_name')} {data.get('last_name')} (ID: {contact_id}).")
+                if request.user.is_authenticated:
+                    log_action(request.user, "CREATE", None, f"Created Bitrix24 employee contact {data.get('first_name')} {data.get('last_name')} (ID: {contact_id}).")
                 return Response(mock_user, status=status.HTTP_201_CREATED)
             else:
+                # Log failure in BitrixSyncLog (Trigger 24)
+                emp_name = f"{data.get('first_name')} {data.get('last_name')}".strip()
+                try:
+                    from notifications.models import BitrixSyncLog, Notification
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    
+                    BitrixSyncLog.objects.create(
+                        employee_name=emp_name,
+                        action_type='Contact Create',
+                        status='FAILED',
+                        retry_count=0,
+                        error_message=res.text
+                    )
+                    
+                    # Notify Admin (Trigger 24)
+                    admins = User.objects.filter(role__code='ADMIN')
+                    notif_msg = f"Bitrix24 sync failed for {emp_name} (Contact Create). Retry available."
+                    for admin in admins:
+                        Notification.objects.create(
+                            recipient=admin,
+                            notif_type='ERROR',
+                            message=notif_msg,
+                            link="/admin/bitrix/sync-log/"
+                        )
+                except Exception:
+                    pass
+
                 return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -343,11 +412,55 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             if res.ok:
                 BitrixClient.get_all_users(force_refresh=True)
                 user = BitrixClient.get_user_detail(pk)
+                
+                # Log success in BitrixSyncLog
+                try:
+                    from notifications.models import BitrixSyncLog
+                    BitrixSyncLog.objects.create(
+                        employee_id=pk,
+                        employee_name=user.get('name') if user else f"{data.get('first_name')} {data.get('last_name')}".strip(),
+                        action_type='Contact Update',
+                        status='SUCCESS',
+                        retry_count=0
+                    )
+                except Exception:
+                    pass
+
                 # Log action
                 from audit_logs.signals import log_action
-                log_action(request.user, "UPDATE", None, f"Updated Bitrix24 employee details (ID: {pk}).")
+                if request.user.is_authenticated:
+                    log_action(request.user, "UPDATE", None, f"Updated Bitrix24 employee details (ID: {pk}).")
                 return Response(user)
             else:
+                # Log failure in BitrixSyncLog (Trigger 24)
+                emp_name = f"{data.get('first_name')} {data.get('last_name')}".strip()
+                try:
+                    from notifications.models import BitrixSyncLog, Notification
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    
+                    BitrixSyncLog.objects.create(
+                        employee_id=pk,
+                        employee_name=emp_name,
+                        action_type='Contact Update',
+                        status='FAILED',
+                        retry_count=0,
+                        error_message=res.text
+                    )
+                    
+                    # Notify Admin (Trigger 24)
+                    admins = User.objects.filter(role__code='ADMIN')
+                    notif_msg = f"Bitrix24 sync failed for {emp_name} (Contact Update). Retry available."
+                    for admin in admins:
+                        Notification.objects.create(
+                            recipient=admin,
+                            notif_type='ERROR',
+                            message=notif_msg,
+                            link="/admin/bitrix/sync-log/"
+                        )
+                except Exception:
+                    pass
+
                 return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -396,8 +509,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         try:
             doc = generate_offer_letter(employee, user=request.user, custom_context=custom_context)
             # Sync to Bitrix24 timeline
-            from .tasks import attach_document_to_bitrix24_timeline
+            from .tasks import attach_document_to_bitrix24_timeline, send_offer_letter_email
             attach_document_to_bitrix24_timeline.delay(doc.id)
+            send_offer_letter_email.delay(employee.id, doc.id)
             return Response({
                 'message': 'Offer letter generated successfully.',
                 'document': EmployeeDocumentSerializer(doc).data

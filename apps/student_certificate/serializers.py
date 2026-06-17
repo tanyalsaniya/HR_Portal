@@ -44,4 +44,11 @@ class StudentSerializer(serializers.ModelSerializer):
                 status='UNPAID'
             )
             
+        # Trigger welcome email task (Trigger 22)
+        try:
+            from .tasks import send_student_welcome_email
+            send_student_welcome_email.delay(student.id)
+        except Exception:
+            pass
+            
         return student

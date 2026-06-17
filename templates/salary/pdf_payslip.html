@@ -127,20 +127,38 @@
             <tr>
                 <td class="label" style="width: 25%;">EMPLOYEE NAME</td>
                 <td class="val" style="width: 25%;">{{ employee.name }}</td>
-                <td class="label" style="width: 35%;">NO. OF LEAVES AVAIL</td>
-                <td class="num-val" style="width: 15%;">{{ slip.leaves_available }}</td>
+                <td class="label" style="width: 25%;">MONTH DAYS</td>
+                <td class="num-val" style="width: 25%;">{{ slip.month_days }}</td>
             </tr>
             <tr>
                 <td class="label">EMPLOYEE DESIGNATION</td>
                 <td class="val">{{ employee.designation }}</td>
-                <td class="label">NO. OF DAYS</td>
-                <td class="num-val">{{ slip.working_days }}</td>
+                <td class="label">WORKED DAYS</td>
+                <td class="num-val">{{ slip.worked_days }}</td>
             </tr>
             <tr>
                 <td class="label">LOCATION</td>
                 <td class="val">{{ slip.location }}</td>
-                <td class="label">LEAVE ENCASHMENT /EXTRA DAYS</td>
-                <td class="num-val">{{ slip.extra_days }}</td>
+                <td class="label">WEEKEND</td>
+                <td class="num-val">{{ slip.weekend }}</td>
+            </tr>
+            <tr>
+                <td class="label">BANK</td>
+                <td class="val">{{ slip.bank_name }}</td>
+                <td class="label">CL</td>
+                <td class="num-val">{{ slip.cl }}</td>
+            </tr>
+            <tr>
+                <td class="label">BANK A/C NO.</td>
+                <td class="val">{{ bank_account_masked }}</td>
+                <td class="label">EXTRA</td>
+                <td class="num-val">{{ slip.extra }}</td>
+            </tr>
+            <tr>
+                <td class="label" style="border-bottom: 1px solid #000;">&nbsp;</td>
+                <td class="val" style="border-bottom: 1px solid #000;">&nbsp;</td>
+                <td class="label">PAYABLE DAYS</td>
+                <td class="num-val">{{ slip.payable_days }}</td>
             </tr>
         </table>
 
@@ -157,54 +175,40 @@
             <tbody>
                 <!-- Row 1 -->
                 <tr>
-                    <td style="border-left: none;">GROSS SALARY</td>
-                    <td class="amount">{{ slip.gross_salary }}</td>
-                    <td>PF CONTRIBUTION</td>
-                    <td class="amount" style="border-right: none;">{{ slip.pf_contribution }}</td>
+                    <td style="border-left: none;">MONTH SALARY</td>
+                    <td class="amount">{{ slip.month_salary }}</td>
+                    <td>FINE / ADVANCE</td>
+                    <td class="amount" style="border-right: none;">{{ slip.fine_advance }}</td>
                 </tr>
                 <!-- Row 2 -->
                 <tr>
-                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-left: none;">PAYABLE SALARY</td>
+                    <td class="amount">{{ slip.payable_salary }}</td>
                     <td style="border-bottom: none;"></td>
-                    <td>ESI</td>
-                    <td class="amount" style="border-right: none;">{{ slip.esi }}</td>
+                    <td style="border-right: none; border-bottom: none;"></td>
                 </tr>
                 <!-- Row 3 -->
                 <tr>
-                    <td style="border-left: none; border-bottom: none;"></td>
+                    <td style="border-left: none; border-bottom: none;">EXTRA DAYS WORKING</td>
+                    <td class="amount" style="border-bottom: none;">{{ slip.extra_days_working }}</td>
                     <td style="border-bottom: none;"></td>
-                    <td>LABOUR WELFARE FUND</td>
-                    <td class="amount" style="border-right: none;">{{ slip.labour_welfare_fund }}</td>
-                </tr>
-                <!-- Row 4 -->
-                <tr>
-                    <td style="border-left: none; border-bottom: none;"></td>
-                    <td style="border-bottom: none;"></td>
-                    <td>PROFESSIONAL TAX</td>
-                    <td class="amount" style="border-right: none;">{{ slip.professional_tax }}</td>
-                </tr>
-                <!-- Row 5 -->
-                <tr>
-                    <td style="border-left: none; border-bottom: none;"></td>
-                    <td style="border-bottom: none;"></td>
-                    <td style="border-bottom: none;">Other DEDUCTIONS</td>
-                    <td class="amount" style="border-right: none; border-bottom: none;">{{ slip.other_deductions }}</td>
+                    <td style="border-right: none; border-bottom: none;"></td>
                 </tr>
                 
                 <!-- TOTAL ROW -->
                 <tr class="total-row">
-                    <td style="border-left: none;">TOTAL</td>
-                    <td class="amount">{{ slip.gross_salary }}</td>
-                    <td>TOTAL</td>
-                    <td class="amount" style="border-right: none;">{{ slip.total_deductions }}</td>
+                    <td style="border-left: none;">TOTAL EARNINGS</td>
+                    <td class="amount">{{ slip.total_earnings }}</td>
+                    <td>TOTAL DEDUCTIONS</td>
+                    <td class="amount" style="border-right: none;">{{ slip.fine_advance }}</td>
                 </tr>
                 
                 <!-- NET PAY ROW -->
                 <tr class="net-pay-row">
                     <td style="border-left: none; border-bottom: none;"></td>
                     <td style="border-bottom: none;"></td>
-                    <td>NET. PAY</td>
-                    <td class="amount" style="border-right: none; border-bottom: none; color: #000;">{{ slip.net_credited_amount }}</td>
+                    <td>NET PAYABLE</td>
+                    <td class="amount" style="border-right: none; border-bottom: none; color: #000;">{{ slip.net_payable }}</td>
                 </tr>
                 
                 <!-- NET PAY IN WORDS -->
@@ -215,7 +219,7 @@
                 <!-- FOOTER NOTE -->
                 <tr class="footer-note">
                     <td colspan="4" style="border-left: none; border-right: none; border-bottom: none;">
-                        This is a automated pay slip and does not need a signature for verification
+                        This is an automated pay slip and does not need a signature for verification
                     </td>
                 </tr>
             </tbody>

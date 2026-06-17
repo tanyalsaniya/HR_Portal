@@ -552,6 +552,29 @@ class ExitPublicQuestionnaireView(APIView):
         if not link.ip_address:
             link.ip_address = ip
             link.save(update_fields=['ip_address'])
+            
+            # Trigger 13: Employee opens secure exit form link
+            try:
+                from notifications.models import Notification
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                
+                admins = User.objects.filter(role__code='ADMIN')
+                hrs = User.objects.filter(role__code='HR')
+                
+                exit_request = link.exit_request
+                employee = exit_request.employee
+                msg = f"{employee.name} has opened the exit form and started filling it"
+                
+                for user in list(admins) + list(hrs):
+                    Notification.objects.create(
+                        recipient=user,
+                        notif_type='INFO',
+                        message=msg,
+                        link=f"/exit/{exit_request.id}/"
+                    )
+            except Exception:
+                pass
 
         exit_request = link.exit_request
         employee = exit_request.employee

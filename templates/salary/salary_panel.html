@@ -460,68 +460,95 @@
                     </div>
                 </div>
 
+                <!-- Attendance Section -->
+                <div class="edit-section">
+                    <h4 class="edit-section-title">Attendance</h4>
+                    <div class="edit-section-grid">
+                        <div class="edit-field-group">
+                            <label>Month Days*</label>
+                            <input type="number" id="editMonthDays" step="0.01" required>
+                            <small id="prevMonthDays"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>Worked Days*</label>
+                            <input type="number" id="editWorkedDays" step="0.01" required>
+                            <small id="prevWorkedDays"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>Weekend</label>
+                            <input type="number" id="editWeekend" step="0.01">
+                            <small id="prevWeekend"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>CL</label>
+                            <input type="number" id="editCl" step="0.01">
+                            <small id="prevCl"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>Extra</label>
+                            <input type="number" id="editExtra" step="0.01">
+                            <small id="prevExtra"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>Payable Days</label>
+                            <input type="number" id="editPayableDays" step="0.01" readonly style="background-color: var(--bg-color-alt, #f1f5f9); cursor: not-allowed;">
+                            <small id="prevPayableDays"></small>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Earnings Section -->
                 <div class="edit-section">
                     <h4 class="edit-section-title">Earnings</h4>
                     <div class="edit-section-grid">
                         <div class="edit-field-group">
-                            <label>Gross Salary*</label>
-                            <input type="number" id="editGrossSalary" step="0.01" required>
-                            <small id="prevGrossSalary"></small>
+                            <label>Month Salary*</label>
+                            <input type="number" id="editMonthSalary" step="0.01" required>
+                            <small id="prevMonthSalary"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>Payable Salary</label>
+                            <input type="number" id="editPayableSalary" step="0.01" readonly style="background-color: var(--bg-color-alt, #f1f5f9); cursor: not-allowed;">
+                            <small id="prevPayableSalary"></small>
+                        </div>
+                        <div class="edit-field-group">
+                            <label>Extra Days Working</label>
+                            <input type="number" id="editExtraDaysWorking" step="0.01">
+                            <small id="prevExtraDaysWorking"></small>
                         </div>
                     </div>
                 </div>
 
                 <!-- Deductions Section -->
                 <div class="edit-section">
-                    <h4 class="edit-section-title">Deductions</h4>
+                    <h4 class="edit-section-title">Deductions & Net Pay</h4>
                     <div class="edit-section-grid">
                         <div class="edit-field-group">
-                            <label>PF Contribution</label>
-                            <input type="number" id="editPfContribution" step="0.01">
-                            <small id="prevPfContribution"></small>
+                            <label>Fine / Advance</label>
+                            <input type="number" id="editFineAdvance" step="0.01">
+                            <small id="prevFineAdvance"></small>
                         </div>
                         <div class="edit-field-group">
-                            <label>ESI</label>
-                            <input type="number" id="editEsi" step="0.01">
-                            <small id="prevEsi"></small>
-                        </div>
-                        <div class="edit-field-group">
-                            <label>Labour Welfare Fund</label>
-                            <input type="number" id="editLabourWelfareFund" step="0.01">
-                            <small id="prevLabourWelfareFund"></small>
-                        </div>
-                        <div class="edit-field-group">
-                            <label>Professional Tax</label>
-                            <input type="number" id="editProfessionalTax" step="0.01">
-                            <small id="prevProfessionalTax"></small>
-                        </div>
-                        <div class="edit-field-group">
-                            <label>Other Deductions</label>
-                            <input type="number" id="editOtherDeductions" step="0.01">
-                            <small id="prevOtherDeductions"></small>
+                            <label>Net Payable</label>
+                            <input type="number" id="editNetPayable" step="0.01" readonly style="background-color: var(--bg-color-alt, #f1f5f9); cursor: not-allowed;">
+                            <small id="prevNetPayable"></small>
                         </div>
                     </div>
                 </div>
 
-                <!-- Attendance Section -->
+                <!-- Bank Details Section -->
                 <div class="edit-section">
-                    <h4 class="edit-section-title">Attendance</h4>
+                    <h4 class="edit-section-title">Bank Details</h4>
                     <div class="edit-section-grid">
                         <div class="edit-field-group">
-                            <label>Leaves Available</label>
-                            <input type="number" id="editLeavesAvailable" step="0.01">
-                            <small id="prevLeavesAvailable"></small>
+                            <label>Bank A/C No.</label>
+                            <input type="text" id="editBankAccountNo">
+                            <small id="prevBankAccountNo"></small>
                         </div>
                         <div class="edit-field-group">
-                            <label>Working Days</label>
-                            <input type="number" id="editWorkingDays" step="0.01">
-                            <small id="prevWorkingDays"></small>
-                        </div>
-                        <div class="edit-field-group">
-                            <label>Leave Encashment / Extra Days</label>
-                            <input type="number" id="editExtraDays" step="0.01">
-                            <small id="prevExtraDays"></small>
+                            <label>Bank Name</label>
+                            <input type="text" id="editBankName">
+                            <small id="prevBankName"></small>
                         </div>
                     </div>
                 </div>
@@ -537,7 +564,7 @@
                         </div>
                         <div class="edit-field-group">
                             <label>Net Credited Amount</label>
-                            <input type="number" id="editNetCredited" step="0.01">
+                            <input type="number" id="editNetCredited" step="0.01" readonly style="background-color: var(--bg-color-alt, #f1f5f9); cursor: not-allowed;">
                             <small id="prevNetCredited"></small>
                         </div>
                         <div class="edit-field-group">

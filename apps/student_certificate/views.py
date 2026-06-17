@@ -51,7 +51,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             User = get_user_model()
             admins = User.objects.filter(role__code='ADMIN')
             
-            message = f"Certificate {student.cert_no} was generated for {student.name} by {request.user.username}."
+            message = f"Certificate generated for {student.name} – {student.program_name}"
             for admin in admins:
                 Notification.objects.create(
                     recipient=admin,
@@ -66,6 +66,18 @@ class StudentViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['POST'], url_path='send-certificate')
+    def send_certificate(self, request, pk=None):
+        student = self.get_object()
+        if not student.cert_pdf:
+            return Response({'error': 'Certificate PDF must be generated before sending.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Trigger Celery task
+        from notifications.tasks import send_certificate_email
+        send_certificate_email.delay(student.id)
+        
+        return Response({'message': 'Certificate email queued successfully.'}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['GET'], url_path='export-excel')
     def export_excel(self, request):

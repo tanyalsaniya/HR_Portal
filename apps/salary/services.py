@@ -61,7 +61,7 @@ def generate_payslip_pdf(salary_slip):
     user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
     employee = BitrixEmployeeMock(user_data) if user_data else None
     
-    bank_acc = employee.bank_account if employee else ""
+    bank_acc = salary_slip.bank_account_no or (employee.bank_account if employee else "")
     bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
     
     net_pay_words = num_to_words(salary_slip.net_salary)
@@ -127,7 +127,7 @@ def generate_payslips_zip(slips, zip_type='employee'):
             user_data = BitrixClient.get_user_detail(slip.bitrix_user_id)
             employee = BitrixEmployeeMock(user_data) if user_data else None
             
-            bank_acc = employee.bank_account if employee else ""
+            bank_acc = slip.bank_account_no or (employee.bank_account if employee else "")
             bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
             
             net_pay_words = num_to_words(slip.net_salary)

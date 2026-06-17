@@ -32,11 +32,24 @@ class SalarySlipSerializer(serializers.ModelSerializer):
     employee_details = serializers.SerializerMethodField(read_only=True)
     uploaded_batch_details = SalaryImportBatchSerializer(source='uploaded_batch', read_only=True)
 
+    gross_salary = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    net_salary = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    net_credited_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_deductions = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    pf_contribution = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    esi = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    labour_welfare_fund = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    professional_tax = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    other_deductions = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    leaves_available = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
+    working_days = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
+    extra_days = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
+
     class Meta:
         model = SalarySlip
         fields = '__all__'
         read_only_fields = (
-            'total_deductions', 'net_salary',
+            'total_deductions', 'net_salary', 'net_credited_amount', 'gross_salary',
             'pdf_file', 'payslip_no', 'created_at', 'updated_at'
         )
 

@@ -207,3 +207,165 @@ def update_bitrix24_on_exit(self, exit_request_id):
         except self.MaxRetriesExceededError:
             pass
         return f"Bitrix24 update failed: {exc}"
+
+
+@shared_task
+def send_exit_initiation_email(exit_request_id):
+    """
+    Trigger 11: Sends exit initiation email to employee with secure link
+    """
+    try:
+        exit_req = ExitRequest.objects.get(id=exit_request_id)
+        emp = exit_req.employee
+        link = exit_req.secure_link
+    except ExitRequest.DoesNotExist:
+        return "Exit request not found."
+    except Exception as e:
+        return f"Error: {e}"
+
+    recipient_email = emp.personal_email or emp.work_email or emp.email
+    if not recipient_email:
+        return "No email for employee."
+
+    url = link.get_link()
+    subject = "Your Exit Process has been Initiated – MTLV"
+    
+    # Render or build HTML message
+    from django.template.loader import render_to_string
+    html_message = None
+    try:
+        html_message = render_to_string('exit/email_secure_link.html', {
+            'employee': emp,
+            'exit_request': exit_req,
+            'url': url,
+            'expiry_days': 7
+        })
+    except Exception:
+        pass
+
+    body = f"""Dear {emp.first_name},
+
+Your offboarding and exit clearance process has been initiated successfully in the MTLV HR Portal.
+
+Your resignation has been acknowledged, and your last working day is confirmed as {exit_req.last_working_day.strftime('%d %b %Y')}.
+
+Please complete your secure exit clearance questionnaire form within 7 days by clicking the link below:
+{url}
+
+What happens next:
+1. Clearances from IT, Finance, Admin, and Library will be processed.
+2. Your Full & Final settlement will be calculated.
+
+Sincerely,
+HR Department
+MTLV
+"""
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient_email],
+            html_message=html_message,
+            fail_silently=False
+        )
+        return "Exit initiation email sent successfully."
+    except Exception as e:
+        logger.error(f"Failed to send exit initiation email: {e}")
+        return f"Failed: {e}"
+
+
+@shared_task
+def send_exit_form_submission_notification(response_id):
+    """
+    Trigger 15: Notify HR & Admin and email employee on exit form submission
+    """
+    from .models import ExitFormResponse
+    from notifications.models import Notification
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    try:
+        resp = ExitFormResponse.objects.get(id=response_id)
+        exit_req = resp.exit_request
+        emp = exit_req.employee
+    except ExitFormResponse.DoesNotExist:
+        return "Form response not found."
+
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:8000')
+
+    # 1. Notify HR and Admin
+    admins = User.objects.filter(role__code='ADMIN')
+    hrs = User.objects.filter(role__code='HR')
+    
+    assets_status = "Returned" if resp.assets_confirmation else "Pending"
+    msg = f"{emp.name} has submitted the exit form. Assets: {assets_status} KT Status: {resp.get_kt_status_display()} Reason: {resp.reason_dropdown}"
+    
+    # In-app + Email for HR
+    for hr in hrs:
+        Notification.objects.create(
+            recipient=hr,
+            notif_type='SUCCESS',
+            message=msg,
+            link=f"/exit/{emp.id}/"
+        )
+        if hr.email:
+            send_mail(
+                subject=f"Exit Form Submitted – {emp.name}",
+                message=f"{msg}\n\nView details at {frontend_url}/exit/{emp.id}/.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[hr.email],
+                fail_silently=True
+            )
+
+    # In-app + Email for Admin
+    for admin in admins:
+        Notification.objects.create(
+            recipient=admin,
+            notif_type='SUCCESS',
+            message=msg,
+            link=f"/exit/{emp.id}/"
+        )
+        if admin.email:
+            send_mail(
+                subject=f"Exit Form Submitted – {emp.name}",
+                message=f"{msg}\n\nView details at {frontend_url}/exit/{emp.id}/.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[admin.email],
+                fail_silently=True
+            )
+
+    # 2. Email employee confirmation
+    recipient_email = resp.personal_email or emp.personal_email or emp.work_email or emp.email
+    if recipient_email:
+        subject = "Exit Form Received – MTLV"
+        body = f"""Dear {emp.first_name},
+
+Thank you for submitting your exit clearance questionnaire form.
+
+Summary of what you submitted:
+- Laptop/Assets: {assets_status}
+- KT Handover Status: {resp.get_kt_status_display()}
+- Handover Recipient: {resp.kt_handover_to or 'N/A'}
+- Primary Reason: {resp.reason_dropdown}
+
+Next steps:
+- The HR and Admin teams will verify your submissions and asset returns.
+- Your clearances will be updated, and Full & Final (F&F) settlement calculations will proceed.
+
+Best Regards,
+HR Team
+MTLV
+"""
+        try:
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[recipient_email],
+                fail_silently=False
+            )
+        except Exception as e:
+            logger.error(f"Failed to send exit form submission email: {e}")
+
+    return "Exit form submission notifications sent."

@@ -4,9 +4,61 @@
 const API_BASE = '/api';
 let currentUser = null;
 
+// ---------- GLOBAL LOADER SYSTEM ----------
+let activeRequestsCount = 0;
+let loaderTimeout = null;
+
+function showGlobalLoader(isBlocking = false) {
+    const bar = document.getElementById('globalLoadingBar');
+    const overlay = document.getElementById('globalLoaderOverlay');
+    
+    if (bar) {
+        bar.classList.remove('finished');
+        bar.classList.add('loading');
+        bar.style.width = '15%';
+        setTimeout(() => {
+            if (bar.classList.contains('loading')) {
+                bar.style.width = '80%';
+            }
+        }, 50);
+    }
+    
+    if (isBlocking && overlay) {
+        if (loaderTimeout) clearTimeout(loaderTimeout);
+        loaderTimeout = setTimeout(() => {
+            overlay.classList.add('show');
+        }, 150);
+    }
+}
+
+function hideGlobalLoader() {
+    const bar = document.getElementById('globalLoadingBar');
+    const overlay = document.getElementById('globalLoaderOverlay');
+    
+    if (loaderTimeout) clearTimeout(loaderTimeout);
+    
+    if (bar) {
+        bar.classList.remove('loading');
+        bar.classList.add('finished');
+    }
+    
+    if (overlay) {
+        overlay.classList.remove('show');
+    }
+}
+
 // ---------- JWT & API HELPER ----------
 async function apiFetch(endpoint, options = {}) {
     let accessToken = localStorage.getItem('accessToken');
+    
+    // Determine if request is silent (notifications check)
+    const isSilent = endpoint.includes('/notifications/feed/');
+    if (!isSilent) {
+        activeRequestsCount++;
+        // If it's a write action, make it blocking
+        const isWrite = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
+        showGlobalLoader(isWrite);
+    }
     
     // Set default headers
     options.headers = options.headers || {};
@@ -43,30 +95,41 @@ async function apiFetch(endpoint, options = {}) {
     } else {
         url = `${API_BASE}${endpoint}`;
     }
-    let response = await fetch(url, options);
 
-    // Handle token expiration (401 Unauthorized)
-    if (response.status === 401) {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-            console.log('Access token expired. Attempting token refresh...');
-            const refreshSuccess = await attemptTokenRefresh(refreshToken);
-            if (refreshSuccess) {
-                // Retry request with new token
-                accessToken = localStorage.getItem('accessToken');
-                options.headers['Authorization'] = `Bearer ${accessToken}`;
-                response = await fetch(url, options);
+    try {
+        let response = await fetch(url, options);
+
+        // Handle token expiration (401 Unauthorized)
+        if (response.status === 401) {
+            const refreshToken = localStorage.getItem('refreshToken');
+            if (refreshToken) {
+                console.log('Access token expired. Attempting token refresh...');
+                const refreshSuccess = await attemptTokenRefresh(refreshToken);
+                if (refreshSuccess) {
+                    // Retry request with new token
+                    accessToken = localStorage.getItem('accessToken');
+                    options.headers['Authorization'] = `Bearer ${accessToken}`;
+                    response = await fetch(url, options);
+                } else {
+                    logout();
+                    return response;
+                }
             } else {
                 logout();
                 return response;
             }
-        } else {
-            logout();
-            return response;
+        }
+
+        return response;
+    } finally {
+        if (!isSilent) {
+            activeRequestsCount--;
+            if (activeRequestsCount <= 0) {
+                activeRequestsCount = 0;
+                hideGlobalLoader();
+            }
         }
     }
-
-    return response;
 }
 
 async function attemptTokenRefresh(refreshToken) {
@@ -180,6 +243,8 @@ function getEmployeeIdFromUrl() {
 }
 
 function switchView(viewId, pushState = true, extraParams = {}) {
+    showGlobalLoader(false);
+
     views.forEach(v => {
         const el = document.getElementById(v);
         if (el) el.style.display = v === viewId ? 'block' : 'none';
@@ -218,6 +283,12 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         }
         history.pushState({ viewId: viewId, employeeId: extraParams.employeeId || null }, '', path);
     }
+
+    setTimeout(() => {
+        if (activeRequestsCount === 0) {
+            hideGlobalLoader();
+        }
+    }, 300);
 }
 
 // Handle browser Back/Forward navigation
@@ -265,12 +336,16 @@ async function checkNotifications() {
                     return;
                 }
 
-                listContainer.innerHTML = notifications.map(n => `
-                    <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
-                        <div class="notif-text">${n.message}</div>
-                        <div class="notif-time">${formatDate(n.created_at)}</div>
-                    </div>
-                `).join('');
+                listContainer.innerHTML = notifications.map(n => {
+                    const typeClass = 'notif-' + (n.notif_type || 'info').toLowerCase();
+                    const unreadClass = n.is_read ? '' : 'unread';
+                    return `
+                        <div class="notif-item ${unreadClass} ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
+                            <div class="notif-text">${n.message}</div>
+                            <div class="notif-time">${formatDate(n.created_at)}</div>
+                        </div>
+                    `;
+                }).join('');
             }
         }
     } catch (e) {

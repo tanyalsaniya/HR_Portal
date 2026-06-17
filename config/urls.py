@@ -13,7 +13,6 @@ urlpatterns = [
     # Secure document serving interceptor
     path('media/employees/<str:emp_id>/docs/<str:filename>', SecureDocumentServeView.as_view(), name='secure_doc_serve'),
     
-    # Delegate routing to respective app-level urls.py configurations
     path('', include('employee_onboarding.urls')),
     path('', include('exit_formality.urls')),
     path('', include('student_certificate.urls')),

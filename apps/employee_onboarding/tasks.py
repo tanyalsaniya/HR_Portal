@@ -226,3 +226,53 @@ HR Team
     except Exception as e:
         logger.error(f"Error sending onboarding welcome email to {recipient_email}: {e}")
         return f"Failed to send email: {e}"
+
+
+@shared_task
+def send_offer_letter_email(employee_id, doc_id):
+    """
+    Sends the generated Offer Letter PDF via email to the employee.
+    """
+    from django.core.mail import EmailMessage
+    from django.conf import settings
+    from .models import EmployeeDocument
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+
+    try:
+        user_detail = BitrixClient.get_user_detail(employee_id)
+        if not user_detail:
+            return "Employee not found."
+        emp = BitrixEmployeeMock(user_detail)
+        doc = EmployeeDocument.objects.get(id=doc_id)
+    except Exception as err:
+        return f"Error loading data: {err}"
+
+    recipient_email = emp.personal_email or emp.work_email or emp.email
+    if not recipient_email:
+        return "No email for employee."
+
+    subject = "Your Offer Letter – MTLV"
+    body = f"""Dear {emp.first_name},
+
+Please find attached your official Offer Letter from MTLV.
+
+If you have any questions or need further details, feel free to contact the HR team.
+
+Best Regards,
+HR Team
+MTLV
+"""
+    try:
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL or 'hr@mtlv.com',
+            to=[recipient_email]
+        )
+        if doc.file:
+            email.attach(doc.original_filename or "Offer_Letter.pdf", doc.file.read(), 'application/pdf')
+        email.send(fail_silently=False)
+        return "Offer letter sent successfully."
+    except Exception as e:
+        logger.error(f"Failed to send offer letter email to {recipient_email}: {e}")
+        return f"Failed: {e}"
