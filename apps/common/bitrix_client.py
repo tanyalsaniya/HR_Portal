@@ -148,7 +148,7 @@ class BitrixClient:
         Translates raw Bitrix24 user API fields into standard HR Portal fields.
         """
         # Parse joining date safely
-        joining_date_raw = raw_user.get('UF_EMPLOYMENT_DATE') or ''
+        joining_date_raw = raw_user.get('UF_EMPLOYMENT_DATE') or raw_user.get('DATE_REGISTER') or ''
         joining_date = None
         if joining_date_raw:
             try:
@@ -191,11 +191,13 @@ class BitrixClient:
             'last_name': last_name,
             'name': f"{first_name} {last_name}".strip(),
             'email': raw_user.get('EMAIL') or '',
-            'phone': raw_user.get('PERSONAL_MOBILE') or raw_user.get('WORK_PHONE') or '9876543210',
+            'work_email': raw_user.get('EMAIL') or '',
+            'personal_email': raw_user.get('UF_PERSONAL_EMAIL') or raw_user.get('PERSONAL_MAILBOX') or '',
+            'phone': raw_user.get('PERSONAL_MOBILE') or raw_user.get('WORK_PHONE') or '',
             'designation': raw_user.get('WORK_POSITION') or 'Software Engineer',
             'department': dept_ids[0] if dept_ids else 1,
             'department_name': department_name,
-            'dob': dob or '1995-01-01',
+            'dob': dob or '',
             'gender': gender,
             'joining_date': joining_date or '2024-01-01',
             'address_line1': raw_user.get('PERSONAL_CITY') or 'Mohali',

@@ -10,9 +10,59 @@ from rest_framework.exceptions import ValidationError
 from openpyxl import Workbook
 
 from roles.permissions import HasModelPermission
-from .models import Student, StudentFeeInstallment
-from .serializers import StudentSerializer, StudentFeeInstallmentSerializer
+from .models import Student, StudentFeeInstallment, Course, StudentCertificate
+from .serializers import (
+    StudentSerializer, StudentFeeInstallmentSerializer, CourseSerializer, StudentCertificateSerializer
+)
 from .services import generate_student_certificate_pdf, send_fee_warning_email
+
+class CourseViewSet(viewsets.ModelViewSet):
+    queryset = Course.objects.all().order_by('course_name')
+    serializer_class = CourseSerializer
+    permission_classes = [HasModelPermission]
+
+
+class StudentCertificateViewSet(viewsets.ModelViewSet):
+    queryset = StudentCertificate.objects.all().order_by('-created_at')
+    serializer_class = StudentCertificateSerializer
+    permission_classes = [HasModelPermission]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        student = serializer.validated_data['student']
+        course = serializer.validated_data['course']
+        
+        # Get completion year for serial number
+        completion_year = student.completion_date.year
+        batch_code = str(completion_year)[-2:]
+        batch_prefix = f"DHUB|{batch_code}|"
+        
+        # select_for_update to prevent race conditions and gaps
+        last_cert = StudentCertificate.objects.filter(
+            serial_no__startswith=batch_prefix
+        ).select_for_update().order_by('-id').first()
+        
+        if last_cert:
+            parts = last_cert.serial_no.split('|')
+            if len(parts) >= 3:
+                try:
+                    next_seq = int(parts[2]) + 1
+                except ValueError:
+                    next_seq = 1
+            else:
+                next_seq = 1
+        else:
+            next_seq = 250
+            
+        serial_no = f"{batch_prefix}{next_seq}"
+        
+        # Save the certificate instance
+        instance = serializer.save(serial_no=serial_no)
+        
+        # Now trigger the PDF generation
+        from .services import generate_student_certificate_pdf
+        generate_student_certificate_pdf(instance)
+
 
 class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
@@ -27,6 +77,71 @@ class StudentViewSet(viewsets.ModelViewSet):
         if student_type:
             queryset = queryset.filter(student_type=student_type)
         return queryset
+
+    @action(detail=True, methods=['GET'], url_path='enrollment-details')
+    def enrollment_details(self, request, pk=None):
+        student = self.get_object()
+        course = student.enrolled_course
+        
+        # Gender pronoun resolution
+        gender = student.gender
+        if gender == 'MALE':
+            s_o_d_o = "S/O"
+            he_she = "he"
+            his_her = "his"
+        elif gender == 'FEMALE':
+            s_o_d_o = "D/O"
+            he_she = "she"
+            his_her = "her"
+        else:
+            s_o_d_o = "S/O or D/O"
+            he_she = "he/she"
+            his_her = "his/her"
+            
+        course_name = course.course_name if course else student.course_at_institute
+        duration = course.default_duration if course else student.training_duration
+        
+        # Format completion month
+        try:
+            completion_month = student.completion_date.strftime("%B %Y")
+        except:
+            completion_month = ""
+            
+        address_str = student.address or ""
+        father_name_str = student.father_name or ""
+        
+        # Default paragraph layouts
+        default_paragraph = (
+            f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
+            f"Has successfully Completed {duration} \"**{course_name}**\" course ."
+        )
+        
+        default_paragraph_with_dates = (
+            f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
+            f"Has successfully Completed \"**{course_name}**\" course in the month of **{completion_month}**."
+        )
+
+        skills = course.skills_list if course else []
+        
+        return Response({
+            'student_id': student.id,
+            'student_name': student.name,
+            'gender': gender,
+            'father_name': father_name_str,
+            'address': address_str,
+            'course_id': course.id if course else None,
+            'course_name': course_name,
+            'duration': duration,
+            'joining_date': student.joining_date,
+            'completion_date': student.completion_date,
+            'completion_month': completion_month,
+            's_o_d_o': s_o_d_o,
+            'he_she': he_she,
+            'his_her': his_her,
+            'skills': skills,
+            'default_paragraph': default_paragraph,
+            'default_paragraph_with_dates': default_paragraph_with_dates,
+        })
 
     @action(detail=True, methods=['POST'], url_path='generate-certificate')
     @transaction.atomic
@@ -43,7 +158,67 @@ class StudentViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK) # return warning trigger payload
             
         try:
-            generate_student_certificate_pdf(student, user=request.user)
+            course = student.enrolled_course
+            if not course:
+                # Create a default course if none enrolled
+                course, _ = Course.objects.get_or_create(
+                    course_name=student.course_at_institute,
+                    defaults={'default_duration': student.training_duration, 'skills_list': []}
+                )
+                student.enrolled_course = course
+                student.save()
+            
+            # Resolve pronouns and default content
+            gender = student.gender
+            s_o_d_o = "D/O" if gender == 'FEMALE' else "S/O"
+            father_name_str = student.father_name or ""
+            address_str = student.address or ""
+            duration = course.default_duration
+            course_name = course.course_name
+            
+            default_content = (
+                f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
+                f"Has successfully Completed {duration} \"**{course_name}**\" course ."
+            )
+            
+            ratings = {skill: 'Excellent' for skill in course.skills_list}
+            
+            # Get completion year for serial number
+            completion_year = student.completion_date.year
+            batch_code = str(completion_year)[-2:]
+            batch_prefix = f"DHUB|{batch_code}|"
+            
+            last_cert = StudentCertificate.objects.filter(
+                serial_no__startswith=batch_prefix
+            ).select_for_update().order_by('-id').first()
+            
+            if last_cert:
+                parts = last_cert.serial_no.split('|')
+                if len(parts) >= 3:
+                    try:
+                        next_seq = int(parts[2]) + 1
+                    except ValueError:
+                        next_seq = 1
+                else:
+                    next_seq = 1
+            else:
+                next_seq = 250
+                
+            serial_no = f"{batch_prefix}{next_seq}"
+            
+            cert = StudentCertificate.objects.create(
+                student=student,
+                course=course,
+                skill_ratings=ratings,
+                show_dates=False,
+                issue_date=today,
+                serial_no=serial_no,
+                cert_content=default_content,
+                place="Mohali"
+            )
+            
+            # Generate PDF using WeasyPrint
+            generate_student_certificate_pdf(cert)
             
             # Send notification to Admin (Admin will see in-app bell)
             from notifications.models import Notification
@@ -51,7 +226,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             User = get_user_model()
             admins = User.objects.filter(role__code='ADMIN')
             
-            message = f"Certificate {student.cert_no} was generated for {student.name} by {request.user.username}."
+            message = f"Certificate {cert.serial_no} was generated for {student.name} by {request.user.username}."
             for admin in admins:
                 Notification.objects.create(
                     recipient=admin,
@@ -117,7 +292,63 @@ class StudentViewSet(viewsets.ModelViewSet):
             for student in students:
                 # Ensure certificate is generated
                 if not student.cert_pdf:
-                    generate_student_certificate_pdf(student, user=request.user)
+                    # Look up latest student certificate or generate default
+                    cert = StudentCertificate.objects.filter(student=student).order_by('-created_at').first()
+                    if not cert:
+                        # Create default
+                        course = student.enrolled_course
+                        if not course:
+                            course, _ = Course.objects.get_or_create(
+                                course_name=student.course_at_institute,
+                                defaults={'default_duration': student.training_duration, 'skills_list': []}
+                            )
+                        
+                        gender = student.gender
+                        s_o_d_o = "D/O" if gender == 'FEMALE' else "S/O"
+                        father_name_str = student.father_name or ""
+                        address_str = student.address or ""
+                        
+                        default_content = (
+                            f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
+                            f"Has successfully Completed {course.default_duration} \"**{course.course_name}**\" course ."
+                        )
+                        
+                        completion_year = student.completion_date.year
+                        batch_code = str(completion_year)[-2:]
+                        batch_prefix = f"DHUB|{batch_code}|"
+                        
+                        with transaction.atomic():
+                            last_cert = StudentCertificate.objects.filter(
+                                serial_no__startswith=batch_prefix
+                            ).select_for_update().order_by('-id').first()
+                            
+                            if last_cert:
+                                parts = last_cert.serial_no.split('|')
+                                if len(parts) >= 3:
+                                    try:
+                                        next_seq = int(parts[2]) + 1
+                                    except ValueError:
+                                        next_seq = 1
+                                else:
+                                    next_seq = 1
+                            else:
+                                next_seq = 250
+                                
+                            serial_no = f"{batch_prefix}{next_seq}"
+                            
+                            cert = StudentCertificate.objects.create(
+                                student=student,
+                                course=course,
+                                skill_ratings={skill: 'Excellent' for skill in course.skills_list},
+                                show_dates=False,
+                                issue_date=datetime.date.today(),
+                                serial_no=serial_no,
+                                cert_content=default_content,
+                                place="Mohali"
+                            )
+                        generate_student_certificate_pdf(cert)
+                    else:
+                        generate_student_certificate_pdf(cert)
                 
                 # Add to ZIP
                 if student.cert_pdf:
@@ -196,3 +427,4 @@ class StudentFeeInstallmentViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Fee warning email sent successfully to the student.'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+

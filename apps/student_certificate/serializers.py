@@ -1,7 +1,13 @@
 from rest_framework import serializers
 from decimal import Decimal
-from .models import Student, StudentFeeInstallment
+from .models import Student, StudentFeeInstallment, Course, StudentCertificate
 from employee_onboarding.serializers import DepartmentSerializer
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = '__all__'
+
 
 class StudentFeeInstallmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,6 +25,7 @@ class StudentSerializer(serializers.ModelSerializer):
     )
     training_duration = serializers.ReadOnlyField()
     department_details = DepartmentSerializer(source='department', read_only=True)
+    enrolled_course_details = CourseSerializer(source='enrolled_course', read_only=True)
 
     class Meta:
         model = Student
@@ -45,3 +52,14 @@ class StudentSerializer(serializers.ModelSerializer):
             )
             
         return student
+
+
+class StudentCertificateSerializer(serializers.ModelSerializer):
+    student_name = serializers.ReadOnlyField(source='student.name')
+    course_name = serializers.ReadOnlyField(source='course.course_name')
+
+    class Meta:
+        model = StudentCertificate
+        fields = '__all__'
+        read_only_fields = ('serial_no', 'pdf_file', 'created_at')
+

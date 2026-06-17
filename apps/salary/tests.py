@@ -273,3 +273,97 @@ class SalaryModuleTests(APITestCase):
         res = self.client.get(url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res['Content-Type'], "application/zip")
+
+    def test_bank_details_autosave_and_prefill(self):
+        # Update mock values to fully-populated user dictionaries to prevent serializer KeyError
+        user_dict_complete = {
+            'id': '10',
+            'emp_id': 'BITRIX-10',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'name': 'John Doe',
+            'email': 'emp@test.com',
+            'work_email': 'emp@test.com',
+            'personal_email': '',
+            'phone': '9876543210',
+            'designation': 'Software Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': '2026-06-01',
+            'status': 'Active',
+            'onboarding_complete': True,
+            'alternate_phone': '',
+            'address_line1': 'Mohali',
+            'address_line2': '',
+            'city': 'Mohali',
+            'state': 'Punjab',
+            'pin_code': '160055',
+            'employment_type': 'Full Time',
+            'emergency_contact_name': 'Emergency Contact',
+            'emergency_relationship': 'Friend',
+            'emergency_phone': '9876543210'
+        }
+        self.mock_get_detail.return_value = user_dict_complete
+        self.mock_get_all.return_value = [user_dict_complete]
+
+        from salary.models import EmployeeBankDetail
+        # Verify no bank details exist initially
+        self.assertEqual(EmployeeBankDetail.objects.count(), 0)
+
+        # 1. Test Auto-save on Excel Import
+        self.client.force_authenticate(user=self.admin_user)
+        excel_content = self.create_excel_file([
+            [1, "John Doe", "Software Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 87000.0, 87000.0, 0.0, 0.0, 87000.0, "987654321", "MockBank"]
+        ])
+        uploaded_file = SimpleUploadedFile("salary.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        url = reverse('salary_import')
+        res = self.client.post(url, {'file': uploaded_file, 'month': 6, 'year': 2026}, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Verify EmployeeBankDetail is saved
+        bank_detail = EmployeeBankDetail.objects.get(bitrix_user_id=self.employee.bitrix_id)
+        self.assertEqual(bank_detail.bank_account_no, "987654321")
+        self.assertEqual(bank_detail.bank_name, "MockBank")
+
+        # 2. Test Prefill on Excel Import when Excel is blank
+        excel_content_blank = self.create_excel_file([
+            [1, "John Doe", "Software Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 87000.0, 87000.0, 0.0, 0.0, 87000.0, "", ""]
+        ])
+        uploaded_file_blank = SimpleUploadedFile("salary_blank.xlsx", excel_content_blank, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        # Let's delete the old slip to test creation
+        SalarySlip.objects.all().delete()
+        res = self.client.post(url, {'file': uploaded_file_blank, 'month': 6, 'year': 2026}, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Verify slip has the prefilled bank account/name from database
+        slip = SalarySlip.objects.get(bitrix_user_id=self.employee.bitrix_id, month=6, year=2026)
+        self.assertEqual(slip.bank_account_no, "987654321")
+        self.assertEqual(slip.bank_name, "MockBank")
+
+        # 3. Test update on Salary slip edit
+        edit_url = reverse('salary_edit', kwargs={'pk': slip.id})
+        res = self.client.put(edit_url, {'bank_account_no': '111222333', 'bank_name': 'NewMockBank'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Verify persistent EmployeeBankDetail is updated
+        bank_detail.refresh_from_db()
+        self.assertEqual(bank_detail.bank_account_no, "111222333")
+        self.assertEqual(bank_detail.bank_name, "NewMockBank")
+
+        # 4. Test Prefill in Employee Details API & view
+        emp_detail_url = reverse('employees_detail_view', kwargs={'pk': int(self.employee.bitrix_id)})
+        self.client.force_authenticate(user=self.admin_user)
+        res = self.client.get(emp_detail_url, {'format': 'json'})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['bank_account'], "111222333")
+        self.assertEqual(res.data['bank_name'], "NewMockBank")
+
+        # 5. Test update via Employee details PATCH request
+        res = self.client.patch(emp_detail_url + "?format=json", {'bank_account': '555666777', 'bank_name': 'FinalMockBank'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Verify updated bank details are saved to database
+        bank_detail.refresh_from_db()
+        self.assertEqual(bank_detail.bank_account_no, "555666777")
+        self.assertEqual(bank_detail.bank_name, "FinalMockBank")

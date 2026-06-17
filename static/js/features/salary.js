@@ -273,7 +273,7 @@ async function loadSlipsRegistry() {
                         <tr>
                             <td><strong>${emp.emp_id}</strong></td>
                             <td><strong>${emp.name}</strong></td>
-                            <td>${emp.department_name || 'N/A'}</td>
+                            <td>${emp.department_name || 'N/A'}${emp.department ? ` (ID: ${emp.department})` : ''}</td>
                             <td>${currentSalaryHtml}</td>
                             <td><span style="font-weight:bold; color:${statusColor};">${emp.status}</span></td>
                             <td>${actions}</td>
@@ -816,7 +816,7 @@ async function loadDedicatedEmployeeSalaryHistory(employeeId) {
                 
                 const deptEl = document.getElementById('historyEmployeeDept');
                 if (deptEl) {
-                    deptEl.textContent = emp.department_details ? emp.department_details.name : (emp.department_name || emp.department || 'N/A');
+                    deptEl.textContent = emp.department_name ? `${emp.department_name} (ID: ${emp.department || 'N/A'})` : (emp.department || 'N/A');
                 }
                 
                 const desgEl = document.getElementById('historyEmployeeDesg');

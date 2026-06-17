@@ -2,9 +2,19 @@ from django.db import models
 from django.conf import settings
 from decimal import Decimal
 from rules import (
-    STUDENT_TYPE_CHOICES, CERTIFICATE_TYPE_CHOICES, STUDENT_STATUS_CHOICES, INSTALLMENT_STATUS_CHOICES
+    STUDENT_TYPE_CHOICES, CERTIFICATE_TYPE_CHOICES, STUDENT_STATUS_CHOICES, INSTALLMENT_STATUS_CHOICES, GENDER_CHOICES
 )
 from common.utils import generate_certificate_number
+
+class Course(models.Model):
+    course_name = models.CharField(max_length=100)
+    default_duration = models.CharField(max_length=50, default="6 months")
+    skills_list = models.JSONField(default=list, help_text="List of skills for this course")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.course_name
+
 
 class Student(models.Model):
     name = models.CharField(max_length=100)
@@ -34,6 +44,18 @@ class Student(models.Model):
     
     total_fees = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     
+    # New Fields
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, default='MALE')
+    father_name = models.CharField(max_length=100, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    enrolled_course = models.ForeignKey(
+        Course,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students'
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -86,3 +108,27 @@ class StudentFeeInstallment(models.Model):
 
     def __str__(self):
         return f"Installment {self.installment_number} for {self.student.name} ({self.status})"
+
+
+class StudentCertificate(models.Model):
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='certificates'
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE
+    )
+    skill_ratings = models.JSONField(default=dict, help_text="Dictionary of skill -> rating")
+    show_dates = models.BooleanField(default=True)
+    issue_date = models.DateField()
+    serial_no = models.CharField(max_length=50, unique=True)
+    pdf_file = models.FileField(upload_to='certificates/', blank=True, null=True)
+    cert_content = models.TextField(blank=True, null=True, help_text="Customized content text")
+    place = models.CharField(max_length=100, default="Mohali")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.serial_no} - {self.student.name}"
+

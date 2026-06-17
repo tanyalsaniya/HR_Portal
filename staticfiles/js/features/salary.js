@@ -2,8 +2,12 @@
 // Salary, Payroll, Excel Import/Export, and ZIP downloads handlers
 
 let activeSalaryTab = 'slips';
+let salaryCurrentPage = 1;
+let salaryTotalCount = 0;
+let salaryFilteredList = [];
 
 async function loadSalaryData() {
+    salaryCurrentPage = 1;
     document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
     
     // Adjust visual panel options based on role
@@ -175,21 +179,32 @@ async function loadSlipsRegistry() {
         }
     }
 
+    const paginationFooter = document.getElementById('salarySlipsPaginationFooter');
+
     // 2. Load and render rows based on Role
     if (isEmployee) {
         // Employee: Flat month-wise registry for themselves
         try {
-            const res = await apiFetch('/salary/history');
+            const res = await apiFetch('/salary/history?no_pagination=true');
             if (res.ok) {
                 const slipsData = await res.json();
-                const slips = slipsData.results || slipsData;
-                
-                if (slips.length === 0) {
+                salaryFilteredList = slipsData.results || slipsData;
+                salaryTotalCount = salaryFilteredList.length;
+
+                if (paginationFooter) {
+                    paginationFooter.style.display = 'flex';
+                    updateSalaryPaginationControls(salaryCurrentPage, salaryTotalCount);
+                }
+
+                if (salaryFilteredList.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #777; padding: 20px;">No salary slips generated yet.</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = slips.map(s => {
+                const startIdx = (salaryCurrentPage - 1) * 10;
+                const paginatedSlips = salaryFilteredList.slice(startIdx, startIdx + 10);
+
+                tbody.innerHTML = paginatedSlips.map(s => {
                     const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                     const period = `${monthNames[s.month]} ${s.year}`;
                     
@@ -219,17 +234,26 @@ async function loadSlipsRegistry() {
     } else {
         // Admin or HR: Consolidated list of employees (one row per employee)
         try {
-            const res = await apiFetch('/employees/');
+            const res = await apiFetch('/employees/?type=all&no_pagination=true');
             if (res.ok) {
                 const empsData = await res.json();
-                const emps = empsData.results || empsData;
-                
-                if (emps.length === 0) {
+                salaryFilteredList = empsData.results || empsData;
+                salaryTotalCount = salaryFilteredList.length;
+
+                if (paginationFooter) {
+                    paginationFooter.style.display = 'flex';
+                    updateSalaryPaginationControls(salaryCurrentPage, salaryTotalCount);
+                }
+
+                if (salaryFilteredList.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #777; padding: 20px;">No employees found.</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = emps.map(emp => {
+                const startIdx = (salaryCurrentPage - 1) * 10;
+                const paginatedEmps = salaryFilteredList.slice(startIdx, startIdx + 10);
+
+                tbody.innerHTML = paginatedEmps.map(emp => {
                     // Calculate current salary from latest structure
                     let currentSalaryHtml = '<span style="color: #999; font-style: italic;">Not Setup</span>';
                     if (emp.salary_structures && emp.salary_structures.length > 0) {
@@ -249,7 +273,7 @@ async function loadSlipsRegistry() {
                         <tr>
                             <td><strong>${emp.emp_id}</strong></td>
                             <td><strong>${emp.name}</strong></td>
-                            <td>${emp.department_name || 'N/A'}</td>
+                            <td>${emp.department_name || 'N/A'}${emp.department ? ` (ID: ${emp.department})` : ''}</td>
                             <td>${currentSalaryHtml}</td>
                             <td><span style="font-weight:bold; color:${statusColor};">${emp.status}</span></td>
                             <td>${actions}</td>
@@ -261,6 +285,30 @@ async function loadSlipsRegistry() {
             console.error(e);
         }
     }
+}
+
+function changeSalaryPage(direction) {
+    const maxPage = Math.ceil(salaryTotalCount / 10) || 1;
+    salaryCurrentPage = Math.max(1, Math.min(maxPage, salaryCurrentPage + direction));
+    loadSlipsRegistry();
+}
+
+function updateSalaryPaginationControls(currentPage, totalCount) {
+    const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * 10 + 1;
+    const pageEnd = Math.min(currentPage * 10, totalCount);
+    
+    const startEl = document.getElementById('salaryPageStart');
+    const endEl = document.getElementById('salaryPageEnd');
+    const totalEl = document.getElementById('salaryTotalCount');
+    const prevBtn = document.getElementById('salaryPrevBtn');
+    const nextBtn = document.getElementById('salaryNextBtn');
+    
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (totalEl) totalEl.textContent = totalCount;
+    
+    if (prevBtn) prevBtn.disabled = currentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
 }
 
 // 5. Load Structures Registry
@@ -523,7 +571,7 @@ function closeSalaryStructureModal() {
 
 async function loadActiveEmployeesSelect(selectId) {
     try {
-        const res = await apiFetch('/employees/');
+        const res = await apiFetch('/employees/?type=all&no_pagination=true');
         if (res.ok) {
             const emps = await res.json();
             const empList = emps.results || emps;
@@ -768,7 +816,7 @@ async function loadDedicatedEmployeeSalaryHistory(employeeId) {
                 
                 const deptEl = document.getElementById('historyEmployeeDept');
                 if (deptEl) {
-                    deptEl.textContent = emp.department_details ? emp.department_details.name : (emp.department_name || emp.department || 'N/A');
+                    deptEl.textContent = emp.department_name ? `${emp.department_name} (ID: ${emp.department || 'N/A'})` : (emp.department || 'N/A');
                 }
                 
                 const desgEl = document.getElementById('historyEmployeeDesg');

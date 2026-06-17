@@ -191,11 +191,24 @@ class SalaryExportView(APIView):
             user_map[str(u['id'])] = BitrixEmployeeMock(u)
             
         row_idx = 2
+        from salary.models import EmployeeBankDetail
+
         if slips.exists():
             for slip in slips:
                 emp = user_map.get(str(slip.bitrix_user_id))
                 emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
                 designation = emp.designation if emp else ""
+                
+                bank_acc = slip.bank_account_no or ""
+                bank_nm = slip.bank_name or ""
+                if not bank_acc or not bank_nm:
+                    detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+                    if detail:
+                        if not bank_acc:
+                            bank_acc = detail.bank_account_no or ""
+                        if not bank_nm:
+                            bank_nm = detail.bank_name or ""
+
                 row_data = [
                     row_idx - 1,
                     emp_name,
@@ -211,8 +224,8 @@ class SalaryExportView(APIView):
                     float(slip.extra_days_working),
                     float(slip.fine_advance),
                     float(slip.net_payable),
-                    slip.bank_account_no or "",
-                    slip.bank_name or ""
+                    bank_acc,
+                    bank_nm
                 ]
                 ws.append(row_data)
                 
@@ -236,6 +249,15 @@ class SalaryExportView(APIView):
                     # Fallback to absolute latest if none effective yet
                     struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id).order_by('-effective_from').first()
 
+                bank_acc = ""
+                bank_nm = ""
+                detail = EmployeeBankDetail.objects.filter(bitrix_user_id=emp.bitrix_id).first()
+                if detail:
+                    bank_acc = detail.bank_account_no or ""
+                    bank_nm = detail.bank_name or ""
+                if not bank_acc:
+                    bank_acc = emp.bank_account or ""
+
                 row_data = [
                     row_idx - 1,
                     emp.name,
@@ -251,8 +273,8 @@ class SalaryExportView(APIView):
                     0.0,  # Extra days working
                     0.0,  # Fine/Advance
                     0.0,  # Net Payable
-                    emp.bank_account or "",
-                    ""    # Bank name
+                    bank_acc,
+                    bank_nm
                 ]
                 ws.append(row_data)
 
@@ -262,7 +284,7 @@ class SalaryExportView(APIView):
                         cell.protection = locked_style
                     else:
                         cell.protection = unlocked_style
-                row_idx += 1
+                    row_idx += 1
 
         response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response['Content-Disposition'] = f'attachment; filename="salary_sheet_{month}_{year}.xlsx"'
@@ -381,6 +403,26 @@ class SalaryImportView(APIView):
                             bank_account_no = ""
                             
                         bank_name = str(ws.cell(row=r_idx, column=16).value or "").strip()
+
+                        from salary.models import EmployeeBankDetail
+                        # Prefill from EmployeeBankDetail if not provided in the excel row
+                        if not bank_account_no or not bank_name:
+                            detail = EmployeeBankDetail.objects.filter(bitrix_user_id=employee.bitrix_id).first()
+                            if detail:
+                                if not bank_account_no:
+                                    bank_account_no = detail.bank_account_no or ""
+                                if not bank_name:
+                                    bank_name = detail.bank_name or ""
+
+                        # If both are provided, save or update EmployeeBankDetail
+                        if bank_account_no and bank_name:
+                            EmployeeBankDetail.objects.update_or_create(
+                                bitrix_user_id=employee.bitrix_id,
+                                defaults={
+                                    'bank_account_no': bank_account_no,
+                                    'bank_name': bank_name
+                                }
+                            )
 
                         # Save SalarySlip
                         slip = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, month=month, year=year).first()
@@ -551,6 +593,18 @@ class SalaryEditView(APIView):
 
         slip.status = 'draft' # Re-review needed after edit
         slip.save()
+
+        # Update or create persistent employee bank details if both are present in the slip
+        if slip.bank_account_no and slip.bank_name:
+            from salary.models import EmployeeBankDetail
+            EmployeeBankDetail.objects.update_or_create(
+                bitrix_user_id=slip.bitrix_user_id,
+                defaults={
+                    'bank_account_no': slip.bank_account_no,
+                    'bank_name': slip.bank_name
+                }
+            )
+
         generate_payslip_pdf(slip)
 
         serializer = SalarySlipSerializer(slip)

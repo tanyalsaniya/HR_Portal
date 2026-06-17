@@ -51,7 +51,9 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_create(self, serializer):
-        bitrix_user_id = serializer.validated_data['bitrix_user_id']
+        bitrix_user_id = serializer.validated_data.get('bitrix_user_id')
+        if not bitrix_user_id:
+            raise ValidationError("bitrix_user_id is required.")
         user_data = BitrixClient.get_user_detail(bitrix_user_id)
         if not user_data:
             raise ValidationError("Employee not found in Bitrix24.")
