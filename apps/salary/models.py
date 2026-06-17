@@ -337,3 +337,14 @@ class SalaryIncrementApproval(models.Model):
         if user:
             return BitrixEmployeeMock(user)
         return None
+
+
+class EmployeeBankDetail(models.Model):
+    bitrix_user_id = models.CharField(max_length=50, unique=True, db_index=True)
+    bank_account_no = models.CharField(max_length=50, blank=True, null=True, default='')
+    bank_name = models.CharField(max_length=100, blank=True, null=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    def __str__(self):
+        return f"Bank Detail for User {self.bitrix_user_id}: {self.bank_name} - {self.bank_account_no}"

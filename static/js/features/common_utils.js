@@ -50,6 +50,13 @@ function applyPermissionsToUI() {
         studentLink.style.display = hasStudentAccess ? 'block' : 'none';
     }
 
+    const tabCertGenBtn = document.getElementById('tabCertGenBtn');
+    if (tabCertGenBtn) {
+        const isAdminOrHr = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR');
+        tabCertGenBtn.style.display = isAdminOrHr ? 'inline-block' : 'none';
+    }
+
+
     const adminLogsLink = document.getElementById('adminLogsLink');
     if (adminLogsLink) adminLogsLink.style.display = hasPermission('audit.read') ? 'block' : 'none';
 

@@ -94,10 +94,21 @@ class EmployeeSerializer(serializers.Serializer):
     # Masked placeholders for banking/pan compatibility
     aadhaar_masked = serializers.CharField(default="XXXXXXXX1234", read_only=True)
     pan_masked = serializers.CharField(default="XXXXXX1234", read_only=True)
-    bank_account = serializers.CharField(default="", required=False, allow_blank=True)
+    bank_account = serializers.SerializerMethodField()
+    bank_name = serializers.SerializerMethodField()
     pan_no = serializers.CharField(default="", required=False, allow_blank=True)
     bond_period_months = serializers.IntegerField(default=0, required=False)
     notice_period_days = serializers.IntegerField(default=30, required=False)
+
+    def get_bank_account(self, obj):
+        from salary.models import EmployeeBankDetail
+        detail = EmployeeBankDetail.objects.filter(bitrix_user_id=obj.get('id')).first()
+        return detail.bank_account_no if detail else ""
+
+    def get_bank_name(self, obj):
+        from salary.models import EmployeeBankDetail
+        detail = EmployeeBankDetail.objects.filter(bitrix_user_id=obj.get('id')).first()
+        return detail.bank_name if detail else ""
 
     def get_documents(self, obj):
         docs = EmployeeDocument.objects.filter(bitrix_user_id=obj.get('id'))

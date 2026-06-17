@@ -713,6 +713,8 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
             
             document.getElementById('editEmpAadhaar').value = emp.aadhaar_masked || '';
             document.getElementById('editEmpPan').value = emp.pan_masked || '';
+            document.getElementById('editEmpBankAccount').value = emp.bank_account || '';
+            document.getElementById('editEmpBankName').value = emp.bank_name || '';
             
             document.getElementById('editEmpEmergencyName').value = emp.emergency_contact_name || '';
             
@@ -837,6 +839,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const panVal = document.getElementById('editEmpPan').value;
             if (aadhaarVal) formData.append('aadhaar', aadhaarVal);
             if (panVal) formData.append('pan', panVal);
+            
+            const bankAccountVal = document.getElementById('editEmpBankAccount').value;
+            const bankNameVal = document.getElementById('editEmpBankName').value;
+            formData.append('bank_account', bankAccountVal);
+            formData.append('bank_name', bankNameVal);
             
             formData.append('emergency_contact_name', document.getElementById('editEmpEmergencyName').value);
             formData.append('emergency_relationship', document.getElementById('editEmpEmergencyRel').value);

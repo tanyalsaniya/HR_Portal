@@ -410,6 +410,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 res = requests.post(update_url_crm, json=payload_crm, timeout=10)
                 
             if res.ok:
+                # Update local bank details if provided
+                bank_account = data.get('bank_account')
+                bank_name = data.get('bank_name')
+                if bank_account is not None or bank_name is not None:
+                    from salary.models import EmployeeBankDetail
+                    detail, _ = EmployeeBankDetail.objects.get_or_create(bitrix_user_id=pk)
+                    if bank_account is not None:
+                        detail.bank_account_no = bank_account
+                    if bank_name is not None:
+                        detail.bank_name = bank_name
+                    detail.save()
+
                 BitrixClient.get_all_users(force_refresh=True)
                 user = BitrixClient.get_user_detail(pk)
                 

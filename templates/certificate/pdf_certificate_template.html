@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Student Certificate</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            width: 210mm;
+            height: 297mm;
+            font-family: 'Inter', sans-serif;
+            color: #000000;
+            -webkit-print-color-adjust: exact;
+        }
+        
+        .certificate-container {
+            width: 210mm;
+            height: 297mm;
+            box-sizing: border-box;
+            background-image: url('file://{{ bg_image_path }}');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            position: relative;
+            padding: 55mm 22mm 25mm 22mm;
+        }
+        
+        .cert-title-container {
+            text-align: center;
+            margin-bottom: 15mm;
+        }
+        
+        .cert-title {
+            font-size: 32pt;
+            font-weight: 800;
+            color: #0c1b33;
+            letter-spacing: 1px;
+            margin: 0;
+            text-transform: capitalize;
+        }
+        
+        .cert-title-underline {
+            width: 52mm;
+            height: 4px;
+            background-color: #0a4f9f;
+            margin: 6px auto 0 auto;
+        }
+        
+        .serial-no {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-left: 8mm;
+            margin-bottom: 10mm;
+        }
+        
+        .cert-paragraph {
+            font-size: 13pt;
+            line-height: 1.8;
+            color: #1a1a1a;
+            margin-left: 8mm;
+            margin-right: 8mm;
+            margin-bottom: 8mm;
+            text-align: justify;
+        }
+        
+        .cert-paragraph strong {
+            font-weight: 700;
+            color: #000000;
+        }
+        
+        .section-heading {
+            font-size: 13pt;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-left: 8mm;
+            margin-bottom: 6mm;
+        }
+        
+        .skills-table {
+            width: 85%;
+            margin-left: 8mm;
+            margin-bottom: 8mm;
+            border-collapse: collapse;
+        }
+        
+        .skills-table td {
+            padding: 6px 0;
+            font-size: 11.5pt;
+            color: #1a1a1a;
+            vertical-align: middle;
+        }
+        
+        .skill-name {
+            font-weight: 600;
+            width: 40%;
+        }
+        
+        .excellent-cell {
+            width: 25%;
+            font-weight: 500;
+            text-align: left;
+        }
+        
+        .rating-cell {
+            width: 17.5%;
+            font-weight: 500;
+            text-align: left;
+        }
+        
+        .checkbox-box {
+            display: inline-block;
+            width: 26px;
+            height: 14px;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-left: 6px;
+            position: relative;
+            line-height: 12px;
+            text-align: center;
+        }
+        
+        .checkbox-box.checked {
+            background-color: transparent;
+        }
+        
+        .checkbox-box.checked::after {
+            content: "✓";
+            color: #0a4f9f;
+            font-weight: 800;
+            font-size: 11pt;
+            position: absolute;
+            top: -1px;
+            left: 7px;
+        }
+        
+        .dates-section {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-left: 8mm;
+            margin-bottom: 6mm;
+            line-height: 1.6;
+        }
+        
+        .closing-text {
+            font-size: 14pt;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-left: 8mm;
+            margin-bottom: 15mm;
+        }
+        
+        .footer-container {
+            position: absolute;
+            bottom: 30mm;
+            left: 30mm;
+            right: 30mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        
+        .footer-left {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #1a1a1a;
+            line-height: 1.5;
+        }
+        
+        .footer-right {
+            text-align: center;
+            font-size: 11pt;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        
+        .signature-line {
+            width: 55mm;
+            border-top: 2.5px solid #0c1b33;
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate-container">
+        <!-- Title -->
+        <div class="cert-title-container">
+            <h1 class="cert-title">Certificate</h1>
+            <div class="cert-title-underline"></div>
+        </div>
+        
+        <!-- Serial Number -->
+        <div class="serial-no">
+            Sr.no {{ certificate.serial_no }}
+        </div>
+        
+        <!-- Certifying Paragraph -->
+        <div class="cert-paragraph">
+            {{ cert_content_html|safe }}
+        </div>
+        
+        <!-- Section Heading -->
+        <div class="section-heading">
+            {{ performance_heading }}
+        </div>
+        
+        <!-- Skills table -->
+        <table class="skills-table">
+            <tbody>
+                {% for skill, rating in skill_ratings.items %}
+                <tr>
+                    <td class="skill-name">{{ skill }}</td>
+                    <td class="excellent-cell">Excellent <span class="checkbox-box {% if rating == 'Excellent' %}checked{% endif %}"></span></td>
+                    <td class="rating-cell">Good <span class="checkbox-box {% if rating == 'Good' %}checked{% endif %}"></span></td>
+                    <td class="rating-cell">Poor <span class="checkbox-box {% if rating == 'Poor' %}checked{% endif %}"></span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Dates Section (conditional) -->
+        {% if certificate.show_dates %}
+        <div class="dates-section">
+            <div>Date of joining : {{ certificate.student.joining_date|date:"d-m-Y" }}</div>
+            <div>Date of completion : {{ certificate.student.completion_date|date:"d-m-Y" }}</div>
+        </div>
+        {% endif %}
+        
+        <!-- Closing line -->
+        <div class="closing-text">
+            We hope {{ he_she }} serves {{ his_her }} best service to this industry.
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer-container">
+            <div class="footer-left">
+                <div>Date: {{ certificate.issue_date|date:"d-m-Y" }}</div>
+                <div>Place: {{ certificate.place }}</div>
+            </div>
+            <div class="footer-right">
+                <div class="signature-line"></div>
+                <div>For Devex Hub Pvt.ltd</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

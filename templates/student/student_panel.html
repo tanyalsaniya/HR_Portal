@@ -1,4 +1,53 @@
 <!-- VIEW 5: STUDENTS & INTERNS -->
+<style>
+    .student-tabs-container {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 25px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 10px;
+    }
+    .student-tab-btn {
+        background: none;
+        border: none;
+        padding: 8px 16px;
+        font-size: 9.5pt;
+        font-weight: 600;
+        color: var(--text-color);
+        opacity: 0.7;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    .student-tab-btn.active {
+        opacity: 1;
+        color: var(--primary-color);
+        border-bottom: 2px solid var(--primary-color);
+    }
+    
+    .prev-checkbox {
+        display: inline-block;
+        width: 22px;
+        height: 12px;
+        border: 1px solid #1a1a1a;
+        border-radius: 3px;
+        vertical-align: middle;
+        margin-left: 4px;
+        line-height: 9px;
+        text-align: center;
+        font-size: 8pt;
+        position: relative;
+    }
+    .prev-checkbox.checked::after {
+        content: "✓";
+        color: #0a4f9f;
+        font-weight: 900;
+        position: absolute;
+        top: -1px;
+        left: 5px;
+    }
+</style>
+
 <div id="studentView" class="view-panel">
     <div class="flex-row-header">
         <h2>Student & Intern Directory</h2>
@@ -8,33 +57,172 @@
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Cert No</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Type</th>
-                    <th>Joining Date</th>
-                    <th>Completion Date</th>
-                    <th>Total Fees</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="studentTableBody">
-                <!-- Populated dynamically -->
-            </tbody>
-        </table>
+    <!-- Student Navigation Tabs -->
+    <div class="student-tabs-container">
+        <button class="student-tab-btn active" id="tabStudentDirectoryBtn" onclick="switchStudentTab('directory')">Directory</button>
+        <button class="student-tab-btn" id="tabCertGenBtn" onclick="switchStudentTab('certgen')" style="display: none;">Certificate Generator</button>
+    </div>
+
+    <!-- TAB 1: DIRECTORY CONTENT -->
+    <div id="studentTabDirectory">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Cert No</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Joining Date</th>
+                        <th>Completion Date</th>
+                        <th>Total Fees</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="studentTableBody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: CERTIFICATE GENERATOR CONTENT -->
+    <div id="studentTabCertGen" style="display: none;">
+        <!-- Two Column Editor/Preview Layout -->
+        <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 30px;">
+            <!-- Left: Editor Column -->
+            <div class="card" style="background-color: var(--card-bg); padding: 25px; border: 1px solid var(--border-color); border-radius: 8px;">
+                <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--primary-color); font-weight: 800;">Certificate Content Editor</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <label>Select Student*</label>
+                    <select id="certStudentSelect" onchange="loadStudentCertPrefills()" style="width: 100%;">
+                        <option value="">-- Select Student --</option>
+                    </select>
+                </div>
+                
+                <div class="form-grid" style="margin-bottom: 15px;">
+                    <div>
+                        <label>Course*</label>
+                        <select id="certCourseSelect" onchange="onCertCourseChange()" style="width: 100%;">
+                            <option value="">-- Select Course --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Duration</label>
+                        <input type="text" id="certDurationInput" oninput="onCertDurationChange()">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label>Certifying Paragraph Text (Admin/HR editable)*</label>
+                    <textarea id="certParagraphTextarea" rows="6" oninput="updateLivePreview()" style="font-family: inherit; font-size: 9.5pt; line-height: 1.5; padding: 10px;"></textarea>
+                    <small style="color: #64748b; margin-top: 4px; display: block;">Formatting: Use double asterisks like **text** to bold words in the final certificate PDF and PNG.</small>
+                </div>
+
+                <!-- Skill Ratings Grid -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 700; margin-bottom: 8px; display: block;">Performance Ratings (Skills list)</label>
+                    <div id="certSkillsContainer" style="background-color: rgba(0,0,0,0.02); padding: 15px; border: 1px solid var(--border-color); border-radius: 6px; display: flex; flex-direction: column; gap: 12px; max-height: 250px; overflow-y: auto;">
+                        <!-- Populate dynamically -->
+                    </div>
+                </div>
+
+                <div class="form-grid" style="margin-bottom: 15px;">
+                    <div>
+                        <label>Issue Date*</label>
+                        <input type="date" id="certIssueDate" onchange="updateLivePreview()">
+                    </div>
+                    <div>
+                        <label>Place*</label>
+                        <input type="text" id="certPlace" value="Mohali" oninput="updateLivePreview()">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 25px; display: flex; gap: 15px; align-items: center;">
+                    <label style="margin: 0; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600;">
+                        <input type="checkbox" id="certShowDatesToggle" checked onchange="onShowDatesToggle()" style="width: auto; cursor: pointer;">
+                        Show Date of Joining & Completion underneath skills table
+                    </label>
+                </div>
+
+                <div style="text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-primary" onclick="generateAndSaveCertificate()" style="background: var(--primary-color); font-weight: 700;">Generate & Save PDF</button>
+                </div>
+            </div>
+
+            <!-- Right: Preview Column -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+                <h3 style="margin: 0; align-self: flex-start; color: var(--primary-color); font-weight: 800;">Final Certificate Preview</h3>
+                
+                <!-- Live Preview frame -->
+                <div class="cert-preview-frame" id="certLivePreview" style="width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0,0,0,0.08); aspect-ratio: 210/297; position: relative; background-image: url('/static/images/certificate_1.png'); background-size: 100% 100%; overflow: hidden; background-repeat: no-repeat; background-color: #ffffff; box-sizing: border-box; display: flex; flex-direction: column; padding: 50px 35px 35px 35px; font-family: 'Inter', sans-serif;">
+                    <!-- Title -->
+                    <div style="text-align: center; margin-bottom: 12px;">
+                        <span style="font-size: 18pt; font-weight: 800; color: #0c1b33; display: inline-block; border-bottom: 2px solid #0a4f9f; padding-bottom: 2px;">Certificate</span>
+                    </div>
+                    
+                    <!-- Serial Number -->
+                    <div id="prevSerialNo" style="font-size: 7.5pt; font-weight: 600; color: #1a1a1a; margin-bottom: 8px;">
+                        Sr.no DHUB|25|250
+                    </div>
+                    
+                    <!-- Certifying Paragraph -->
+                    <div id="prevParagraph" style="font-size: 8pt; line-height: 1.5; color: #1a1a1a; text-align: justify; margin-bottom: 8px;">
+                        This is to certify that ...
+                    </div>
+                    
+                    <!-- Heading -->
+                    <div id="prevPerformanceHeading" style="font-size: 8pt; font-weight: 600; color: #1a1a1a; margin-bottom: 6px;">
+                        His Performance Given as Below
+                    </div>
+                    
+                    <!-- Skills table -->
+                    <table id="prevSkillsTable" style="width: 100%; border-collapse: collapse; font-size: 7pt; color: #1a1a1a; margin-bottom: 8px;">
+                        <!-- Rows populated dynamically -->
+                    </table>
+                    
+                    <!-- Dates Section -->
+                    <div id="prevDatesSection" style="font-size: 7.5pt; font-weight: 600; color: #1a1a1a; line-height: 1.4; margin-bottom: 8px; display: none;">
+                        <div id="prevJoinDate">Date of joining : 15-01-2025</div>
+                        <div id="prevCompDate">Date of completion : 15-07-2025</div>
+                    </div>
+                    
+                    <!-- Closing Text -->
+                    <div id="prevClosingText" style="font-size: 8.5pt; font-weight: 700; color: #1a1a1a; margin-bottom: 15px;">
+                        We hope he serves his best service to this industry.
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div style="position: absolute; bottom: 8%; left: 35px; right: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 7.5pt; font-weight: 600; color: #1a1a1a;">
+                        <div>
+                            <div id="prevIssueDateText">Date: 01-09-2025</div>
+                            <div id="prevPlaceText" style="margin-top: 2px;">Place: Mohali</div>
+                        </div>
+                        <div style="text-align: center; font-weight: 700;">
+                            <div style="width: 65px; border-top: 1.5px solid #0c1b33; margin: 0 auto 3px auto;"></div>
+                            <div>For Devex Hub Pvt.ltd</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Actions -->
+                <div style="display: flex; gap: 15px; width: 100%; justify-content: center; margin-top: 10px;">
+                    <button class="btn" id="btnDownloadPDF" onclick="downloadGeneratedPDF()" style="background-color: #0284c7; color: white; display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; font-weight: 600;" disabled>
+                        📥 Download PDF
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- MODAL 3: ADD STUDENT / INTERN -->
+<!-- MODAL 3: REGISTER STUDENT / INTERN -->
 <div class="modal" id="studentModal">
-    <div class="modal-content" style="width: 600px;">
+    <div class="modal-content" style="width: 650px; max-height: 90%; overflow-y: auto;">
         <div class="flex-row-header">
-            <h3 style="margin:0;">Register Student / Intern</h3>
+            <h3 style="margin:0; font-weight: 800;">Register Student / Intern</h3>
             <button onclick="closeStudentModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
         </div>
         <form id="studentForm">
@@ -56,8 +244,27 @@
                     <input type="text" id="studInstitute" required>
                 </div>
                 <div>
-                    <label>Course Name*</label>
-                    <input type="text" id="studCourse" placeholder="e.g. B.Tech CSE" required>
+                    <label>Enrolled Program Course (DB)*</label>
+                    <select id="studEnrolledCourse" onchange="onSelectModalCourse()" required>
+                        <option value="">-- Select Course --</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Course Name (Legacy/Custom Name)*</label>
+                    <input type="text" id="studCourse" placeholder="e.g. Frontend (React JS)" required>
+                </div>
+                <div>
+                    <label>Gender*</label>
+                    <select id="studGender" required>
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                        <option value="OTHER">Other</option>
+                        <option value="PREFER_NOT">Prefer not to say</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Father's/Guardian's Name*</label>
+                    <input type="text" id="studFatherName" required>
                 </div>
                 <div>
                     <label>Student Type*</label>
@@ -66,6 +273,14 @@
                         <option value="TRAINEE">Trainee</option>
                         <option value="PROJECT_STUDENT">Project Student</option>
                         <option value="INDUSTRIAL_VISIT">Industrial Visit</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Certificate Type*</label>
+                    <select id="studCertType" required>
+                        <option value="INTERNSHIP_CERT">Internship Certificate</option>
+                        <option value="TRAINING_CERT">Training Completion Certificate</option>
+                        <option value="PROJECT_CERT">Project Completion Certificate</option>
                     </select>
                 </div>
                 <div class="form-group-full">
@@ -89,16 +304,12 @@
                     <input type="date" id="studCompletion" required>
                 </div>
                 <div>
-                    <label>Certificate Type*</label>
-                    <select id="studCertType" required>
-                        <option value="INTERNSHIP_CERT">Internship Certificate</option>
-                        <option value="TRAINING_CERT">Training Completion Certificate</option>
-                        <option value="PROJECT_CERT">Project Completion Certificate</option>
-                    </select>
-                </div>
-                <div>
                     <label>Total Program Fees (Rs.)*</label>
                     <input type="number" id="studFees" value="0" required>
+                </div>
+                <div class="form-group-full">
+                    <label>Address*</label>
+                    <textarea id="studAddress" rows="2" placeholder="Street, City, State, ZIP..." required></textarea>
                 </div>
             </div>
 
@@ -111,7 +322,7 @@
             </div>
 
             <div style="margin-top: 20px; text-align: right;">
-                <button type="submit" class="btn btn-primary">Register Student</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">Register Student</button>
             </div>
         </form>
     </div>

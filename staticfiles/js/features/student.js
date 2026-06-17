@@ -2,6 +2,9 @@
 // Students and Interns registry, installments, certificate generation handlers
 
 let studentInstallmentRows = [];
+let currentSelectedStudentName = '';
+let currentStudentDetails = null;
+let generatedPdfUrl = null;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
 async function loadStudentData() {
@@ -25,7 +28,7 @@ async function loadStudentData() {
                         <td>Rs. ${s.total_fees}</td>
                         <td><span style="font-weight:bold; color:${s.status === 'ACTIVE' ? '#eab308' : '#22c55e'}">${s.status}</span></td>
                         <td>
-                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="generateStudentCertificate(${s.id})">Generate Cert</button>
+                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="openCertTabWithStudent(${s.id})">Generate Cert</button>
                             ${s.cert_pdf ? `<button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="window.open('${s.cert_pdf}', '_blank')">View Cert</button>` : ''}
                             <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="viewInstallmentsModal(${s.id}, '${s.name}')">Fee Schedule</button>
                         </td>
@@ -43,6 +46,7 @@ function openStudentModal() {
     if (modal) {
         modal.style.display = 'flex';
         loadDepartmentsSelect('studDept');
+        loadCoursesSelect('studEnrolledCourse');
         // reset installments rows
         studentInstallmentRows = [];
         const container = document.getElementById('installmentsWrapper');
@@ -76,33 +80,17 @@ function addInstallmentRow() {
     }
 }
 
-async function generateStudentCertificate(studentId, override = false) {
-    showToast('Generating training certificate...');
-    try {
-        const res = await apiFetch(`/students/${studentId}/generate-certificate/`, {
-            method: 'POST',
-            body: JSON.stringify({ confirm_override: override })
-        });
-        
-        if (res.ok) {
-            const result = await res.json();
-            if (result.requires_override) {
-                if (confirm(result.warning)) {
-                    generateStudentCertificate(studentId, true); // re-call with override
-                }
-            } else {
-                showToast('Certificate generated successfully!');
-                if (result.cert_pdf) {
-                    window.open(result.cert_pdf, '_blank');
-                }
-                loadStudentData();
-            }
-        } else {
-            showToast('Certificate generation failed.', 'error');
+// Open Certificate tab and automatically select a student
+function openCertTabWithStudent(studentId) {
+    switchStudentTab('certgen');
+    // We wait a tiny bit to make sure select option elements are loaded
+    setTimeout(() => {
+        const select = document.getElementById('certStudentSelect');
+        if (select) {
+            select.value = studentId;
+            loadStudentCertPrefills();
         }
-    } catch (e) {
-        console.error(e);
-    }
+    }, 400);
 }
 
 // Installments viewer overlay/list
@@ -195,6 +183,368 @@ async function triggerWarningEmail(instId) {
     }
 }
 
+// ---------- TABS CONTROLLERS & DROPDOWNS ----------
+function switchStudentTab(tab) {
+    const dirTab = document.getElementById('studentTabDirectory');
+    const certTab = document.getElementById('studentTabCertGen');
+    const dirBtn = document.getElementById('tabStudentDirectoryBtn');
+    const certBtn = document.getElementById('tabCertGenBtn');
+    
+    if (tab === 'directory') {
+        if (dirTab) dirTab.style.display = 'block';
+        if (certTab) certTab.style.display = 'none';
+        if (dirBtn) dirBtn.classList.add('active');
+        if (certBtn) certBtn.classList.remove('active');
+    } else {
+        if (dirTab) dirTab.style.display = 'none';
+        if (certTab) certTab.style.display = 'block';
+        if (dirBtn) dirBtn.classList.remove('active');
+        if (certBtn) certBtn.classList.add('active');
+        
+        loadStudentsSelect();
+        loadCoursesSelect('certCourseSelect');
+    }
+}
+
+async function loadCoursesSelect(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    try {
+        const res = await apiFetch('/api/student/courses/');
+        if (res.ok) {
+            const data = await res.json();
+            const list = data.results || data;
+            
+            let html = '<option value="">-- Select Course --</option>';
+            list.forEach(c => {
+                html += `<option value="${c.id}" data-skills='${JSON.stringify(c.skills_list)}' data-duration="${c.default_duration}">${c.course_name}</option>`;
+            });
+            el.innerHTML = html;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function loadStudentsSelect() {
+    const el = document.getElementById('certStudentSelect');
+    if (!el) return;
+    try {
+        const res = await apiFetch('/api/student/students/');
+        if (res.ok) {
+            const data = await res.json();
+            const list = data.results || data;
+            let html = '<option value="">-- Select Student --</option>';
+            list.forEach(s => {
+                html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
+            });
+            el.innerHTML = html;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function onSelectModalCourse() {
+    const select = document.getElementById('studEnrolledCourse');
+    const input = document.getElementById('studCourse');
+    if (select && input && select.selectedIndex > 0) {
+        const option = select.options[select.selectedIndex];
+        input.value = option.text;
+    }
+}
+
+// ---------- EDITOR & PREVIEW LOGIC ----------
+async function loadStudentCertPrefills() {
+    const select = document.getElementById('certStudentSelect');
+    if (!select || !select.value) return;
+    
+    const studentId = select.value;
+    currentSelectedStudentName = select.options[select.selectedIndex].text.split(' (')[0];
+    
+    try {
+        const res = await apiFetch(`/api/student/students/${studentId}/enrollment-details/`);
+        if (res.ok) {
+            const data = await res.json();
+            currentStudentDetails = data;
+            
+            // Disable downloads until new generation succeeds
+            generatedPdfUrl = null;
+            document.getElementById('btnDownloadPDF').disabled = true;
+            
+            // Set Course select
+            const courseSelect = document.getElementById('certCourseSelect');
+            if (courseSelect) {
+                courseSelect.value = data.course_id || '';
+            }
+            
+            // Set Duration input
+            const durationInput = document.getElementById('certDurationInput');
+            if (durationInput) {
+                durationInput.value = data.duration || '';
+            }
+            
+            // Set Place and Issue Date (today)
+            document.getElementById('certPlace').value = "Mohali";
+            const todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('certIssueDate').value = todayStr;
+            
+            // Build skills
+            renderEditorSkills(data.skills);
+            
+            // Set Paragraph Text
+            const showDates = document.getElementById('certShowDatesToggle').checked;
+            document.getElementById('certParagraphTextarea').value = showDates ? data.default_paragraph_with_dates : data.default_paragraph;
+            
+            // Update preview
+            updateLivePreview();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function renderEditorSkills(skillsList) {
+    const container = document.getElementById('certSkillsContainer');
+    if (!container) return;
+    
+    if (!skillsList || skillsList.length === 0) {
+        container.innerHTML = '<div style="color:#64748b; font-size:9.5pt;">No skills defined for this course.</div>';
+        return;
+    }
+    
+    let html = '';
+    skillsList.forEach((skill, idx) => {
+        html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-color); padding-bottom: 6px;">
+                <span style="font-weight: 600; font-size: 9.5pt; color: var(--text-color);">${skill}</span>
+                <div style="display: flex; gap: 10px;">
+                    <label style="margin:0; font-size: 9pt; display: inline-flex; align-items: center; gap: 4px; cursor:pointer;">
+                        <input type="radio" name="skill_${idx}" value="Excellent" checked onchange="updateLivePreview()" style="width: auto; cursor:pointer;"> Excellent
+                    </label>
+                    <label style="margin:0; font-size: 9pt; display: inline-flex; align-items: center; gap: 4px; cursor:pointer;">
+                        <input type="radio" name="skill_${idx}" value="Good" onchange="updateLivePreview()" style="width: auto; cursor:pointer;"> Good
+                    </label>
+                    <label style="margin:0; font-size: 9pt; display: inline-flex; align-items: center; gap: 4px; cursor:pointer;">
+                        <input type="radio" name="skill_${idx}" value="Poor" onchange="updateLivePreview()" style="width: auto; cursor:pointer;"> Poor
+                    </label>
+                </div>
+                <input type="hidden" class="skill-name-hidden" value="${skill}">
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function onCertCourseChange() {
+    const select = document.getElementById('certCourseSelect');
+    if (!select) return;
+    
+    if (select.selectedIndex > 0) {
+        const option = select.options[select.selectedIndex];
+        const duration = option.getAttribute('data-duration') || '6 months';
+        const skills = JSON.parse(option.getAttribute('data-skills') || '[]');
+        
+        document.getElementById('certDurationInput').value = duration;
+        renderEditorSkills(skills);
+        
+        if (currentStudentDetails) {
+            currentStudentDetails.course_name = option.text;
+            currentStudentDetails.duration = duration;
+            currentStudentDetails.skills = skills;
+            
+            const s_o_d_o = currentStudentDetails.s_o_d_o;
+            const father_name = currentStudentDetails.father_name;
+            const address = currentStudentDetails.address;
+            const student_name = currentStudentDetails.student_name;
+            const completion_month = currentStudentDetails.completion_month;
+            
+            currentStudentDetails.default_paragraph = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed ${duration} \"**${option.text}**\" course .`;
+            currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed \"**${option.text}**\" course in the month of **${completion_month}**.`;
+            
+            const showDates = document.getElementById('certShowDatesToggle').checked;
+            document.getElementById('certParagraphTextarea').value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
+        }
+    }
+    updateLivePreview();
+}
+
+function onCertDurationChange() {
+    const duration = document.getElementById('certDurationInput').value;
+    const textarea = document.getElementById('certParagraphTextarea');
+    if (textarea && currentStudentDetails) {
+        let text = textarea.value;
+        const oldDuration = currentStudentDetails.duration;
+        if (text.includes(oldDuration)) {
+            textarea.value = text.replace(oldDuration, duration);
+            currentStudentDetails.duration = duration;
+        }
+    }
+    updateLivePreview();
+}
+
+function onShowDatesToggle() {
+    const showDates = document.getElementById('certShowDatesToggle').checked;
+    const textarea = document.getElementById('certParagraphTextarea');
+    if (textarea && currentStudentDetails) {
+        textarea.value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
+    }
+    updateLivePreview();
+}
+
+function updateLivePreview() {
+    if (!currentStudentDetails) return;
+    
+    // 1. Serial Number Preview
+    const completionYear = new Date(currentStudentDetails.completion_date).getFullYear() || 2025;
+    const batchCode = String(completionYear).slice(-2);
+    document.getElementById('prevSerialNo').textContent = `Sr.no DHUB|${batchCode}|XXX`;
+    
+    // 2. Paragraph Text formatting
+    let text = document.getElementById('certParagraphTextarea').value || "";
+    let htmlText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    htmlText = htmlText.replace(/\n/g, '<br>');
+    document.getElementById('prevParagraph').innerHTML = htmlText;
+    
+    // 3. Performance Heading
+    const hisHer = currentStudentDetails.his_her || 'his/her';
+    const capHisHer = hisHer.charAt(0).toUpperCase() + hisHer.slice(1);
+    document.getElementById('prevPerformanceHeading').textContent = `${capHisHer} Performance Given as Below`;
+    
+    // 4. Skills checkboxes
+    const skillsContainer = document.getElementById('certSkillsContainer');
+    const prevTable = document.getElementById('prevSkillsTable');
+    if (skillsContainer && prevTable) {
+        const hiddenInputs = skillsContainer.querySelectorAll('.skill-name-hidden');
+        let tableHtml = '<tbody>';
+        
+        hiddenInputs.forEach((input, idx) => {
+            const skillName = input.value;
+            const ratingRadio = skillsContainer.querySelector(`input[name="skill_${idx}"]:checked`);
+            const rating = ratingRadio ? ratingRadio.value : 'Excellent';
+            
+            tableHtml += `
+                <tr>
+                    <td style="padding: 2.5px 0; font-weight:600; width:40%;">${skillName}</td>
+                    <td style="padding: 2.5px 0; width:25%;">Excellent <span class="prev-checkbox ${rating === 'Excellent' ? 'checked' : ''}"></span></td>
+                    <td style="padding: 2.5px 0; width:17.5%;">Good <span class="prev-checkbox ${rating === 'Good' ? 'checked' : ''}"></span></td>
+                    <td style="padding: 2.5px 0; width:17.5%;">Poor <span class="prev-checkbox ${rating === 'Poor' ? 'checked' : ''}"></span></td>
+                </tr>
+            `;
+        });
+        tableHtml += '</tbody>';
+        prevTable.innerHTML = tableHtml;
+    }
+    
+    // 5. Show Dates Section
+    const showDates = document.getElementById('certShowDatesToggle').checked;
+    const prevDatesSection = document.getElementById('prevDatesSection');
+    if (prevDatesSection) {
+        if (showDates) {
+            prevDatesSection.style.display = 'block';
+            const joiningDate = formatInputDate(currentStudentDetails.joining_date);
+            const completionDate = formatInputDate(currentStudentDetails.completion_date);
+            document.getElementById('prevJoinDate').textContent = `Date of joining : ${joiningDate}`;
+            document.getElementById('prevCompDate').textContent = `Date of completion : ${completionDate}`;
+        } else {
+            prevDatesSection.style.display = 'none';
+        }
+    }
+    
+    // 6. Closing Text
+    const heShe = currentStudentDetails.he_she || 'he/she';
+    document.getElementById('prevClosingText').textContent = `We hope ${heShe} serves ${hisHer} best service to this industry.`;
+    
+    // 7. Footer text
+    const issueDateVal = document.getElementById('certIssueDate').value;
+    const formattedIssueDate = issueDateVal ? formatInputDate(issueDateVal) : '';
+    document.getElementById('prevIssueDateText').textContent = `Date: ${formattedIssueDate}`;
+    
+    const placeVal = document.getElementById('certPlace').value;
+    document.getElementById('prevPlaceText').textContent = `Place: ${placeVal}`;
+}
+
+function formatInputDate(dateString) {
+    if (!dateString) return '';
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY
+    }
+    return dateString;
+}
+
+// ---------- ACTIONS ----------
+async function generateAndSaveCertificate() {
+    const select = document.getElementById('certStudentSelect');
+    if (!select || !select.value) {
+        showToast('Please select a student.', 'error');
+        return;
+    }
+    const courseSelect = document.getElementById('certCourseSelect');
+    if (!courseSelect || !courseSelect.value) {
+        showToast('Please select a course.', 'error');
+        return;
+    }
+    
+    const skillRatings = {};
+    const container = document.getElementById('certSkillsContainer');
+    if (container) {
+        const hiddenInputs = container.querySelectorAll('.skill-name-hidden');
+        hiddenInputs.forEach((input, idx) => {
+            const skillName = input.value;
+            const ratingRadio = container.querySelector(`input[name="skill_${idx}"]:checked`);
+            skillRatings[skillName] = ratingRadio ? ratingRadio.value : 'Excellent';
+        });
+    }
+    
+    const data = {
+        student: parseInt(select.value),
+        course: parseInt(courseSelect.value),
+        skill_ratings: skillRatings,
+        show_dates: document.getElementById('certShowDatesToggle').checked,
+        issue_date: document.getElementById('certIssueDate').value,
+        place: document.getElementById('certPlace').value,
+        cert_content: document.getElementById('certParagraphTextarea').value
+    };
+    
+    showToast('Generating and saving certificate PDF...');
+    
+    try {
+        const res = await apiFetch('/api/student/certificates/', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        if (res.ok) {
+            const result = await res.json();
+            showToast('Certificate saved & PDF generated successfully!');
+            
+            generatedPdfUrl = result.pdf_file;
+            document.getElementById('btnDownloadPDF').disabled = false;
+            
+            document.getElementById('prevSerialNo').textContent = `Sr.no ${result.serial_no}`;
+            loadStudentData();
+        } else {
+            const err = await res.json();
+            showToast(JSON.stringify(err), 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('An error occurred during certificate generation.', 'error');
+    }
+}
+
+function downloadGeneratedPDF() {
+    if (generatedPdfUrl) {
+        window.open(generatedPdfUrl, '_blank');
+    } else {
+        showToast('No PDF generated yet.', 'error');
+    }
+}
+
+
+
+// ---------- DOM SETUP & SUBMISSION ----------
 document.addEventListener('DOMContentLoaded', () => {
     // Register student submit
     const studentForm = document.getElementById('studentForm');
@@ -213,12 +563,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
+            const enrolledCourseVal = document.getElementById('studEnrolledCourse').value;
             const data = {
                 name: document.getElementById('studName').value,
                 email: document.getElementById('studEmail').value,
                 phone: document.getElementById('studPhone').value,
                 institute: document.getElementById('studInstitute').value,
                 course_at_institute: document.getElementById('studCourse').value,
+                enrolled_course: enrolledCourseVal ? parseInt(enrolledCourseVal) : null,
+                gender: document.getElementById('studGender').value,
+                father_name: document.getElementById('studFatherName').value,
+                address: document.getElementById('studAddress').value,
                 student_type: document.getElementById('studType').value,
                 program_name: document.getElementById('studProgram').value,
                 department: document.getElementById('studDept').value,
@@ -236,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(data)
                 });
                 if (res.ok) {
-                    showToast('Student registered and installment plans generated!');
+                    showToast('Student registered successfully!');
                     closeStudentModal();
                     loadStudentData();
                 } else {
