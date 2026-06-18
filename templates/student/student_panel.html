@@ -52,7 +52,7 @@
     <div class="flex-row-header">
         <h2>Student & Intern Directory</h2>
         <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" id="exportStudentBtn" onclick="window.location.href='/api/student/students/export-excel/'">Export to Excel</button>
+            <button class="btn btn-primary" id="exportStudentBtn" onclick="window.location.href='/api/student/students/export-excel/?status=ACTIVE'">Export to Excel</button>
             <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()">+ Register Student</button>
         </div>
     </div>
@@ -60,11 +60,16 @@
     <!-- Student Navigation Tabs -->
     <div class="student-tabs-container">
         <button class="student-tab-btn active" id="tabStudentDirectoryBtn" onclick="switchStudentTab('directory')">Directory</button>
+        <button class="student-tab-btn" id="tabBitrixStudentsBtn" onclick="switchStudentTab('bitrix')">Active Students (Bitrix24)</button>
         <button class="student-tab-btn" id="tabCertGenBtn" onclick="switchStudentTab('certgen')" style="display: none;">Certificate Generator</button>
     </div>
 
     <!-- TAB 1: DIRECTORY CONTENT -->
     <div id="studentTabDirectory">
+        <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <p style="margin: 0; color: #64748b; font-size: 9.5pt;">Currently enrolled (ongoing) students from Bitrix24 CRM. Click "Generate Cert" to create certificates.</p>
+            <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadStudentData()">↻ Refresh</button>
+        </div>
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
@@ -81,6 +86,35 @@
                     </tr>
                 </thead>
                 <tbody id="studentTableBody">
+                    <!-- Populated dynamically from Bitrix API -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB: BITRIX24 ACTIVE STUDENTS -->
+    <div id="studentTabBitrix" style="display: none;">
+        <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <p style="margin: 0; color: #64748b; font-size: 9.5pt;">Live data from Bitrix24 CRM — showing ONLY currently enrolled (ongoing) students. Excludes completed and failed students.</p>
+            <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadBitrixStudents()">↻ Refresh</button>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Institute</th>
+                        <th>Father's Name</th>
+                        <th>Start Date</th>
+                        <th>Completion Date</th>
+                        <th>Total Fees</th>
+                        <th>Stage</th>
+                    </tr>
+                </thead>
+                <tbody id="bitrixStudentTableBody">
                     <!-- Populated dynamically -->
                 </tbody>
             </table>

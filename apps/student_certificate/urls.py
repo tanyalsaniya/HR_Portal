@@ -1,7 +1,7 @@
 # apps/student_certificate/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import StudentViewSet, StudentFeeInstallmentViewSet, CourseViewSet, StudentCertificateViewSet
+from .views import StudentViewSet, StudentFeeInstallmentViewSet, CourseViewSet, StudentCertificateViewSet, BitrixActiveStudentsView
 from accounts.views import hybrid_view
 
 # API Router
@@ -19,5 +19,6 @@ urlpatterns = [
     path('students/', hybrid_view(StudentViewSet, {'get': 'list', 'post': 'create'}), name='students_view'),
     path('students/<int:pk>/', hybrid_view(StudentViewSet, {'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='students_detail_view'),
     path('students/<int:student_id>/generate-certificate/', hybrid_view(StudentViewSet, {'post': 'generate_certificate'}), name='students_generate_certificate'),
+    path('api/student/bitrix-active/', BitrixActiveStudentsView.as_view(), name='bitrix_active_students'),
 ]
 

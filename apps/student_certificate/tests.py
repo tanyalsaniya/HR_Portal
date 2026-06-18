@@ -80,6 +80,37 @@ class StudentCertificateTestCase(APITestCase):
         self.assertEqual(data['his_her'], 'his')
         self.assertIn('HTML5', data['skills'])
 
+    def test_student_list_filters_active_only(self):
+        completed_student = Student.objects.create(
+            name='Rahul Verma',
+            email='rahul@test.com',
+            institute='Institute C',
+            course_at_institute='B.Tech ECE',
+            student_type='PROJECT_STUDENT',
+            program_name='Winter Program',
+            department=self.dept,
+            joining_date=datetime.date(2025, 2, 1),
+            completion_date=datetime.date(2025, 8, 1),
+            total_fees=0,
+            gender='MALE',
+            father_name='Suresh Verma',
+            address='Delhi',
+            enrolled_course=self.course,
+            status='COMPLETED'
+        )
+
+        url = '/api/student/students/?status=ACTIVE'
+        response = self.client.get(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        payload = response.json()
+        results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+        returned_ids = {item['id'] for item in results}
+
+        self.assertIn(self.male_student.id, returned_ids)
+        self.assertIn(self.female_student.id, returned_ids)
+        self.assertNotIn(completed_student.id, returned_ids)
+
     from unittest.mock import patch
 
     @patch('student_certificate.services.generate_student_certificate_pdf')

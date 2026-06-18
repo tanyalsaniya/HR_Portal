@@ -1,11 +1,16 @@
 import io
+import json
 import zipfile
 import datetime
+import urllib.request
+import urllib.parse
+from decimal import Decimal
 from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 from openpyxl import Workbook
 
@@ -14,13 +19,21 @@ from .models import Student, StudentFeeInstallment, Course, StudentCertificate
 from .serializers import (
     StudentSerializer, StudentFeeInstallmentSerializer, CourseSerializer, StudentCertificateSerializer
 )
-from .services import generate_student_certificate_pdf, send_fee_warning_email
+from .services import (
+    generate_student_certificate_pdf, 
+    send_fee_warning_email,
+    fetch_active_students_from_bitrix,
+    fetch_active_students_paginated,
+    format_bitrix_student_data,
+    get_students_by_status_category,
+    get_students_by_stage_detailed
+)
 
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all().order_by('course_name')
     serializer_class = CourseSerializer
     permission_classes = [HasModelPermission]
-
+                                    
 
 class StudentCertificateViewSet(viewsets.ModelViewSet):
     queryset = StudentCertificate.objects.all().order_by('-created_at')
@@ -68,15 +81,22 @@ class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [HasModelPermission]
 
-    def get_queryset(self):
-        queryset = Student.objects.all().order_by('-joining_date')
+    def _get_filtered_queryset(self, queryset=None):
+        queryset = queryset or Student.objects.all()
+        queryset = queryset.order_by('-joining_date')
+
         status_param = self.request.query_params.get('status')
         student_type = self.request.query_params.get('student_type')
+
         if status_param:
             queryset = queryset.filter(status=status_param)
         if student_type:
             queryset = queryset.filter(student_type=student_type)
+
         return queryset
+
+    def get_queryset(self):
+        return self._get_filtered_queryset()
 
     @action(detail=True, methods=['GET'], url_path='enrollment-details')
     def enrollment_details(self, request, pk=None):
@@ -268,7 +288,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         ]
         ws.append(headers)
         
-        students = Student.objects.all().order_by('-joining_date')
+        students = self._get_filtered_queryset()
         for student in students:
             ws.append([
                 student.cert_no, student.name, student.email, student.phone or "", 
@@ -373,6 +393,378 @@ class StudentViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = 'attachment; filename=certificates.zip'
         return response
 
+    @action(detail=False, methods=['GET'], url_path='active-from-bitrix')
+    def fetch_active_from_bitrix(self, request):
+        """
+        Fetches ONLY active, currently enrolled STUDENTS from Bitrix24 CRM.
+        
+        **IMPORTANT**: This endpoint returns ONLY STUDENT data, NOT employee data.
+        - Automatically separates and filters out employee records
+        - Students and employees are managed via different APIs
+        - Only students with learning/course fields are included
+        
+        Returns:
+            - Students with status = ACTIVE (not COMPLETED or DISCONTINUED)
+            - Students currently enrolled (completion_date > today)
+            - STUDENT DATA ONLY (employees excluded)
+            
+        Query Parameters:
+            - paginate (bool): Use pagination. Defaults to False (fetch all)
+            - page_size (int): Records per page. Defaults to 50
+            - offset (int): Starting position. Defaults to 0
+            - format_data (bool): Format the data. Defaults to True
+            
+        Examples:
+            GET /api/students/active-from-bitrix/  (All students, no employees)
+            GET /api/students/active-from-bitrix/?paginate=true&page_size=50&offset=0
+            
+        Response:
+            {
+              "count": 25,
+              "students": [
+                {
+                  "bitrix_id": "1044",
+                  "name": "John Doe",
+                  "email": "john@example.com",
+                  "course_name": "Python Development",
+                  ...
+                }
+              ]
+            }
+        """
+        try:
+            use_pagination = request.query_params.get('paginate', '').lower() == 'true'
+            page_size = int(request.query_params.get('page_size', 50))
+            offset = int(request.query_params.get('offset', 0))
+            format_data = request.query_params.get('format_data', 'true').lower() == 'true'
+            
+            if use_pagination:
+                result = fetch_active_students_paginated(page_size=page_size, offset=offset)
+                students = result.get('items', [])
+                next_offset = result.get('next_offset')
+            else:
+                students = fetch_active_students_from_bitrix()
+                next_offset = None
+            
+            # Format data if requested
+            if format_data:
+                formatted_students = [format_bitrix_student_data(s) for s in students]
+            else:
+                formatted_students = students
+            
+            response_data = {
+                'count': len(formatted_students),
+                'students': formatted_students
+            }
+            
+            if use_pagination:
+                response_data['next_offset'] = next_offset
+                response_data['has_more'] = next_offset is not None
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching active students from Bitrix: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to fetch active students: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['POST'], url_path='sync-active-from-bitrix')
+    @transaction.atomic
+    def sync_active_from_bitrix(self, request):
+        """
+        Syncs active STUDENTS ONLY from Bitrix24 CRM into the local Student model.
+        
+        **IMPORTANT**: This syncs ONLY STUDENT data, NOT employee data.
+        - Automatically filters out employee records
+        - Creates new Student records for students not yet in the database
+        - Updates existing records if their data has changed
+        - Employees are synced via separate API/endpoint
+        
+        Request Body (required fields):
+            {
+                "department_id": 1,              // Required: Department ID
+                "created_by_id": 1,             // Required: User ID of the importer
+                "auto_enroll_course": false,    // Optional: Auto-enroll in a course
+                "course_id": 1                  // Optional: Course ID (if auto_enroll_course is true)
+            }
+            
+        Returns:
+            Summary of sync operation including created, updated, and skipped records.
+            (Skipped = no student fields or employee data)
+            
+        Example:
+            POST /api/students/sync-active-from-bitrix/
+            {
+              "department_id": 1,
+              "created_by_id": 5,
+              "auto_enroll_course": true,
+              "course_id": 3
+            }
+            
+        Response:
+            {
+              "message": "Sync completed successfully",
+              "created": 12,
+              "updated": 3,
+              "skipped": 0,
+              "total_imported": 15
+            }
+        """
+        try:
+            department_id = request.data.get('department_id')
+            created_by_id = request.data.get('created_by_id')
+            
+            if not department_id or not created_by_id:
+                return Response(
+                    {'error': 'department_id and created_by_id are required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            auto_enroll_course = request.data.get('auto_enroll_course', False)
+            course_id = request.data.get('course_id')
+            
+            # Fetch active students from Bitrix
+            bitrix_students = fetch_active_students_from_bitrix()
+            
+            if not bitrix_students:
+                return Response(
+                    {'message': 'No active students found in Bitrix24 CRM'}, 
+                    status=status.HTTP_200_OK
+                )
+            
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
+            created_count = 0
+            updated_count = 0
+            skipped_count = 0
+            
+            for bitrix_student in bitrix_students:
+                try:
+                    email = bitrix_student.get('EMAIL') or bitrix_student.get('UF_EMAIL')
+                    name = bitrix_student.get('NAME') or ''
+                    
+                    if not email or not name:
+                        skipped_count += 1
+                        continue
+                    
+                    # Format the data
+                    formatted = format_bitrix_student_data(bitrix_student)
+                    
+                    # Check if student exists
+                    student, created = Student.objects.update_or_create(
+                        email=email,
+                        defaults={
+                            'name': name,
+                            'phone': formatted.get('phone', ''),
+                            'institute': formatted.get('institute', ''),
+                            'course_at_institute': formatted.get('course_name', ''),
+                            'joining_date': datetime.datetime.strptime(
+                                formatted.get('joining_date', '2024-01-01').split('T')[0],
+                                '%Y-%m-%d'
+                            ).date() if formatted.get('joining_date') else datetime.date.today(),
+                            'completion_date': datetime.datetime.strptime(
+                                formatted.get('completion_date', '2024-12-31').split('T')[0],
+                                '%Y-%m-%d'
+                            ).date() if formatted.get('completion_date') else datetime.date.today() + datetime.timedelta(days=180),
+                            'mentor': formatted.get('mentor', ''),
+                            'father_name': formatted.get('father_name', ''),
+                            'status': 'ACTIVE',
+                            'student_type': 'TRAINEE',
+                            'program_name': formatted.get('course_name', 'General'),
+                            'cert_type': 'TRAINING_CERT',
+                            'department_id': department_id,
+                            'created_by_id': created_by_id if created else None,
+                        }
+                    )
+                    
+                    if auto_enroll_course and course_id:
+                        student.enrolled_course_id = course_id
+                        student.save()
+                    
+                    if created:
+                        created_count += 1
+                    else:
+                        updated_count += 1
+                        
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error syncing student {bitrix_student.get('NAME')}: {str(e)}")
+                    skipped_count += 1
+                    continue
+            
+            return Response({
+                'message': f'Sync completed successfully',
+                'created': created_count,
+                'updated': updated_count,
+                'skipped': skipped_count,
+                'total_processed': created_count + updated_count + skipped_count,
+                'total_imported': created_count + updated_count
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error syncing active students from Bitrix: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Sync failed: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['GET'], url_path='status-summary')
+    def status_summary(self, request):
+        """
+        Returns a summary of students grouped by completion status.
+        
+        Returns students in three categories:
+        - COMPLETED: Finished courses (stage: UC_69T3IT with past completion date)
+        - INCOMPLETE: Failed/discontinued (stage: FAIL)
+        - ONGOING: Currently enrolled (all other stages)
+        
+        Example:
+            GET /api/students/status-summary/
+            
+        Response:
+            {
+              "summary": {
+                "total": 45,
+                "completed": 10,
+                "incomplete": 4,
+                "ongoing": 31
+              },
+              "students_by_status": {
+                "COMPLETED": [...],
+                "INCOMPLETE": [...],
+                "ONGOING": [...]
+              },
+              "stage_summary": {
+                "UC_69T3IT": {"count": 10, "student_ids": [...]},
+                "FAIL": {"count": 4, "student_ids": [...]}
+              }
+            }
+        """
+        try:
+            result = get_students_by_status_category()
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching status summary: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to fetch status summary: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['GET'], url_path='stage-breakdown')
+    def stage_breakdown(self, request):
+        """
+        Returns detailed stage-wise breakdown of students.
+        
+        Shows students grouped by their pipeline stage with detailed information:
+        - ✅ Completed: UC_69T3IT stage (finished courses)
+        - ❌ Incomplete/Failed: FAIL stage (discontinued students)
+        - 🔄 Ongoing: CLIENT, UC_8CP2UP, UC_QXBN3E, UC_10M2QN, UC_26OISW (various stages)
+        
+        Example:
+            GET /api/students/stage-breakdown/
+            
+        Response:
+            {
+              "summary": {"total": 45, "completed": 10, "incomplete": 4, "ongoing": 31},
+              "stage_breakdown": [
+                {
+                  "stage_id": "DT1044_20:UC_69T3IT",
+                  "stage_code": "UC_69T3IT",
+                  "stage_name": "Final - Course Completed",
+                  "count": 10,
+                  "student_ids": ["110", "114", "116", ...],
+                  "students": [...]
+                },
+                {
+                  "stage_id": "DT1044_20:FAIL",
+                  "stage_code": "FAIL",
+                  "stage_name": "Failed",
+                  "count": 4,
+                  "student_ids": ["136", "276", "278", "280"],
+                  "students": [...]
+                }
+              ],
+              "status_summary": {
+                "✅ Completed": {"count": 10, "stage": "UC_69T3IT", "student_ids": [...]},
+                "❌ Incomplete/Failed": {"count": 4, "stage": "FAIL", "student_ids": [...]},
+                "🔄 Ongoing": {"count": 31, "stage": "Multiple...", "student_ids": [...]}
+              }
+            }
+        """
+        try:
+            result = get_students_by_stage_detailed()
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching stage breakdown: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to fetch stage breakdown: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['GET'], url_path='status-stats')
+    def status_stats(self, request):
+        """
+        Quick statistics endpoint for student status distribution.
+        
+        Returns lightweight summary for dashboards and quick stats display.
+        
+        Example:
+            GET /api/students/status-stats/
+            
+        Response:
+            {
+              "total_students": 45,
+              "completed": {"count": 10, "percentage": 22.2, "student_ids": [...]},
+              "incomplete": {"count": 4, "percentage": 8.9, "student_ids": [...]},
+              "ongoing": {"count": 31, "percentage": 68.9, "student_ids": [...]}
+            }
+        """
+        try:
+            result = get_students_by_status_category()
+            summary = result['summary']
+            total = summary['total']
+            
+            stats = {
+                'total_students': total,
+                'completed': {
+                    'count': summary['completed'],
+                    'percentage': round((summary['completed'] / total * 100), 1) if total > 0 else 0,
+                    'student_ids': [s['bitrix_id'] for s in result['students_by_status']['COMPLETED']]
+                },
+                'incomplete': {
+                    'count': summary['incomplete'],
+                    'percentage': round((summary['incomplete'] / total * 100), 1) if total > 0 else 0,
+                    'student_ids': [s['bitrix_id'] for s in result['students_by_status']['INCOMPLETE']]
+                },
+                'ongoing': {
+                    'count': summary['ongoing'],
+                    'percentage': round((summary['ongoing'] / total * 100), 1) if total > 0 else 0,
+                    'student_ids': [s['bitrix_id'] for s in result['students_by_status']['ONGOING']]
+                }
+            }
+            
+            return Response(stats, status=status.HTTP_200_OK)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching status stats: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to fetch status stats: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class StudentFeeInstallmentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentFeeInstallmentSerializer
@@ -439,4 +831,92 @@ class StudentFeeInstallmentViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Fee warning email sent successfully to the student.'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BitrixActiveStudentsView(APIView):
+    """Fetch only currently enrolled (ongoing) students from Bitrix24 API. No DB storage."""
+    permission_classes = [HasModelPermission]
+
+    BITRIX_URL = "https://devexhub.bitrix24.in/rest/1/y1t21isqgj5qw1mc/crm.item.list.json"
+    ENTITY_TYPE_ID = 1044
+
+    # Stages that mean the student is NO LONGER active (completed / failed only)
+    # Only EXCLUDE completed and failed stages
+    EXCLUDED_STAGES = {
+        'DT1044_20:FAIL',        # Dropped out / failed
+        'DT1044_20:UC_69T3IT',   # Course completed
+    }
+    
+    # ONGOING stages (students we WANT to show):
+    # CLIENT, UC_8CP2UP, UC_QXBN3E, UC_10M2QN, UC_26OISW
+    INCLUDED_STAGES = {
+        'DT1044_20:CLIENT',      # Inquiry/Lead stage
+        'DT1044_20:UC_8CP2UP',   # Application Submitted
+        'DT1044_20:UC_QXBN3E',   # Under Review
+        'DT1044_20:UC_10M2QN',   # Enrollment Started
+        'DT1044_20:UC_26OISW',   # Course Starting Soon
+    }
+
+    def _is_currently_enrolled(self, item):
+        """Return True only if the student is in an ongoing stage (not completed or failed)."""
+        stage = item.get('stageId', '')
+        
+        # Exclude completed and failed students
+        if stage in self.EXCLUDED_STAGES:
+            return False
+        
+        # Safety net: exclude if stage contains FAIL
+        if 'FAIL' in stage.upper():
+            return False
+        
+        # Include if in included ongoing stages
+        if stage in self.INCLUDED_STAGES:
+            return True
+        
+        # Default: exclude if not explicitly included (safety net for unknown stages)
+        return False
+
+    def get(self, request):
+        try:
+            active_students = []
+            start = 0
+            while True:
+                params = urllib.parse.urlencode({
+                    'entityTypeId': self.ENTITY_TYPE_ID,
+                    'start': start,
+                })
+                url = f"{self.BITRIX_URL}?{params}"
+                req = urllib.request.Request(url)
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+
+                items = data.get('result', {}).get('items', [])
+                if not items:
+                    break
+
+                for item in items:
+                    if not self._is_currently_enrolled(item):
+                        continue
+                    active_students.append({
+                        'id': item.get('id'),
+                        'name': (item.get('title') or '').strip(),
+                        'email': item.get('ufCrm6_1761731565702') or '',
+                        'phone': item.get('ufCrm6_1761731546152') or '',
+                        'course_id': item.get('ufCrm6_1761731874888'),
+                        'start_date': (item.get('ufCrm6_1761734468448') or '')[:10],
+                        'completion_date': (item.get('ufCrm6_1761735481170') or '')[:10],
+                        'father_name': item.get('ufCrm6_1761731958409') or '',
+                        'institute': item.get('ufCrm6_1761732176981') or '',
+                        'total_fees': item.get('ufCrm6_1761732340679') or '0',
+                        'stage': item.get('stageId', ''),
+                    })
+
+                next_offset = data.get('next')
+                if not next_offset:
+                    break
+                start = next_offset
+
+            return Response({'count': len(active_students), 'results': active_students})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 

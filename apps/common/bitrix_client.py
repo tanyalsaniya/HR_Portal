@@ -2,6 +2,7 @@ import os
 import requests
 import logging
 from django.core.cache import cache
+from datetime import datetime, date
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,243 @@ class BitrixClient:
             logger.error(f"Error fetching user detail for ID {bitrix_user_id}: {e}")
             
         return None
+
+    @classmethod
+    def get_active_students_from_crm(cls, entity_type_id=1044, force_refresh=False):
+        """
+        Fetches ONLY active, currently enrolled STUDENTS from Bitrix24 CRM.
+        Filters for:
+        - STUDENTS ONLY (excludes employees and other entity types)
+        - Students with ACTIVE status (not COMPLETED or DISCONTINUED)
+        - Students currently enrolled (completion_date > today)
+        
+        Args:
+            entity_type_id: The Bitrix24 CRM entity type ID (default: 1044 for students)
+            force_refresh: Force refresh from API (ignore cache)
+            
+        Returns:
+            List of active, currently enrolled students with pagination support
+        """
+        cache_key = f"bitrix24_active_students_{entity_type_id}"
+        
+        if not force_refresh:
+            cached_data = cache.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+
+        webhook = cls.get_webhook_url()
+        base_url = f"{webhook}/crm.item.list.json"
+        
+        active_students = []
+        start = 0
+        today = date.today()
+        
+        try:
+            logger.info(f"Fetching active STUDENTS from Bitrix24 CRM (entityTypeId={entity_type_id})")
+            while True:
+                # Build API request with filters for active, ongoing STUDENTS ONLY
+                # Filter 1: Status must be ACTIVE (not COMPLETED or DISCONTINUED)
+                # Filter 2: Completion date is in the future (currently ongoing)
+                # Filter 3: Has student-specific fields (UF_JOINING_DATE, UF_COMPLETION_DATE) - NOT employee data
+                
+                params = {
+                    'entityTypeId': entity_type_id,
+                    'start': start,
+                    'filter': {
+                        'STATUS': 'ACTIVE',  # Only active students
+                    },
+                    'select': ['*', 'uf_*']  # Select all standard and custom fields
+                }
+                
+                response = requests.post(
+                    base_url,
+                    json=params,
+                    timeout=15
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    result = data.get('result', [])
+                    
+                    # Filter for STUDENT DATA ONLY (not employee data)
+                    for item in result:
+                        # STUDENT VALIDATION: Check for student-specific fields
+                        # Students must have course/learning related fields, not employment fields
+                        has_student_fields = (
+                            item.get('UF_COMPLETION_DATE') or 
+                            item.get('UF_JOINING_DATE') or 
+                            item.get('UF_COURSE_NAME') or
+                            item.get('UF_INSTITUTE') or
+                            item.get('TITLE') or
+                            item.get('NAME')
+                        )
+                        
+                        # EMPLOYEE EXCLUSION: Exclude if it has employee-specific fields
+                        # Employees typically have these fields; students should not
+                        has_employee_fields = (
+                            item.get('WORK_EMAIL') or 
+                            item.get('WORK_PHONE') or
+                            item.get('UF_EMPLOYMENT_DATE') or
+                            item.get('PERSONAL_BIRTHDAY') and 
+                            not (item.get('UF_JOINING_DATE') or item.get('UF_COURSE_NAME'))
+                        )
+                        
+                        # Skip if this is employee data
+                        if has_employee_fields and not (item.get('UF_COURSE_NAME') or item.get('UF_INSTITUTE')):
+                            logger.debug(f"Skipping employee record: {item.get('NAME')} (ID: {item.get('ID')})")
+                            continue
+                        
+                        # Must have at least one student field
+                        if not has_student_fields:
+                            logger.debug(f"Skipping record without student fields: {item.get('NAME')} (ID: {item.get('ID')})")
+                            continue
+                        
+                        # Now check completion date for currently enrolled students
+                        completion_date_str = item.get('UF_COMPLETION_DATE') or item.get('completion_date')
+                        
+                        try:
+                            if completion_date_str:
+                                completion_date = datetime.strptime(
+                                    completion_date_str.split('T')[0] if 'T' in completion_date_str else completion_date_str, 
+                                    '%Y-%m-%d'
+                                ).date()
+                                
+                                # Only include if completion date is in the future (currently enrolled)
+                                if completion_date > today:
+                                    active_students.append(item)
+                                else:
+                                    logger.debug(f"Excluding completed student: {item.get('NAME')} (completion: {completion_date})")
+                            else:
+                                # Include if no completion date set (ongoing by default)
+                                logger.debug(f"Including student with no completion date: {item.get('NAME')}")
+                                active_students.append(item)
+                        except (ValueError, TypeError, AttributeError) as e:
+                            logger.warning(f"Error parsing dates for student {item.get('ID')}: {e}")
+                            # Include if date parsing fails but has student fields
+                            active_students.append(item)
+                    
+                    # Check for next page
+                    next_start = data.get('next')
+                    if next_start:
+                        start = next_start
+                    else:
+                        break
+                else:
+                    logger.error(f"Bitrix24 CRM API returned error: {response.status_code} - {response.text}")
+                    break
+                    
+        except Exception as e:
+            logger.error(f"Failed to fetch active students from Bitrix24 CRM: {e}")
+
+        try:
+            # Cache the filtered results
+            cache.set(cache_key, active_students, 300)  # Cache for 5 minutes
+            logger.info(f"Successfully fetched {len(active_students)} active STUDENTS from Bitrix24 CRM (employees excluded)")
+            return active_students
+        except Exception as e:
+            logger.error(f"Failed to cache students: {e}")
+            return active_students
+
+    @classmethod
+    def get_active_students_paginated(cls, entity_type_id=1044, page_size=50, offset=0):
+        """
+        Fetches active STUDENTS ONLY with pagination support.
+        Excludes employee data automatically.
+        
+        Args:
+            entity_type_id: The Bitrix24 CRM entity type ID (default: 1044)
+            page_size: Number of records per page
+            offset: Starting record position
+            
+        Returns:
+            Dict with 'items' (student list only), 'next_offset' (for pagination), and 'total_count'
+        """
+        webhook = cls.get_webhook_url()
+        base_url = f"{webhook}/crm.item.list.json"
+        today = date.today()
+        
+        try:
+            # Request page of data
+            params = {
+                'entityTypeId': entity_type_id,
+                'start': offset,
+                'limit': page_size,
+                'filter': {
+                    'STATUS': 'ACTIVE'  # Only active students
+                },
+                'select': ['*', 'uf_*']
+            }
+            
+            response = requests.post(base_url, json=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                result = data.get('result', [])
+                
+                # Filter for STUDENT DATA ONLY (not employees) and currently enrolled
+                active_enrolled_students = []
+                for item in result:
+                    # STUDENT VALIDATION: Check for student-specific fields
+                    has_student_fields = (
+                        item.get('UF_COMPLETION_DATE') or 
+                        item.get('UF_JOINING_DATE') or 
+                        item.get('UF_COURSE_NAME') or
+                        item.get('UF_INSTITUTE') or
+                        item.get('TITLE') or
+                        item.get('NAME')
+                    )
+                    
+                    # EMPLOYEE EXCLUSION: Exclude if it has employee-specific fields
+                    has_employee_fields = (
+                        item.get('WORK_EMAIL') or 
+                        item.get('WORK_PHONE') or
+                        item.get('UF_EMPLOYMENT_DATE') or
+                        (item.get('PERSONAL_BIRTHDAY') and 
+                         not (item.get('UF_COURSE_NAME') or item.get('UF_INSTITUTE')))
+                    )
+                    
+                    # Skip if this looks like employee data
+                    if has_employee_fields and not (item.get('UF_COURSE_NAME') or item.get('UF_INSTITUTE')):
+                        logger.debug(f"[Pagination] Skipping employee record: {item.get('NAME')} (ID: {item.get('ID')})")
+                        continue
+                    
+                    # Must have at least one student field
+                    if not has_student_fields:
+                        logger.debug(f"[Pagination] Skipping record without student fields: {item.get('NAME')}")
+                        continue
+                    
+                    # Check completion date for currently enrolled students
+                    completion_date_str = item.get('UF_COMPLETION_DATE') or item.get('completion_date')
+                    
+                    try:
+                        if completion_date_str:
+                            completion_date = datetime.strptime(
+                                completion_date_str.split('T')[0] if 'T' in completion_date_str else completion_date_str,
+                                '%Y-%m-%d'
+                            ).date()
+                            if completion_date > today:
+                                active_enrolled_students.append(item)
+                            else:
+                                logger.debug(f"[Pagination] Excluding completed student: {item.get('NAME')}")
+                        else:
+                            # Include if no completion date set (ongoing by default)
+                            active_enrolled_students.append(item)
+                    except (ValueError, TypeError):
+                        # Include if date parsing fails but has student fields
+                        active_enrolled_students.append(item)
+                
+                return {
+                    'items': active_enrolled_students,
+                    'next_offset': data.get('next', None),
+                    'total_count': len(active_enrolled_students)  # Actual student count, not including employees
+                }
+            else:
+                logger.error(f"CRM API error: {response.text}")
+                return {'items': [], 'next_offset': None, 'total_count': 0}
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch paginated students: {e}")
+            return {'items': [], 'next_offset': None, 'total_count': 0}
 
     @staticmethod
     def _normalize_user(raw_user):
