@@ -41,6 +41,51 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
     permission_classes = [HasModelPermission]
 
     @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        student_id = request.data.get('student')
+        if not student_id:
+            return Response({'error': 'student is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            student = Student.objects.get(id=student_id)
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        confirm_override = request.data.get('confirm_override', False)
+        today = datetime.date.today()
+        
+        # Check completion date warning rule
+        if student.completion_date > today and not confirm_override:
+            return Response({
+                'warning': f"Warning: The completion date ({student.completion_date}) is in the future. Generating this certificate will complete their profile early. Do you wish to override?",
+                'requires_override': True
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Trigger Notification to Admins
+        cert_instance = serializer.instance
+        from notifications.models import Notification
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        admins = User.objects.filter(role__code='ADMIN')
+        
+        username = request.user.username if request.user.is_authenticated else 'System'
+        message = f"Certificate {cert_instance.serial_no} was generated for {student.name} by {username}."
+        for admin in admins:
+            Notification.objects.create(
+                recipient=admin,
+                notif_type='INFO',
+                message=message,
+                link=f"/students/{student.id}/"
+            )
+            
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @transaction.atomic
     def perform_create(self, serializer):
         student = serializer.validated_data['student']
         course = serializer.validated_data['course']
@@ -75,6 +120,7 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
         # Now trigger the PDF generation
         from .services import generate_student_certificate_pdf
         generate_student_certificate_pdf(instance)
+
 
 
 class StudentViewSet(viewsets.ModelViewSet):
@@ -764,6 +810,103 @@ class StudentViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to fetch status stats: {str(e)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=False, methods=['POST'], url_path='get-or-create-from-bitrix')
+    @transaction.atomic
+    def get_or_create_from_bitrix(self, request):
+        email = request.data.get('email')
+        name = request.data.get('name')
+        if not email or not name:
+            return Response({'error': 'name and email are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        bitrix_id = request.data.get('id')
+        phone = request.data.get('phone', '')
+        institute = request.data.get('institute', '')
+        course_name = request.data.get('course_name') or request.data.get('course_at_institute') or 'General'
+        joining_date_str = request.data.get('start_date') or request.data.get('joining_date')
+        completion_date_str = request.data.get('completion_date')
+        father_name = request.data.get('father_name', '')
+        total_fees = request.data.get('total_fees', '0')
+        
+        # Parse dates
+        today = datetime.date.today()
+        
+        completion_date = None
+        if completion_date_str:
+            try:
+                completion_date = datetime.datetime.strptime(completion_date_str.split('T')[0], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+                
+        joining_date = None
+        if joining_date_str:
+            try:
+                joining_date = datetime.datetime.strptime(joining_date_str.split('T')[0], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        # Handle missing dates logically
+        if not joining_date and not completion_date:
+            joining_date = today
+            completion_date = today + datetime.timedelta(days=180)
+        elif not joining_date:
+            joining_date = completion_date - datetime.timedelta(days=180)
+        elif not completion_date:
+            completion_date = joining_date + datetime.timedelta(days=180)
+
+        # Find or create department
+        from employee_onboarding.models import Department
+        dept = Department.objects.first()
+        if not dept:
+            dept = Department.objects.create(name="Training")
+            
+        # Find or create course
+        course = Course.objects.filter(course_name__iexact=course_name).first()
+        if not course:
+            course = Course.objects.create(
+                course_name=course_name,
+                default_duration="6 months",
+                skills_list=["Java", "Python", "Web Development"]
+            )
+
+        # Parse total fees robustly (removing currency formatting like "Rs. 20,000", commas, etc.)
+        parsed_fees = Decimal('0.00')
+        if total_fees:
+            import re
+            cleaned_fees_str = re.sub(r'[^\d.]', '', str(total_fees))
+            if cleaned_fees_str:
+                try:
+                    parsed_fees = Decimal(cleaned_fees_str)
+                except Exception:
+                    pass
+
+        student, created = Student.objects.update_or_create(
+            email=email,
+            defaults={
+                'name': name,
+                'phone': phone,
+                'institute': institute,
+                'course_at_institute': course_name,
+                'enrolled_course': course,
+                'joining_date': joining_date,
+                'completion_date': completion_date,
+                'father_name': father_name,
+                'status': 'ACTIVE',
+                'student_type': 'TRAINEE',
+                'program_name': course_name,
+                'cert_type': 'TRAINING_CERT',
+                'department': dept,
+                'total_fees': parsed_fees,
+                'created_by': request.user if request.user.is_authenticated else None
+            }
+        )
+
+        return Response({
+            'id': student.id,
+            'name': student.name,
+            'email': student.email,
+            'cert_no': student.cert_no
+        }, status=status.HTTP_200_OK)
 
 
 class StudentFeeInstallmentViewSet(viewsets.ModelViewSet):

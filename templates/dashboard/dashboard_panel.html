@@ -1,45 +1,622 @@
 <!-- VIEW 1: DASHBOARD -->
 <div id="dashboardView" class="view-panel" style="display: block;">
-    <div class="dashboard-grid">
-        <div class="widget-card">
-            <div style="font-size: 9pt; color: #777;">Total Employees</div>
-            <div class="widget-value" id="statTotalEmployees">0</div>
+
+    <!-- ═══════════════════════════════════════
+         HERO WELCOME BANNER
+    ═══════════════════════════════════════ -->
+    <div class="db-hero" id="dbHeroBanner">
+        <div class="db-hero-left">
+            <div class="db-hero-badge">
+                <span class="db-hero-badge-dot"></span>
+                Live Dashboard
+            </div>
+            <h1 class="db-hero-title" id="dbWelcomeTitle">Good morning</h1>
+            <p class="db-hero-subtitle">Here's your HR operations overview for today.</p>
         </div>
-        <div class="widget-card">
-            <div style="font-size: 9pt; color: #777;">Active Employees</div>
-            <div class="widget-value" id="statActiveEmployees">0</div>
-        </div>
-        <div class="widget-card">
-            <div style="font-size: 9pt; color: #777;">Pending Exits</div>
-            <div class="widget-value" id="statPendingExits">0</div>
-        </div>
-        <div class="widget-card">
-            <div style="font-size: 9pt; color: #777;">Active Students</div>
-            <div class="widget-value" id="statActiveStudents">0</div>
-        </div>
-        <div class="widget-card" id="adminWidgetIncrements" style="display: none;">
-            <div style="font-size: 9pt; color: #777;">Pending Salary Increments</div>
-            <div class="widget-value" id="statAnniversaries">0</div>
+        <div class="db-hero-right">
+            <div class="db-hero-date" id="dbCurrentDate">—</div>
+            <div class="db-hero-time" id="dbCurrentTime">—</div>
         </div>
     </div>
 
-    <div style="margin-top: 40px;">
-        <h3>Recent Operational Logs</h3>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Model Name</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody id="dashboardRecentLogsBody">
-                <tr>
-                    <td colspan="5" style="text-align: center;">No logs visible. Log in as Admin to see details.</td>
-                </tr>
-            </tbody>
-        </table>
+    <!-- ═══════════════════════════════════════
+         KPI STAT CARDS — clean white, single accent
+    ═══════════════════════════════════════ -->
+    <div class="db-stats-grid">
+
+        <!-- Total Employees -->
+        <div class="db-stat-card" onclick="switchView('onboardingView')">
+            <div class="db-stat-top">
+                <div class="db-stat-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <span class="db-stat-nav-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </span>
+            </div>
+            <div class="db-stat-value" id="statTotalEmployees">—</div>
+            <div class="db-stat-label">Total Employees</div>
+            <div class="db-stat-footer">
+                <span class="db-stat-tag db-tag-neutral">Workforce</span>
+            </div>
+        </div>
+
+        <!-- Active Employees -->
+        <div class="db-stat-card" onclick="switchView('onboardingView')">
+            <div class="db-stat-top">
+                <div class="db-stat-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <span class="db-stat-nav-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </span>
+            </div>
+            <div class="db-stat-value" id="statActiveEmployees">—</div>
+            <div class="db-stat-label">Active Employees</div>
+            <div class="db-stat-footer">
+                <span class="db-stat-tag db-tag-positive">
+                    <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none" opacity="0.2"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>
+                    Active
+                </span>
+            </div>
+        </div>
+
+        <!-- Active Students -->
+        <div class="db-stat-card" onclick="switchView('studentView')">
+            <div class="db-stat-top">
+                <div class="db-stat-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5-10-5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+                </div>
+                <span class="db-stat-nav-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </span>
+            </div>
+            <div class="db-stat-value" id="statActiveStudents">—</div>
+            <div class="db-stat-label">Active Students</div>
+            <div class="db-stat-footer">
+                <span class="db-stat-tag db-tag-neutral">Enrolled</span>
+            </div>
+        </div>
+
+        <!-- Pending Exits -->
+        <div class="db-stat-card" onclick="switchView('exitView')">
+            <div class="db-stat-top">
+                <div class="db-stat-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </div>
+                <span class="db-stat-nav-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </span>
+            </div>
+            <div class="db-stat-value" id="statPendingExits">—</div>
+            <div class="db-stat-label">Pending Exits</div>
+            <div class="db-stat-footer">
+                <span class="db-stat-tag db-tag-warn" id="dbExitTag">Needs Review</span>
+            </div>
+        </div>
+
+        <!-- Salary Increments (Admin only) -->
+        <div class="db-stat-card" id="adminWidgetIncrements" style="display:none;" onclick="switchView('salaryView')">
+            <div class="db-stat-top">
+                <div class="db-stat-icon-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="18" x2="12" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </div>
+                <span class="db-stat-nav-arrow">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </span>
+            </div>
+            <div class="db-stat-value" id="statAnniversaries">—</div>
+            <div class="db-stat-label">Salary Increments</div>
+            <div class="db-stat-footer">
+                <span class="db-stat-tag db-tag-warn">Pending</span>
+            </div>
+        </div>
+
     </div>
+
+    <!-- ═══════════════════════════════════════
+         MAIN CONTENT — Activity + Right Panel
+    ═══════════════════════════════════════ -->
+    <div class="db-main-grid">
+
+        <!-- Activity Feed -->
+        <div class="db-card">
+            <div class="db-card-header">
+                <div class="db-card-title-group">
+                    <div class="db-card-icon-box">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                    <div>
+                        <div class="db-card-title">Recent Activity</div>
+                        <div class="db-card-subtitle">Latest system operations</div>
+                    </div>
+                </div>
+                <button class="db-view-all-btn" onclick="switchView('logsView')">
+                    View all
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+            </div>
+            <div class="db-activity-list" id="dashboardRecentLogsBody">
+                <div class="db-empty-state">
+                    <svg width="32" height="32" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <div class="db-empty-text">Loading activity log…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="db-right-col">
+
+            <!-- Quick Actions -->
+            <div class="db-card">
+                <div class="db-card-header">
+                    <div class="db-card-title-group">
+                        <div class="db-card-icon-box">
+                            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        </div>
+                        <div>
+                            <div class="db-card-title">Quick Actions</div>
+                            <div class="db-card-subtitle">Jump to common tasks</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="db-qa-list">
+                    <button class="db-qa-row" onclick="switchView('onboardingView')">
+                        <div class="db-qa-row-icon">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                        </div>
+                        <span class="db-qa-row-label">Add Employee</span>
+                        <svg class="db-qa-row-arrow" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                    <button class="db-qa-row" onclick="switchView('studentView')">
+                        <div class="db-qa-row-icon">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5-10-5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+                        </div>
+                        <span class="db-qa-row-label">Students / Interns</span>
+                        <svg class="db-qa-row-arrow" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                    <button class="db-qa-row" onclick="switchView('salaryView')">
+                        <div class="db-qa-row-icon">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="18" x2="12" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        </div>
+                        <span class="db-qa-row-label">Salary & Slips</span>
+                        <svg class="db-qa-row-arrow" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                    <button class="db-qa-row" onclick="switchView('exitView')">
+                        <div class="db-qa-row-icon">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        </div>
+                        <span class="db-qa-row-label">Exit Tracker</span>
+                        <svg class="db-qa-row-arrow" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workforce Breakdown -->
+            <div class="db-card">
+                <div class="db-card-header" style="margin-bottom:1.25rem;">
+                    <div class="db-card-title-group">
+                        <div class="db-card-icon-box">
+                            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </div>
+                        <div>
+                            <div class="db-card-title">Workforce Breakdown</div>
+                            <div class="db-card-subtitle">Current distribution</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Bars breakdown -->
+                <div class="db-breakdown-list" id="dbBreakdownList">
+                    <div class="db-breakdown-row">
+                        <div class="db-breakdown-label">
+                            <span>Employees</span>
+                            <span class="db-breakdown-count" id="brkEmployees">0</span>
+                        </div>
+                        <div class="db-bar-track"><div class="db-bar-fill db-bar-primary" id="barEmployees" style="width:0%"></div></div>
+                    </div>
+                    <div class="db-breakdown-row">
+                        <div class="db-breakdown-label">
+                            <span>Active Students</span>
+                            <span class="db-breakdown-count" id="brkStudents">0</span>
+                        </div>
+                        <div class="db-bar-track"><div class="db-bar-fill db-bar-mid" id="barStudents" style="width:0%"></div></div>
+                    </div>
+                    <div class="db-breakdown-row">
+                        <div class="db-breakdown-label">
+                            <span>Pending Exits</span>
+                            <span class="db-breakdown-count" id="brkExits">0</span>
+                        </div>
+                        <div class="db-bar-track"><div class="db-bar-fill db-bar-light" id="barExits" style="width:0%"></div></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
 </div>
+
+<!-- ═══════════════════════════════════════════
+     CLEAN PROFESSIONAL DASHBOARD STYLES
+═══════════════════════════════════════════ -->
+<style>
+
+/* ─── Hero Banner ─────────────────────────── */
+.db-hero {
+    background: linear-gradient(130deg, #1e1b4b 0%, #312e81 55%, #4c1d95 100%);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+    box-shadow: 0 4px 24px rgba(49, 46, 129, 0.22);
+}
+.db-hero-left {}
+.db-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.85);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 0.875rem;
+}
+.db-hero-badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade80;
+    animation: db-pulse 2.2s infinite;
+}
+@keyframes db-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.65; transform: scale(1.35); }
+}
+.db-hero-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 0.35rem;
+    letter-spacing: -0.03em;
+}
+.db-hero-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255,255,255,0.6);
+    margin: 0;
+}
+.db-hero-right { text-align: right; flex-shrink: 0; }
+.db-hero-date {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.55);
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+}
+.db-hero-time {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ─── KPI Stat Cards ─────────────────────── */
+.db-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.db-stat-card {
+    background: #fff;
+    border: 1px solid #eff0f4;
+    border-radius: 14px;
+    padding: 1.25rem 1.375rem 1rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    position: relative;
+}
+.db-stat-card:hover {
+    border-color: #7c3aed;
+    box-shadow: 0 6px 24px rgba(124,58,237,0.1);
+    transform: translateY(-3px);
+}
+.db-stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+.db-stat-icon-box {
+    width: 36px; height: 36px;
+    background: #f5f3ff;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #7c3aed;
+}
+.db-stat-nav-arrow {
+    color: #cbd5e1;
+    transition: color 0.15s;
+}
+.db-stat-card:hover .db-stat-nav-arrow { color: #7c3aed; }
+
+.db-stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.db-stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.db-stat-footer { margin-top: 0.625rem; }
+.db-stat-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+}
+.db-tag-neutral  { background: #f1f5f9; color: #64748b; }
+.db-tag-positive { background: #f0fdf4; color: #16a34a; }
+.db-tag-warn     { background: #fff7ed; color: #c2410c; }
+
+/* ─── Main Grid Layout ───────────────────── */
+.db-main-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 1.25rem;
+}
+@media (max-width: 1080px) {
+    .db-main-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Generic Card ───────────────────────── */
+.db-card {
+    background: #fff;
+    border: 1px solid #eff0f4;
+    border-radius: 14px;
+    padding: 1.375rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.db-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.db-card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.db-card-icon-box {
+    width: 34px; height: 34px;
+    background: #f5f3ff;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    color: #7c3aed;
+    flex-shrink: 0;
+}
+.db-card-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+}
+.db-card-subtitle {
+    font-size: 0.73rem;
+    color: #94a3b8;
+    margin-top: 1px;
+}
+.db-view-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #7c3aed;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+    transition: opacity 0.15s;
+}
+.db-view-all-btn:hover { opacity: 0.7; }
+
+/* ─── Activity Feed ──────────────────────── */
+.db-activity-list {
+    display: flex;
+    flex-direction: column;
+}
+.db-activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f8fafc;
+}
+.db-activity-item:last-child { border-bottom: none; }
+.db-activity-dot {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700;
+    flex-shrink: 0; margin-top: 1px;
+}
+.dot-create  { background: #f0fdf4; color: #16a34a; }
+.dot-update  { background: #f5f3ff; color: #7c3aed; }
+.dot-delete  { background: #fef2f2; color: #dc2626; }
+.dot-default { background: #f1f5f9; color: #475569; }
+
+.db-activity-content { flex: 1; min-width: 0; }
+.db-activity-desc {
+    font-size: 0.825rem;
+    font-weight: 500;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.db-activity-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 3px;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+.db-actor-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+.db-empty-state {
+    padding: 2.5rem;
+    text-align: center;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
+}
+.db-empty-text {
+    font-size: 0.825rem;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+/* ─── Right Column ───────────────────────── */
+.db-right-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* ─── Quick Actions List ─────────────────── */
+.db-qa-list { display: flex; flex-direction: column; gap: 2px; }
+.db-qa-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.5rem;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+    width: 100%;
+    text-align: left;
+}
+.db-qa-row:hover { background: #faf8ff; }
+.db-qa-row-icon {
+    width: 32px; height: 32px;
+    background: #f5f3ff;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #7c3aed;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.db-qa-row:hover .db-qa-row-icon { background: #ede9fe; }
+.db-qa-row-label {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+.db-qa-row-arrow {
+    color: #d1d5db;
+    transition: color 0.15s, transform 0.15s;
+}
+.db-qa-row:hover .db-qa-row-arrow { color: #7c3aed; transform: translateX(2px); }
+
+/* ─── Breakdown Bar Chart ────────────────── */
+.db-breakdown-list { display: flex; flex-direction: column; gap: 1rem; }
+.db-breakdown-row {}
+.db-breakdown-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 0.35rem;
+}
+.db-breakdown-count {
+    font-weight: 700;
+    color: #1e293b;
+    font-variant-numeric: tabular-nums;
+}
+.db-bar-track {
+    height: 7px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.db-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.db-bar-primary { background: #7c3aed; }
+.db-bar-mid     { background: #a78bfa; }
+.db-bar-light   { background: #ddd6fe; }
+
+/* ─── Dark Mode ──────────────────────────── */
+[data-theme="dark"] .db-stat-card,
+[data-theme="dark"] .db-card {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: none;
+}
+[data-theme="dark"] .db-stat-card:hover {
+    border-color: #7c3aed;
+    box-shadow: 0 6px 24px rgba(124,58,237,0.18);
+}
+[data-theme="dark"] .db-stat-icon-box,
+[data-theme="dark"] .db-card-icon-box,
+[data-theme="dark"] .db-qa-row-icon { background: rgba(124,58,237,0.15); }
+[data-theme="dark"] .db-stat-value  { color: #f1f5f9; }
+[data-theme="dark"] .db-stat-label  { color: #64748b; }
+[data-theme="dark"] .db-card-title  { color: #f1f5f9; }
+[data-theme="dark"] .db-card-subtitle { color: #64748b; }
+[data-theme="dark"] .db-activity-item { border-bottom-color: #1e293b; }
+[data-theme="dark"] .db-activity-desc { color: #e2e8f0; }
+[data-theme="dark"] .db-actor-chip   { background: #334155; color: #94a3b8; }
+[data-theme="dark"] .db-qa-row:hover { background: rgba(124,58,237,0.08); }
+[data-theme="dark"] .db-qa-row-label { color: #e2e8f0; }
+[data-theme="dark"] .db-breakdown-label { color: #94a3b8; }
+[data-theme="dark"] .db-breakdown-count { color: #e2e8f0; }
+[data-theme="dark"] .db-bar-track    { background: #334155; }
+[data-theme="dark"] .db-tag-neutral  { background: #334155; color: #94a3b8; }
+[data-theme="dark"] .db-tag-positive { background: rgba(22,163,74,0.15); color: #4ade80; }
+[data-theme="dark"] .db-tag-warn     { background: rgba(194,65,12,0.12); color: #fb923c; }
+[data-theme="dark"] .dot-create  { background: rgba(22,163,74,0.15); }
+[data-theme="dark"] .dot-update  { background: rgba(124,58,237,0.15); }
+[data-theme="dark"] .dot-delete  { background: rgba(220,38,38,0.15); }
+[data-theme="dark"] .dot-default { background: #334155; }
+</style>
