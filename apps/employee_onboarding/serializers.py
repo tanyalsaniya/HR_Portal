@@ -85,6 +85,7 @@ class EmployeeSerializer(serializers.Serializer):
     emergency_relationship = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     emergency_phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     bitrix_contact_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    exit_request_id = serializers.SerializerMethodField()
     
     # Relational documents and structures
     documents = serializers.SerializerMethodField()
@@ -142,6 +143,9 @@ class EmployeeSerializer(serializers.Serializer):
             except Exception:
                 pass
         return None
+
+    def get_exit_request_id(self, obj):
+        return obj.get('exit_request_id')
 
 
 class LetterTemplateSerializer(serializers.ModelSerializer):

@@ -217,6 +217,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'notifications.tasks.run_daily_onboarding_pipeline',
         'schedule': crontab(hour=8, minute=0),  # Daily at 08:00 IST
     },
+    'daily-bitrix-sync-retry': {
+        'task': 'notifications.tasks.retry_failed_bitrix_syncs',
+        'schedule': crontab(hour=9, minute=0),  # Daily at 09:00 IST
+    },
 }
 
 # ---------- COMPANY & SIGNATORY DEFAULTS FOR LETTERS ----------

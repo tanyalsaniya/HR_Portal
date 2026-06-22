@@ -10,35 +10,49 @@ let certEditorSkills = [];
 // ---------- STUDENTS & INTERNS VIEW ----------
 async function loadStudentData() {
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
+    // Load active students from database
     try {
-        const res = await apiFetch('/students/');
+        const res = await apiFetch('/api/student/students/?status=ACTIVE');
         if (res.ok) {
-            const studs = await res.json();
-            const studList = studs.results || studs;
+            const data = await res.json();
+            const studList = data.results || data;
             const tbody = document.getElementById('studentTableBody');
             
             if (tbody) {
+                if (studList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No active students found in the database.</td></tr>';
+                    return;
+                }
+                
                 tbody.innerHTML = studList.map(s => `
                     <tr>
-                        <td>${s.cert_no}</td>
-                        <td>${s.name}</td>
-                        <td>${s.email}</td>
-                        <td>${s.student_type}</td>
-                        <td>${s.joining_date}</td>
-                        <td>${s.completion_date}</td>
-                        <td>Rs. ${s.total_fees}</td>
-                        <td><span style="font-weight:bold; color:${s.status === 'ACTIVE' ? '#eab308' : '#22c55e'}">${s.status}</span></td>
-                        <td>
-                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="openCertTabWithStudent(${s.id})">Generate Cert</button>
-                            ${s.cert_pdf ? `<button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="window.open('${s.cert_pdf}', '_blank')">View Cert</button>` : ''}
-                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="viewInstallmentsModal(${s.id}, '${s.name}')">Fee Schedule</button>
+                        <td>${s.cert_no || '-'}</td>
+                        <td>${s.name || '-'}</td>
+                        <td>${s.email || '-'}</td>
+                        <td>${s.student_type || 'Student'}</td>
+                        <td>${s.joining_date || '-'}</td>
+                        <td>${s.completion_date || '-'}</td>
+                        <td>Rs. ${s.total_fees || '0'}</td>
+                        <td><span style="font-weight:bold; color:#22c55e; font-size:8.5pt;">ACTIVE</span></td>
+                        <td style="white-space: nowrap;">
+                            <button class="btn" style="font-size:8pt; padding:4px 8px; background-color:#7c3aed; color:white;" onclick="openCertTabWithStudent('${s.id}')">Generate Cert</button>
+                            <button class="btn" style="font-size:8pt; padding:4px 8px; background-color:#3b82f6; color:white;" onclick="viewInstallmentsModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')">Installments</button>
                         </td>
                     </tr>
                 `).join('');
             }
+        } else {
+            const tbody = document.getElementById('studentTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch active students from the database.</td></tr>';
+            }
         }
     } catch (e) {
-        console.error(e);
+        console.error('Error loading students:', e);
+        const tbody = document.getElementById('studentTableBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#ef4444;">Error connecting to API.</td></tr>';
+        }
     }
 }
 
@@ -83,16 +97,49 @@ function addInstallmentRow() {
 
 // Open Certificate tab and automatically select a student
 function openCertTabWithStudent(studentId) {
-    switchStudentTab('certgen');
-    // We wait a tiny bit to make sure select option elements are loaded
-    setTimeout(() => {
-        const select = document.getElementById('certStudentSelect');
-        if (select) {
-            select.value = studentId;
-            loadStudentCertPrefills();
-        }
-    }, 400);
+    switchStudentTab('certgen', studentId);
 }
+
+// Open Certificate tab with Bitrix student data (from API, not database)
+function openCertTabWithBitrixStudent(bitrixId, name, courseId, institute, startDate, completionDate) {
+    switchStudentTab('certgen');
+    
+    // Wait for tab to load and form elements to be ready
+    setTimeout(() => {
+        // Pre-fill certificate form with Bitrix student data
+        const nameField = document.getElementById('certStudentNameInput') || document.createElement('input');
+        const courseField = document.getElementById('certCourseSelect');
+        const instituteField = document.getElementById('certInstituteInput') || document.createElement('input');
+        const startDateField = document.getElementById('certStartDateInput') || document.createElement('input');
+        const completionDateField = document.getElementById('certCompletionDateInput') || document.createElement('input');
+        
+        // Store Bitrix ID for later use
+        if (!document.getElementById('certBitrixIdInput')) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.id = 'certBitrixIdInput';
+            hidden.value = bitrixId;
+            const form = document.querySelector('#studentTabCertGen form') || document.getElementById('certParagraphTextarea').parentElement;
+            if (form) form.appendChild(hidden);
+        } else {
+            document.getElementById('certBitrixIdInput').value = bitrixId;
+        }
+        
+        // Populate visible fields
+        if (nameField) nameField.value = name;
+        if (instituteField) instituteField.value = institute;
+        if (startDateField) startDateField.value = startDate;
+        if (completionDateField) completionDateField.value = completionDate;
+        
+        // Update preview
+        setTimeout(() => {
+            if (nameField && nameField.oninput) nameField.oninput();
+        }, 100);
+        
+        showToast(`Loaded Bitrix student: ${name}`);
+    }, 300);
+}
+
 
 // Installments viewer overlay/list
 async function viewInstallmentsModal(studentId, name) {
@@ -185,25 +232,79 @@ async function triggerWarningEmail(instId) {
 }
 
 // ---------- TABS CONTROLLERS & DROPDOWNS ----------
-function switchStudentTab(tab) {
+function switchStudentTab(tab, selectedStudentId = null) {
     const dirTab = document.getElementById('studentTabDirectory');
     const certTab = document.getElementById('studentTabCertGen');
+    const bitrixTab = document.getElementById('studentTabBitrix');
     const dirBtn = document.getElementById('tabStudentDirectoryBtn');
     const certBtn = document.getElementById('tabCertGenBtn');
+    const bitrixBtn = document.getElementById('tabBitrixStudentsBtn');
+    
+    // Hide all tabs
+    if (dirTab) dirTab.style.display = 'none';
+    if (certTab) certTab.style.display = 'none';
+    if (bitrixTab) bitrixTab.style.display = 'none';
+    
+    // Remove active from all buttons
+    if (dirBtn) dirBtn.classList.remove('active');
+    if (certBtn) certBtn.classList.remove('active');
+    if (bitrixBtn) bitrixBtn.classList.remove('active');
     
     if (tab === 'directory') {
         if (dirTab) dirTab.style.display = 'block';
-        if (certTab) certTab.style.display = 'none';
         if (dirBtn) dirBtn.classList.add('active');
-        if (certBtn) certBtn.classList.remove('active');
+        loadStudentData(); // Load active students from database
+    } else if (tab === 'bitrix') {
+        if (bitrixTab) bitrixTab.style.display = 'block';
+        if (bitrixBtn) bitrixBtn.classList.add('active');
+        loadBitrixStudents();
     } else {
-        if (dirTab) dirTab.style.display = 'none';
         if (certTab) certTab.style.display = 'block';
-        if (dirBtn) dirBtn.classList.remove('active');
-        if (certBtn) certBtn.classList.add('active');
-        
-        loadStudentsSelect();
+        if (certBtn) {
+            certBtn.classList.add('active');
+            certBtn.style.display = 'inline-block'; // Ensure the tab button is shown
+        }
+        loadStudentsSelect(selectedStudentId);
         loadCoursesSelect('certCourseSelect');
+    }
+}
+
+async function loadBitrixStudents() {
+    const tbody = document.getElementById('bitrixStudentTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
+    
+    try {
+        const res = await apiFetch('/api/student/bitrix-active/');
+        if (res.ok) {
+            const data = await res.json();
+            const students = data.results || [];
+            
+            if (students.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No active students found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = students.map(s => `
+                <tr>
+                    <td>${s.id}</td>
+                    <td>${s.name}</td>
+                    <td>${s.email}</td>
+                    <td>${s.phone}</td>
+                    <td>${s.institute}</td>
+                    <td>${s.father_name}</td>
+                    <td>${s.start_date}</td>
+                    <td>${s.completion_date}</td>
+                    <td>${s.total_fees}</td>
+                    <td><span style="font-size:7.5pt; padding:2px 8px; border-radius:10px; background:#e0f2fe; color:#0369a1; font-weight:600;">${s.stage.split(':').pop()}</span></td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch data from Bitrix24.</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Error connecting to Bitrix24 API.</td></tr>';
     }
 }
 
@@ -227,11 +328,11 @@ async function loadCoursesSelect(elementId) {
     }
 }
 
-async function loadStudentsSelect() {
+async function loadStudentsSelect(selectedStudentId = null) {
     const el = document.getElementById('certStudentSelect');
     if (!el) return;
     try {
-        const res = await apiFetch('/api/student/students/');
+        const res = await apiFetch('/api/student/students/?status=ACTIVE');
         if (res.ok) {
             const data = await res.json();
             const list = data.results || data;
@@ -240,6 +341,10 @@ async function loadStudentsSelect() {
                 html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
             });
             el.innerHTML = html;
+            if (selectedStudentId) {
+                el.value = selectedStudentId;
+                loadStudentCertPrefills();
+            }
         }
     } catch (e) {
         console.error(e);

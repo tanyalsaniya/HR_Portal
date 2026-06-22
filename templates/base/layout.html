@@ -211,6 +211,18 @@
             background-color: rgba(37, 99, 235, 0.03);
         }
 
+        /* Color coded notification items */
+        .notif-item.notif-info { border-left: 4px solid #3b82f6; }
+        .notif-item.notif-info.unread { background-color: rgba(59, 130, 246, 0.04); }
+        .notif-item.notif-success { border-left: 4px solid #10b981; }
+        .notif-item.notif-success.unread { background-color: rgba(16, 185, 129, 0.04); }
+        .notif-item.notif-warning { border-left: 4px solid #f59e0b; }
+        .notif-item.notif-warning.unread { background-color: rgba(245, 158, 11, 0.04); }
+        .notif-item.notif-urgent { border-left: 4px solid #ef4444; }
+        .notif-item.notif-urgent.unread { background-color: rgba(239, 68, 68, 0.04); }
+        .notif-item.notif-error { border-left: 4px solid #b91c1c; }
+        .notif-item.notif-error.unread { background-color: rgba(185, 28, 28, 0.04); }
+
         .notif-text {
             font-size: 9.5pt;
             font-weight: 500;
@@ -513,10 +525,89 @@
             border-bottom: 2px solid var(--primary-color);
             color: var(--primary-color) !important;
         }
+
+        /* Premium Global Loading Bar */
+        .loading-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            background: linear-gradient(90deg, #7c3aed, #a78bfa, #c084fc);
+            z-index: 99999;
+            transition: width 0.4s ease, opacity 0.4s ease;
+            box-shadow: 0 0 10px rgba(124, 58, 237, 0.5);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-bar.loading {
+            opacity: 1;
+            width: 85%;
+            animation: pulse-loading 2s infinite ease-in-out;
+        }
+
+        .loading-bar.finished {
+            width: 100%;
+            opacity: 0;
+            transition: width 0.3s ease, opacity 0.5s ease 0.3s;
+        }
+
+        @keyframes pulse-loading {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
+            100% { filter: brightness(1); }
+        }
+
+        /* Premium Global Spinner Overlay */
+        .global-loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(248, 250, 252, 0.7); /* translucent light */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        [data-theme="dark"] .global-loader-overlay {
+            background-color: rgba(15, 23, 42, 0.7); /* translucent dark */
+        }
+
+        .global-loader-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .premium-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin-premium 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes spin-premium {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
+
+    <!-- GLOBAL LOADING SYSTEM ELEMENTS -->
+    <div id="globalLoadingBar" class="loading-bar"></div>
+    <div id="globalLoaderOverlay" class="global-loader-overlay">
+        <div class="premium-spinner"></div>
+    </div>
 
     <div class="portal-layout">
         <!-- SIDEBAR -->
@@ -707,7 +798,7 @@
                     
                     if (typeof checkNotifications === 'function') {
                         checkNotifications();
-                        setInterval(checkNotifications, 15000);
+                        setInterval(checkNotifications, 30000);
                     }
                 } else {
                     logout();

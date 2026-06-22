@@ -498,6 +498,44 @@ class SalaryImportView(APIView):
             batch.status = 'partial'
             error_report_url = self.generate_error_xlsx(batch.id, headers, failed_rows_data)
             batch.error_report_path = error_report_url
+            
+            # Trigger 21: Salary Import Completed with Errors
+            try:
+                from notifications.models import Notification
+                from django.contrib.auth import get_user_model
+                from django.core.mail import send_mail
+                
+                User = get_user_model()
+                admins = User.objects.filter(role__code='ADMIN')
+                hrs = User.objects.filter(role__code='HR')
+                
+                msg = f"Salary import completed. {success_count} rows imported successfully. {failed_count} rows failed. Download error report to review."
+                
+                for hr in hrs:
+                    Notification.objects.create(
+                        recipient=hr,
+                        notif_type='WARNING',
+                        message=msg,
+                        link="/salary/import/result/"
+                    )
+                    if hr.email:
+                        error_full_url = f"{settings.FRONTEND_URL}{error_report_url}" if hasattr(settings, 'FRONTEND_URL') else f"http://localhost:8000{error_report_url}"
+                        send_mail(
+                            subject="Salary Import Completed with Errors",
+                            message=f"{msg}\n\nDownload the error report here: {error_full_url}",
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[hr.email],
+                            fail_silently=True
+                        )
+                for admin in admins:
+                    Notification.objects.create(
+                        recipient=admin,
+                        notif_type='WARNING',
+                        message=msg,
+                        link="/salary/import/result/"
+                    )
+            except Exception:
+                pass
         else:
             batch.status = 'success'
             error_report_url = None
@@ -557,6 +595,28 @@ class SalaryPublishView(APIView):
             slip.status = 'published'
             slip.save()
             generate_payslip_pdf(slip)
+
+        # Trigger 20 notification
+        import calendar
+        try:
+            month_name = calendar.month_name[month]
+            month_year = f"{month_name} {year}"
+            month_year_slug = f"{month_name.lower()}-{year}"
+            
+            from notifications.models import Notification
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            admins_and_hrs = User.objects.filter(role__code__in=['ADMIN', 'HR'])
+            msg = f"Salary slips generated for {month_year}. {count} slips ready for download."
+            for user in admins_and_hrs:
+                Notification.objects.create(
+                    recipient=user,
+                    notif_type='SUCCESS',
+                    message=msg,
+                    link=f"/salary/slips/{month_year_slug}/"
+                )
+        except Exception:
+            pass
 
         return Response({'message': f'Successfully published {count} salary slips.'}, status=status.HTTP_200_OK)
 
