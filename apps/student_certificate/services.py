@@ -31,11 +31,21 @@ def generate_student_certificate_pdf(certificate):
         his_her = "his/her"
         
     bg_image_path = os.path.join(settings.BASE_DIR, 'apps', 'student_certificate', 'media', 'certificate (1).png')
+    logo_left_path = os.path.join(settings.BASE_DIR, 'apps', 'student_certificate', 'media', 'DevEx Hub logo.png')
+    logo_right_path = os.path.join(settings.BASE_DIR, 'apps', 'student_certificate', 'media', '(accreditationpartner logo.png')
     
-    # Convert windows path for URI standard in WeasyPrint
+    # Convert windows paths for URI standard in WeasyPrint
     bg_path = bg_image_path.replace('\\', '/')
     if not bg_path.startswith('/'):
         bg_path = '/' + bg_path
+        
+    left_logo_uri = logo_left_path.replace('\\', '/')
+    if not left_logo_uri.startswith('/'):
+        left_logo_uri = '/' + left_logo_uri
+
+    right_logo_uri = logo_right_path.replace('\\', '/')
+    if not right_logo_uri.startswith('/'):
+        right_logo_uri = '/' + right_logo_uri
         
     cert_content_text = certificate.cert_content or ""
     # Convert double asterisks to bold tag
@@ -47,6 +57,8 @@ def generate_student_certificate_pdf(certificate):
     context = {
         'certificate': certificate,
         'bg_image_path': bg_path,
+        'left_logo_path': left_logo_uri,
+        'right_logo_path': right_logo_uri,
         'cert_content_html': html_content,
         'performance_heading': performance_heading,
         'he_she': he_she,

@@ -32,9 +32,30 @@
             padding: 55mm 22mm 25mm 22mm;
         }
         
+        .cert-header {
+            position: absolute;
+            top: 20mm;
+            left: 22mm;
+            right: 22mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 8mm;
+        }
+        
+        .logo-left {
+            max-height: 26mm;
+            width: auto;
+        }
+        
+        .logo-right {
+            max-height: 24mm;
+            width: auto;
+        }
+        
         .cert-title-container {
             text-align: center;
-            margin-bottom: 15mm;
+            margin-bottom: 0;
         }
         
         .cert-title {
@@ -192,10 +213,14 @@
 </head>
 <body>
     <div class="certificate-container">
-        <!-- Title -->
-        <div class="cert-title-container">
-            <h1 class="cert-title">Certificate</h1>
-            <div class="cert-title-underline"></div>
+        <!-- Header with Logos and Title -->
+        <div class="cert-header">
+            <img src="file://{{ left_logo_path }}" class="logo-left">
+            <div class="cert-title-container">
+                <h1 class="cert-title">Certificate</h1>
+                <div class="cert-title-underline"></div>
+            </div>
+            <img src="file://{{ right_logo_path }}" class="logo-right">
         </div>
         
         <!-- Serial Number -->
