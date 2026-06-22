@@ -34,7 +34,7 @@ async function loadStudentData() {
                         <td>Rs. ${s.total_fees || '0'}</td>
                         <td><span style="font-weight:bold; color:#eab308; font-size:8.5pt;">ONGOING</span></td>
                         <td style="white-space: nowrap;">
-                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="openCertTabWithBitrixStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${s.course_id || ''}', '${s.institute || ''}', '${s.start_date || ''}', '${s.completion_date || ''}')">Generate Cert</button>
+                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="openCertTabWithBitrixStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${s.email}', '${s.course_id || ''}', '${s.institute || ''}', '${s.start_date || ''}', '${s.completion_date || ''}', '${s.total_fees || '0'}')">Generate Cert</button>
                         </td>
                     </tr>
                 `).join('');
@@ -107,43 +107,48 @@ function openCertTabWithStudent(studentId) {
 }
 
 // Open Certificate tab with Bitrix student data (from API, not database)
-function openCertTabWithBitrixStudent(bitrixId, name, courseId, institute, startDate, completionDate) {
-    switchStudentTab('certgen');
-    
-    // Wait for tab to load and form elements to be ready
-    setTimeout(() => {
-        // Pre-fill certificate form with Bitrix student data
-        const nameField = document.getElementById('certStudentNameInput') || document.createElement('input');
-        const courseField = document.getElementById('certCourseSelect');
-        const instituteField = document.getElementById('certInstituteInput') || document.createElement('input');
-        const startDateField = document.getElementById('certStartDateInput') || document.createElement('input');
-        const completionDateField = document.getElementById('certCompletionDateInput') || document.createElement('input');
-        
-        // Store Bitrix ID for later use
-        if (!document.getElementById('certBitrixIdInput')) {
-            const hidden = document.createElement('input');
-            hidden.type = 'hidden';
-            hidden.id = 'certBitrixIdInput';
-            hidden.value = bitrixId;
-            const form = document.querySelector('#studentTabCertGen form') || document.getElementById('certParagraphTextarea').parentElement;
-            if (form) form.appendChild(hidden);
+async function openCertTabWithBitrixStudent(bitrixId, name, email, courseId, institute, startDate, completionDate, totalFees = '0') {
+    showGlobalLoader(true);
+    try {
+        const payload = {
+            id: bitrixId,
+            name: name,
+            email: email,
+            course_name: courseId,
+            institute: institute,
+            start_date: startDate,
+            completion_date: completionDate,
+            total_fees: totalFees
+        };
+        const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            const student = await res.json();
+            switchStudentTab('certgen');
+            
+            // Reload the students select dropdown so it contains the new/updated student
+            await loadStudentsSelect();
+            
+            // Pre-select the student in the dropdown
+            const select = document.getElementById('certStudentSelect');
+            if (select) {
+                select.value = student.id;
+                // Trigger the prefills and preview load
+                await loadStudentCertPrefills();
+            }
+            showToast(`Loaded and synced student: ${student.name}`);
         } else {
-            document.getElementById('certBitrixIdInput').value = bitrixId;
+            const err = await res.json();
+            showToast(JSON.stringify(err), 'error');
         }
-        
-        // Populate visible fields
-        if (nameField) nameField.value = name;
-        if (instituteField) instituteField.value = institute;
-        if (startDateField) startDateField.value = startDate;
-        if (completionDateField) completionDateField.value = completionDate;
-        
-        // Update preview
-        setTimeout(() => {
-            if (nameField && nameField.oninput) nameField.oninput();
-        }, 100);
-        
-        showToast(`Loaded Bitrix student: ${name}`);
-    }, 300);
+    } catch (e) {
+        console.error(e);
+        showToast('Error syncing student data.', 'error');
+    } finally {
+        hideGlobalLoader();
+    }
 }
 
 
@@ -335,7 +340,7 @@ async function loadStudentsSelect() {
     const el = document.getElementById('certStudentSelect');
     if (!el) return;
     try {
-        const res = await apiFetch('/api/student/students/');
+        const res = await apiFetch('/api/student/students/?status=ACTIVE');
         if (res.ok) {
             const data = await res.json();
             const list = data.results || data;
@@ -631,7 +636,29 @@ async function generateAndSaveCertificate() {
             loadStudentData();
         } else {
             const err = await res.json();
-            showToast(JSON.stringify(err), 'error');
+            if (err.requires_override) {
+                if (confirm(err.warning)) {
+                    data.confirm_override = true;
+                    showToast('Generating and saving certificate (with override)...');
+                    const retryRes = await apiFetch('/api/student/certificates/', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                    if (retryRes.ok) {
+                        const retryResult = await retryRes.json();
+                        showToast('Certificate saved & PDF generated successfully!');
+                        generatedPdfUrl = retryResult.pdf_file;
+                        document.getElementById('btnDownloadPDF').disabled = false;
+                        document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
+                        loadStudentData();
+                    } else {
+                        const retryErr = await retryRes.json();
+                        showToast(retryErr.error || JSON.stringify(retryErr), 'error');
+                    }
+                }
+            } else {
+                showToast(err.error || JSON.stringify(err), 'error');
+            }
         }
     } catch (e) {
         console.error(e);

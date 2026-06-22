@@ -1,0 +1,10 @@
+{ 
+  "entityTypeId": 1044, 
+  "filter": { 
+    "!STAGE_ID": [ 
+      "DT1044_20:UC_69T3IT", 
+      "DT1044_20:FAIL" 
+    ] 
+  }, 
+  "select": ["ID", "TITLE", "STAGE_ID"] 
+} 
