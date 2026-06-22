@@ -94,7 +94,7 @@ class DashboardAPIView(APIView):
             from common.bitrix_client import BitrixClient
             users = BitrixClient.get_all_users()
             data['total_employees'] = len(users)
-            data['active_employees'] = len(users)
+            data['active_employees'] = sum(1 for u in users if u.get('status') == 'Active')
 
         if is_admin or 'student.read' in user_perms:
             data['active_students'] = Student.objects.filter(status='ACTIVE').count()
@@ -141,3 +141,12 @@ def hybrid_view(view_class_or_func, actions=None, template_name='base/layout.htm
         else:
             return render(request, template_name)
     return wrapper
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def client_log_view(request):
+    if request.method == 'POST':
+        print("CLIENT LOG:", request.body.decode('utf-8'))
+    return HttpResponse("OK")

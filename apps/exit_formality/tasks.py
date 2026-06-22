@@ -228,7 +228,7 @@ def send_exit_initiation_email(exit_request_id):
         return "No email for employee."
 
     url = link.get_link()
-    subject = "Your Exit Process has been Initiated – MTLV"
+    subject = "Your Exit Process has been Initiated – Devex Hub Pvt Ltd."
     
     # Render or build HTML message
     from django.template.loader import render_to_string
@@ -245,7 +245,7 @@ def send_exit_initiation_email(exit_request_id):
 
     body = f"""Dear {emp.first_name},
 
-Your offboarding and exit clearance process has been initiated successfully in the MTLV HR Portal.
+Your offboarding and exit clearance process has been initiated successfully in the Devex Hub Pvt Ltd. HR Portal.
 
 Your resignation has been acknowledged, and your last working day is confirmed as {exit_req.last_working_day.strftime('%d %b %Y')}.
 
@@ -258,7 +258,7 @@ What happens next:
 
 Sincerely,
 HR Department
-MTLV
+Devex Hub Pvt Ltd.
 """
     try:
         send_mail(
@@ -338,7 +338,7 @@ def send_exit_form_submission_notification(response_id):
     # 2. Email employee confirmation
     recipient_email = resp.personal_email or emp.personal_email or emp.work_email or emp.email
     if recipient_email:
-        subject = "Exit Form Received – MTLV"
+        subject = "Exit Form Received – Devex Hub Pvt Ltd."
         body = f"""Dear {emp.first_name},
 
 Thank you for submitting your exit clearance questionnaire form.
@@ -355,7 +355,7 @@ Next steps:
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
         try:
             send_mail(

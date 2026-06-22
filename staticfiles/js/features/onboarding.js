@@ -2171,3 +2171,44 @@ function previewProfilePhoto(input) {
         }
     }
 }
+
+// -----------------------------------------------------------------------
+// triggerExitFormality(empId)
+// Called from the employee row "Initiate Exit" dropdown button.
+// Opens the shared Initiate Exit modal (defined in exit.js / layout) and
+// pre-selects the correct employee in the dropdown.
+// -----------------------------------------------------------------------
+async function triggerExitFormality(empId) {
+    // Open the modal (function defined in exit.js, loaded globally)
+    if (typeof openInitiateExitModal === 'function') {
+        openInitiateExitModal();
+    } else {
+        showToast('Exit modal is not available. Please go to the Exit page.', 'error');
+        return;
+    }
+
+    // Wait for the employee select dropdown to be populated, then pre-select
+    const maxWait = 50; // 50 * 100ms = 5 seconds
+    let waited = 0;
+    const interval = setInterval(() => {
+        waited++;
+        const select = document.getElementById('exitEmployeeSelect');
+        if (!select) {
+            if (waited >= maxWait) clearInterval(interval);
+            return;
+        }
+        // Options loaded when more than the placeholder exist
+        if (select.options.length > 1) {
+            clearInterval(interval);
+            const strId = String(empId);
+            for (let i = 0; i < select.options.length; i++) {
+                if (String(select.options[i].value) === strId) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+        } else if (waited >= maxWait) {
+            clearInterval(interval);
+        }
+    }, 100);
+}

@@ -93,7 +93,7 @@ def send_onboarding_welcome_email(employee_data):
         logger.warning(f"No recipient email found for onboarding welcome email to {full_name}.")
         return "Failed: No recipient email."
         
-    company_name = getattr(settings, 'COMPANY_NAME', 'MTLV Solutions Private Limited')
+    company_name = getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.')
     
     subject = f"Welcome to {company_name}! - Onboarding Initiated Successfully"
     
@@ -251,16 +251,16 @@ def send_offer_letter_email(employee_id, doc_id):
     if not recipient_email:
         return "No email for employee."
 
-    subject = "Your Offer Letter – MTLV"
+    subject = "Your Offer Letter – Devex Hub Pvt Ltd."
     body = f"""Dear {emp.first_name},
 
-Please find attached your official Offer Letter from MTLV.
+Please find attached your official Offer Letter from Devex Hub Pvt Ltd.
 
 If you have any questions or need further details, feel free to contact the HR team.
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
     try:
         email = EmailMessage(

@@ -6,53 +6,77 @@ let currentSelectedStudentName = '';
 let currentStudentDetails = null;
 let generatedPdfUrl = null;
 let certEditorSkills = [];
+let currentStudentList = [];
+
+let studentDirectoryStart = 0;
+let studentDirectoryNext = null;
+let bitrixStudentStart = 0;
+let bitrixStudentNext = null;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
 async function loadStudentData() {
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
-    // Load ongoing students from Bitrix24 API
+    // Load ongoing students from Bitrix24 API with pagination
     try {
-        const res = await apiFetch('/api/student/bitrix-active/');
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${studentDirectoryStart}`);
         if (res.ok) {
             const data = await res.json();
             const studList = data.results || [];
-            const tbody = document.getElementById('studentTableBody');
+            currentStudentList = studList;
+            studentDirectoryNext = data.next !== undefined ? data.next : null;
             
+            const tbody = document.getElementById('studentTableBody');
             if (tbody) {
                 if (studList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No ongoing students found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#64748b;">No ongoing students found.</td></tr>';
+                    // Update pagination controls
+                    updateStudentDirectoryPagination(0);
                     return;
                 }
                 
-                tbody.innerHTML = studList.map(s => `
-                    <tr>
-                        <td>-</td>
+                tbody.innerHTML = studList.map((s, index) => `
+                    <tr onclick="handleStudentRowClick(event, ${index})" style="cursor: pointer;">
                         <td>${s.name || '-'}</td>
                         <td>${s.email || '-'}</td>
-                        <td>Student</td>
-                        <td>${s.start_date || '-'}</td>
-                        <td>${s.completion_date || '-'}</td>
                         <td>Rs. ${s.total_fees || '0'}</td>
                         <td><span style="font-weight:bold; color:#eab308; font-size:8.5pt;">ONGOING</span></td>
-                        <td style="white-space: nowrap;">
-                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="openCertTabWithBitrixStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${s.email}', '${s.course_id || ''}', '${s.institute || ''}', '${s.start_date || ''}', '${s.completion_date || ''}', '${s.total_fees || '0'}')">Generate Cert</button>
+                        <td style="white-space: nowrap;" onclick="event.stopPropagation()">
+                            <button class="btn" style="font-size:8pt; padding:4px 8px;" onclick="openCertTabWithBitrixStudent(${index})">Generate Cert</button>
                         </td>
                     </tr>
                 `).join('');
+                
+                // Update pagination controls
+                updateStudentDirectoryPagination(studList.length);
             }
         } else {
             const tbody = document.getElementById('studentTableBody');
             if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch ongoing students from Bitrix24.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch ongoing students from Bitrix24.</td></tr>';
             }
         }
     } catch (e) {
         console.error('Error loading students:', e);
         const tbody = document.getElementById('studentTableBody');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#ef4444;">Error connecting to Bitrix24 API.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#ef4444;">Error connecting to Bitrix24 API.</td></tr>';
         }
     }
+}
+
+function updateStudentDirectoryPagination(count) {
+    const pageStart = count === 0 ? 0 : studentDirectoryStart + 1;
+    const pageEnd = count === 0 ? 0 : studentDirectoryStart + count;
+    
+    const startEl = document.getElementById('studentPageStart');
+    const endEl = document.getElementById('studentPageEnd');
+    const prevBtn = document.getElementById('studentPrevBtn');
+    const nextBtn = document.getElementById('studentNextBtn');
+    
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (prevBtn) prevBtn.disabled = (studentDirectoryStart === 0);
+    if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
 }
 
 function openStudentModal() {
@@ -108,18 +132,20 @@ function openCertTabWithStudent(studentId) {
 }
 
 // Open Certificate tab with Bitrix student data (from API, not database)
-async function openCertTabWithBitrixStudent(bitrixId, name, email, courseId, institute, startDate, completionDate, totalFees = '0') {
+async function openCertTabWithBitrixStudent(index) {
+    const s = currentStudentList[index];
+    if (!s) return;
     showGlobalLoader(true);
     try {
         const payload = {
-            id: bitrixId,
-            name: name,
-            email: email,
-            course_name: courseId,
-            institute: institute,
-            start_date: startDate,
-            completion_date: completionDate,
-            total_fees: totalFees
+            id: s.bitrix_id ?? s.id,
+            name: s.name,
+            email: s.email,
+            course_name: s.course_id ? String(s.course_id) : '',
+            institute: s.institute || '',
+            start_date: s.start_date || '',
+            completion_date: s.completion_date || '',
+            total_fees: s.total_fees || '0'
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
@@ -265,10 +291,12 @@ function switchStudentTab(tab) {
     if (tab === 'directory') {
         if (dirTab) dirTab.style.display = 'block';
         if (dirBtn) dirBtn.classList.add('active');
+        studentDirectoryStart = 0;
         loadStudentData(); // Load Bitrix ongoing students
     } else if (tab === 'bitrix') {
         if (bitrixTab) bitrixTab.style.display = 'block';
         if (bitrixBtn) bitrixBtn.classList.add('active');
+        bitrixStudentStart = 0;
         loadBitrixStudents();
     } else {
         if (certTab) certTab.style.display = 'block';
@@ -284,13 +312,15 @@ async function loadBitrixStudents() {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
     
     try {
-        const res = await apiFetch('/api/student/bitrix-active/');
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${bitrixStudentStart}`);
         if (res.ok) {
             const data = await res.json();
             const students = data.results || [];
+            bitrixStudentNext = data.next !== undefined ? data.next : null;
             
             if (students.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No active students found.</td></tr>';
+                updateBitrixStudentPagination(0);
                 return;
             }
             
@@ -308,6 +338,8 @@ async function loadBitrixStudents() {
                     <td><span style="font-size:7.5pt; padding:2px 8px; border-radius:10px; background:#e0f2fe; color:#0369a1; font-weight:600;">${s.stage.split(':').pop()}</span></td>
                 </tr>
             `).join('');
+            
+            updateBitrixStudentPagination(students.length);
         } else {
             tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch data from Bitrix24.</td></tr>';
         }
@@ -315,6 +347,21 @@ async function loadBitrixStudents() {
         console.error(e);
         tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Error connecting to Bitrix24 API.</td></tr>';
     }
+}
+
+function updateBitrixStudentPagination(count) {
+    const pageStart = count === 0 ? 0 : bitrixStudentStart + 1;
+    const pageEnd = count === 0 ? 0 : bitrixStudentStart + count;
+    
+    const startEl = document.getElementById('bitrixStudentPageStart');
+    const endEl = document.getElementById('bitrixStudentPageEnd');
+    const prevBtn = document.getElementById('bitrixStudentPrevBtn');
+    const nextBtn = document.getElementById('bitrixStudentNextBtn');
+    
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (prevBtn) prevBtn.disabled = (bitrixStudentStart === 0);
+    if (nextBtn) nextBtn.disabled = (bitrixStudentNext === null);
 }
 
 async function loadCoursesSelect(elementId) {
@@ -785,14 +832,20 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                const res = await apiFetch(`/student/installments/${instId}/record-payment/`, {
+                const res = await apiFetch(`/api/student/installments/${instId}/record-payment/`, {
                     method: 'POST',
                     body: JSON.stringify(data)
                 });
                 if (res.ok) {
                     showToast('Payment recorded successfully.');
                     closeRecordPaymentModal();
-                    loadStudentData();
+                    // If detail panel is open and installments tab is active, reload list
+                    const detailView = document.getElementById('studentDetailView');
+                    if (detailView && detailView.style.display !== 'none') {
+                        loadStudentInstallmentsList();
+                    } else {
+                        loadStudentData();
+                    }
                 } else {
                     showToast('Failed to record payment.', 'error');
                 }
@@ -801,4 +854,537 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Submit student edit
+    const editStudentForm = document.getElementById('editStudentForm');
+    if (editStudentForm) {
+        editStudentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentStudentDetails) return;
+            
+            showToast('Saving changes...');
+            const enrolledCourseVal = document.getElementById('editStudEnrolledCourse').value;
+            const data = {
+                name: document.getElementById('editStudName').value,
+                email: document.getElementById('editStudEmail').value,
+                phone: document.getElementById('editStudPhone').value,
+                father_name: document.getElementById('editStudFatherName').value,
+                gender: document.getElementById('editStudGender').value,
+                dob: document.getElementById('editStudDob').value || null,
+                address: document.getElementById('editStudAddress').value,
+                institute: document.getElementById('editStudInstitute').value,
+                enrolled_course: enrolledCourseVal ? parseInt(enrolledCourseVal) : null,
+                course_at_institute: document.getElementById('editStudCourse').value,
+                student_type: document.getElementById('editStudType').value,
+                cert_type: document.getElementById('editStudCertType').value,
+                program_name: document.getElementById('editStudProgram').value,
+                department: parseInt(document.getElementById('editStudDept').value),
+                mentor: document.getElementById('editStudMentor').value,
+                joining_date: document.getElementById('editStudJoining').value,
+                completion_date: document.getElementById('editStudCompletion').value,
+                total_fees: document.getElementById('editStudFees').value,
+                status: document.getElementById('editStudStatus').value
+            };
+
+            try {
+                const res = await apiFetch(`/api/student/students/${currentStudentDetails.id}/`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    showToast('Student profile updated successfully.');
+                    openStudentProfileDetail(currentStudentDetails.id, 'personal');
+                    loadStudentData();
+                } else {
+                    const err = await res.json();
+                    showToast('Failed to update profile: ' + JSON.stringify(err), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+                showToast('Error saving changes.', 'error');
+            }
+        });
+    }
+
+    // Submit student document upload
+    const studentDocUploadForm = document.getElementById('studentDocUploadForm');
+    if (studentDocUploadForm) {
+        studentDocUploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentStudentDetails) return;
+
+            showToast('Uploading document...');
+            const formData = new FormData();
+            formData.append('student', currentStudentDetails.id);
+            formData.append('doc_type', document.getElementById('studentUploadDocType').value);
+            formData.append('label', document.getElementById('studentUploadDocLabel').value);
+            formData.append('remarks', document.getElementById('studentUploadDocRemarks').value);
+            
+            const fileInput = document.getElementById('studentUploadDocFile');
+            if (fileInput.files.length > 0) {
+                formData.append('file', fileInput.files[0]);
+            }
+
+            try {
+                const res = await apiFetch('/api/student/documents/', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    showToast('Document uploaded successfully.');
+                    fileInput.value = '';
+                    document.getElementById('studentUploadDocLabel').value = '';
+                    document.getElementById('studentUploadDocRemarks').value = '';
+                    loadStudentDocumentsList();
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                }
+            } catch (ex) {
+                console.error(ex);
+                showToast('Error uploading document.', 'error');
+            }
+        });
+    }
 });
+
+// ---------- STUDENT PROFILE PANEL DYNAMIC LOGIC ----------
+let activeStudentProfileTab = 'personal';
+
+async function handleStudentRowClick(event, index) {
+    if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+        return;
+    }
+    
+    const s = currentStudentList[index];
+    if (!s) return;
+    
+    switchView('studentDetailView', false);
+    showGlobalLoader(true);
+    try {
+        const payload = {
+            id: s.bitrix_id ?? s.id,
+            name: s.name,
+            email: s.email,
+            course_name: s.course_id ? String(s.course_id) : '',
+            institute: s.institute || '',
+            start_date: s.start_date || '',
+            completion_date: s.completion_date || '',
+            total_fees: s.total_fees || '0'
+        };
+        const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            const student = await res.json();
+            openStudentProfileDetail(student.id);
+        } else {
+            const err = await res.json();
+            showToast(JSON.stringify(err), 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Error syncing student data.', 'error');
+    } finally {
+        hideGlobalLoader();
+    }
+}
+
+async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shouldSwitchView = true) {
+    if (shouldSwitchView) {
+        switchView('studentDetailView', true, {
+            studentId: studentId,
+            studentTab: tabToFocus,
+            skipStudentDetailLoad: true
+        });
+    }
+    showGlobalLoader(true);
+    try {
+        const res = await apiFetch(`/api/student/students/${studentId}/`);
+        if (res.ok) {
+            const student = await res.json();
+            currentStudentDetails = student;
+
+            // Populate header banner
+            const nameEl = document.getElementById('detailStudentName');
+            if (nameEl) nameEl.textContent = student.name || '';
+            const courseEl = document.getElementById('detailStudentCourse');
+            if (courseEl) courseEl.textContent = student.course_at_institute || 'General';
+            const deptEl = document.getElementById('detailStudentDept');
+            if (deptEl) deptEl.textContent = student.department_details ? student.department_details.name : 'Training';
+            const certNoEl = document.getElementById('detailStudentCertNo');
+            if (certNoEl) certNoEl.textContent = student.cert_no || 'Pending';
+            
+            // Student type badge styling
+            const typeBadge = document.getElementById('detailStudentTypeBadge');
+            if (typeBadge) {
+                typeBadge.textContent = student.student_type;
+                if (student.student_type === 'INTERN') {
+                    typeBadge.style.backgroundColor = '#8b5cf6'; // Purple
+                } else if (student.student_type === 'TRAINEE') {
+                    typeBadge.style.backgroundColor = '#3b82f6'; // Blue
+                } else {
+                    typeBadge.style.backgroundColor = '#10b981'; // Green
+                }
+                typeBadge.style.color = 'white';
+            }
+
+            // Status badge styling
+            const statusBadge = document.getElementById('detailStudentStatusBadge');
+            if (statusBadge) {
+                statusBadge.textContent = student.status;
+                if (student.status === 'ACTIVE') {
+                    statusBadge.style.backgroundColor = '#10b981';
+                } else if (student.status === 'COMPLETED') {
+                    statusBadge.style.backgroundColor = '#10b981';
+                } else {
+                    statusBadge.style.backgroundColor = '#ef4444';
+                }
+                statusBadge.style.color = 'white';
+            }
+
+            // Populate Form Fields (Personal Info Tab) safely
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.value = val || '';
+            };
+            
+            setVal('editStudName', student.name);
+            setVal('editStudEmail', student.email);
+            setVal('editStudPhone', student.phone);
+            setVal('editStudFatherName', student.father_name);
+            setVal('editStudGender', student.gender || 'MALE');
+            setVal('editStudDob', student.dob);
+            setVal('editStudAddress', student.address);
+            setVal('editStudInstitute', student.institute);
+            setVal('editStudCourse', student.course_at_institute);
+            setVal('editStudType', student.student_type || 'TRAINEE');
+            setVal('editStudCertType', student.cert_type || 'TRAINING_CERT');
+            setVal('editStudProgram', student.program_name);
+            setVal('editStudMentor', student.mentor);
+            setVal('editStudJoining', student.joining_date);
+            setVal('editStudCompletion', student.completion_date);
+            setVal('editStudFees', student.total_fees || '0');
+            setVal('editStudStatus', student.status || 'ACTIVE');
+
+            // Load enrolled course and departments dropdowns
+            await loadStudentDetailSelects(student.enrolled_course, student.department);
+
+            switchStudentProfileTab(tabToFocus);
+        } else {
+            showToast('Failed to load student details.', 'error');
+        }
+    } catch (e) {
+        console.error('Error inside openStudentProfileDetail:', e);
+        showToast('Error loading student details: ' + e.message, 'error');
+    } finally {
+        hideGlobalLoader();
+    }
+}
+
+async function loadStudentDetailSelects(enrolledCourseId, deptId) {
+    // Enrolled Courses Select
+    const courseSelect = document.getElementById('editStudEnrolledCourse');
+    if (courseSelect) {
+        try {
+            const res = await apiFetch('/api/student/courses/');
+            if (res.ok) {
+                const data = await res.json();
+                const list = data.results || data;
+                let html = '<option value="">-- Select Course --</option>';
+                list.forEach(c => {
+                    html += `<option value="${c.id}">${c.course_name}</option>`;
+                });
+                courseSelect.innerHTML = html;
+                courseSelect.value = enrolledCourseId || '';
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Departments Select
+    const deptSelect = document.getElementById('editStudDept');
+    if (deptSelect) {
+        try {
+            const res = await apiFetch('/onboarding/departments/');
+            if (res.ok) {
+                const depts = await res.json();
+                const deptList = depts.results || depts;
+                let html = deptList.map(d => `<option value="${d.id}">${d.id}</option>`).join('');
+                deptSelect.innerHTML = html;
+                deptSelect.value = deptId || '';
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+}
+
+function switchStudentProfileTab(tabId) {
+    activeStudentProfileTab = tabId;
+    const tabs = ['personal', 'docs', 'installments', 'certificates'];
+    
+    tabs.forEach(t => {
+        const btn = document.getElementById(`sTab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
+        const block = document.getElementById(`studentTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        
+        if (t === tabId) {
+            if (btn) {
+                btn.classList.add('active');
+                btn.style.color = 'var(--primary-color)';
+                btn.style.borderBottom = '3px solid var(--primary-color)';
+            }
+            if (block) {
+                block.style.display = 'block';
+            }
+        } else {
+            if (btn) {
+                btn.classList.remove('active');
+                btn.style.color = 'var(--text-muted)';
+                btn.style.borderBottom = '3px solid transparent';
+            }
+            if (block) {
+                block.style.display = 'none';
+            }
+        }
+    });
+
+    if (tabId === 'docs') loadStudentDocumentsList();
+    else if (tabId === 'installments') loadStudentInstallmentsList();
+    else if (tabId === 'certificates') loadStudentCertificatesList();
+}
+
+// ---------- DOCUMENTS TAB LOGIC ----------
+function toggleStudentDocLabelField() {
+    const typeSelect = document.getElementById('studentUploadDocType');
+    const container = document.getElementById('studentDocLabelContainer');
+    if (typeSelect && container) {
+        if (typeSelect.value === 'OTHER') {
+            container.style.display = 'block';
+            document.getElementById('studentUploadDocLabel').setAttribute('required', 'true');
+        } else {
+            container.style.display = 'none';
+            document.getElementById('studentUploadDocLabel').removeAttribute('required');
+        }
+    }
+}
+
+async function loadStudentDocumentsList() {
+    if (!currentStudentDetails) return;
+    
+    try {
+        const res = await apiFetch(`/api/student/documents/?student_id=${currentStudentDetails.id}`);
+        if (res.ok) {
+            const docs = await res.json();
+            const docList = docs.results || docs;
+            
+            // Render interactive checklist
+            renderStudentDocumentsChecklist(docList);
+            
+            // Render attachments table
+            const tbody = document.getElementById('studentDocsTableBody');
+            if (tbody) {
+                if (docList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No documents uploaded yet.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = docList.map(d => `
+                    <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
+                        <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${getDocTypeLabel(d.doc_type)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${d.label || d.remarks || '-'}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${formatDate(d.upload_date)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${d.uploaded_by_username || 'System'}</td>
+                        <td style="padding: 10px 20px; text-align: center;">
+                            <div style="display: flex; justify-content: center; gap: 8px;">
+                                <a href="${d.file}" target="_blank" class="btn" style="font-size: 8pt; padding: 4px 8px; background-color: var(--primary-light); color: var(--primary-color);">👁️ View</a>
+                                <button class="btn" style="font-size: 8pt; padding: 4px 8px; background-color: #ef4444; color: white;" onclick="deleteStudentDoc(${d.id})">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function getDocTypeLabel(docType) {
+    const labels = {
+        'RESUME': 'Resume / CV',
+        'AADHAAR': 'ID Proof (Aadhaar Card)',
+        'COLLEGE_ID': 'College ID / Enrollment Letter',
+        'JOINING_LETTER': 'Joining Letter',
+        'FEE_RECEIPT': 'Fee Receipt',
+        'OTHER': 'Other'
+    };
+    return labels[docType] || docType;
+}
+
+function renderStudentDocumentsChecklist(docList) {
+    const container = document.getElementById('studentDocumentsChecklistContainer');
+    if (!container) return;
+    
+    const requiredDocs = [
+        { type: 'RESUME', name: 'Resume / CV', desc: 'Verify professional/academic experience.' },
+        { type: 'AADHAAR', name: 'ID Proof (Aadhaar Card)', desc: 'Government identity verification.' },
+        { type: 'COLLEGE_ID', name: 'College ID / Enrollment Letter', desc: 'College credential validation.' },
+        { type: 'JOINING_LETTER', name: 'Signed Joining Letter', desc: 'Acceptance of student guidelines.' },
+        { type: 'FEE_RECEIPT', name: 'Fee Receipt', desc: 'Payment receipt confirmation.' }
+    ];
+    
+    container.innerHTML = requiredDocs.map(req => {
+        const doc = docList.find(d => d.doc_type === req.type);
+        const isUploaded = !!doc;
+        
+        const badgeBg = isUploaded ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+        const badgeTextColor = isUploaded ? '#10b981' : '#ef4444';
+        const badgeBorderColor = isUploaded ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+        const badgeText = isUploaded ? 'Uploaded' : 'Missing';
+        
+        return `
+            <div style="background-color: var(--bg-card); border: 1.5px solid ${isUploaded ? '#e2e8f0' : badgeBorderColor}; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-sm); transition: all 0.2s;" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow-sm)'">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                        <span style="font-weight: 700; color: var(--text-main); font-size: 13.5px; line-height: 1.3;">${req.name}</span>
+                        <span style="background-color: ${badgeBg}; color: ${badgeTextColor}; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; border: 1px solid ${badgeBorderColor}; white-space: nowrap;">${badgeText}</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.3;">${req.desc}</div>
+                </div>
+                ${isUploaded ? `
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                        <span style="font-size: 9.5px; color: var(--text-light); font-family: monospace;">Uploaded: ${formatSimpleDate(doc.upload_date)}</span>
+                        <a href="${doc.file}" target="_blank" class="btn" style="padding: 4px 10px; font-size: 10px; border-radius: 6px; font-weight:700; background-color: var(--primary-light); color: var(--primary-color);">👁️ View</a>
+                    </div>
+                ` : `
+                    <div style="margin-top: 5px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                        <button class="btn btn-primary btn-sm" style="width: 100%; font-size: 11px; padding: 6px; border-radius: 6px; background-color: var(--primary-light); color: var(--primary-color); border: 1px solid rgba(124,58,237,0.2); font-weight:700;" onclick="document.getElementById('studentUploadDocType').value='${req.type}'; toggleStudentDocLabelField(); document.getElementById('studentUploadDocFile').focus();">Upload File</button>
+                    </div>
+                `}
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteStudentDoc(docId) {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+    
+    showToast('Deleting document...');
+    try {
+        const res = await apiFetch(`/api/student/documents/${docId}/`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            showToast('Document deleted.');
+            loadStudentDocumentsList();
+        } else {
+            showToast('Failed to delete document.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// ---------- FEE INSTALLMENTS TAB LOGIC ----------
+async function loadStudentInstallmentsList() {
+    if (!currentStudentDetails) return;
+    
+    try {
+        const res = await apiFetch(`/api/student/installments/?student_id=${currentStudentDetails.id}`);
+        if (res.ok) {
+            const list = await res.json();
+            const instList = list.results || list;
+            
+            const tbody = document.getElementById('studentInstallmentsTableBody');
+            if (tbody) {
+                if (instList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-light);">No fee installments defined.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = instList.map(inst => `
+                    <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
+                        <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">Installment ${inst.installment_number}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${inst.due_date}</td>
+                        <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">Rs. ${inst.amount}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">Rs. ${inst.paid_amount}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${inst.paid_date || '-'}</td>
+                        <td style="padding: 10px 20px;">
+                            <span style="font-size: 7.5pt; font-weight: bold; padding: 3px 8px; border-radius: 999px; background-color: ${inst.status === 'PAID' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${inst.status === 'PAID' ? '#10b981' : '#ef4444'}">${inst.status}</span>
+                        </td>
+                        <td style="padding: 10px 20px; color: var(--text-muted); font-size: 12px;">${inst.remarks || '-'}</td>
+                        <td style="padding: 10px 20px; text-align: center;">
+                            <div style="display: flex; gap: 8px; justify-content: center;">
+                                ${inst.status !== 'PAID' ? `
+                                    <button class="btn btn-primary" style="font-size: 8pt; padding: 4px 8px;" onclick="openRecordPaymentModal(${inst.id})">Record Payment</button>
+                                    <button class="btn" style="font-size: 8pt; padding: 4px 8px; background-color: #eab308; color: white;" onclick="triggerWarningEmail(${inst.id})">Send Warning</button>
+                                ` : '-'}
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// ---------- CERTIFICATES TAB LOGIC ----------
+async function loadStudentCertificatesList() {
+    if (!currentStudentDetails) return;
+    
+    try {
+        const res = await apiFetch(`/api/student/certificates/?student_id=${currentStudentDetails.id}`);
+        if (res.ok) {
+            const list = await res.json();
+            const certs = list.results || list;
+            
+            const tbody = document.getElementById('studentCertificatesTableBody');
+            if (tbody) {
+                if (certs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = certs.map(c => `
+                    <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
+                        <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${c.serial_no}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.course_name || '-'}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${formatSimpleDate(c.issue_date)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.place || 'Mohali'}</td>
+                        <td style="padding: 10px 20px; text-align: center;">
+                            ${c.pdf_file ? `
+                                <a href="${c.pdf_file}" target="_blank" class="btn" style="font-size: 8pt; padding: 4px 10px; background-color: var(--primary-light); color: var(--primary-color);">📥 Download PDF</a>
+                            ` : '-'}
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function changeStudentPage(direction) {
+    if (direction === 1 && studentDirectoryNext !== null) {
+        studentDirectoryStart = studentDirectoryNext;
+    } else if (direction === -1) {
+        studentDirectoryStart = Math.max(0, studentDirectoryStart - 50);
+    }
+    loadStudentData();
+}
+
+function changeBitrixStudentPage(direction) {
+    if (direction === 1 && bitrixStudentNext !== null) {
+        bitrixStudentStart = bitrixStudentNext;
+    } else if (direction === -1) {
+        bitrixStudentStart = Math.max(0, bitrixStudentStart - 50);
+    }
+    loadBitrixStudents();
+}
+

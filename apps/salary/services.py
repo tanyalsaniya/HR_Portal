@@ -71,7 +71,7 @@ def generate_payslip_pdf(salary_slip):
         'employee': employee,
         'bank_account_masked': bank_account_masked,
         'net_pay_words': net_pay_words,
-        'company_name': getattr(settings, 'COMPANY_NAME', 'MTLV Solutions Private Limited'),
+        'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
         'today': datetime.date.today()
     }
     
@@ -98,7 +98,7 @@ def generate_increment_letter_pdf(approval, user=None):
     context = {
         'approval': approval,
         'employee': employee,
-        'company_name': 'MTLV Solutions Private Limited',
+        'company_name': 'Devex Hub Pvt Ltd.',
         'today': datetime.date.today()
     }
     
@@ -137,7 +137,7 @@ def generate_payslips_zip(slips, zip_type='employee'):
                 'employee': employee,
                 'bank_account_masked': bank_account_masked,
                 'net_pay_words': net_pay_words,
-                'company_name': getattr(settings, 'COMPANY_NAME', 'MTLV Solutions Private Limited'),
+                'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
                 'today': datetime.date.today()
             }
             

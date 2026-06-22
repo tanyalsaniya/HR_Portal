@@ -3,9 +3,12 @@
 
 // Theme Toggle
 function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    html.style.colorScheme = next;
+    localStorage.setItem('theme', next);
 }
 
 // Toggle Notifications slide-over panel

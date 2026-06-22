@@ -132,3 +132,37 @@ class StudentCertificate(models.Model):
     def __str__(self):
         return f"{self.serial_no} - {self.student.name}"
 
+
+def student_upload_to_uuid_filename(instance, filename):
+    import uuid
+    import os
+    ext = os.path.splitext(filename)[1].lower()
+    uuid_filename = f"{uuid.uuid4()}{ext}"
+    return f"students/{instance.student.id}/docs/{uuid_filename}"
+
+
+class StudentDocument(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='documents')
+    doc_type = models.CharField(max_length=50)  # RESUME, AADHAAR, COLLEGE_ID, JOINING_LETTER, FEE_RECEIPT, OTHER
+    label = models.CharField(max_length=200, blank=True, null=True)
+    file = models.FileField(upload_to=student_upload_to_uuid_filename)
+    original_filename = models.CharField(max_length=255, blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='uploaded_student_documents'
+    )
+    upload_date = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.original_filename and self.file:
+            import os
+            self.original_filename = os.path.basename(self.file.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Student {self.student.name} - {self.doc_type}"
+
+

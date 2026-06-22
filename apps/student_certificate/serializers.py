@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from decimal import Decimal
-from .models import Student, StudentFeeInstallment, Course, StudentCertificate
+from .models import Student, StudentFeeInstallment, Course, StudentCertificate, StudentDocument
 from employee_onboarding.serializers import DepartmentSerializer
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -16,8 +16,40 @@ class StudentFeeInstallmentSerializer(serializers.ModelSerializer):
         read_only_fields = ('student', 'status', 'paid_amount', 'paid_date')
 
 
+class StudentDocumentSerializer(serializers.ModelSerializer):
+    uploaded_by_username = serializers.ReadOnlyField(source='uploaded_by.username')
+    file_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentDocument
+        fields = '__all__'
+        read_only_fields = ('uploaded_by', 'upload_date')
+
+    def get_file_name(self, obj):
+        return obj.file.name.split('/')[-1] if obj.file else ""
+
+    def validate_file(self, value):
+        from rules import MAX_DOCUMENT_SIZE_BYTES
+        if value.size > MAX_DOCUMENT_SIZE_BYTES:
+            raise serializers.ValidationError("File size must be less than 10 MB.")
+            
+        allowed_extensions = ['.pdf', '.jpeg', '.jpg', '.png']
+        import os
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext not in allowed_extensions:
+            raise serializers.ValidationError("Only PDF, JPEG, and PNG files are allowed.")
+        return value
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user:
+            validated_data['uploaded_by'] = request.user
+        return super().create(validated_data)
+
+
 class StudentSerializer(serializers.ModelSerializer):
     installments = StudentFeeInstallmentSerializer(many=True, read_only=True)
+    documents = StudentDocumentSerializer(many=True, read_only=True)
     installments_schedule = serializers.ListField(
         child=serializers.DictField(),
         write_only=True,
