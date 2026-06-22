@@ -29,37 +29,32 @@
             background-size: 100% 100%;
             background-repeat: no-repeat;
             position: relative;
-            padding: 55mm 22mm 25mm 22mm;
-        }
-        
-        .cert-header {
-            position: absolute;
-            top: 20mm;
-            left: 22mm;
-            right: 22mm;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 8mm;
+            padding: 48mm 22mm 25mm 22mm;
         }
         
         .logo-left {
-            max-height: 26mm;
+            position: absolute;
+            top: 18mm;
+            left: 30mm;
+            max-height: 25mm;
             width: auto;
         }
         
         .logo-right {
-            max-height: 24mm;
+            position: absolute;
+            top: 14mm;
+            right: 30mm;
+            max-height: 22mm;
             width: auto;
         }
         
         .cert-title-container {
             text-align: center;
-            margin-bottom: 0;
+            margin-bottom: 8mm;
         }
         
         .cert-title {
-            font-size: 32pt;
+            font-size: 26pt;
             font-weight: 800;
             color: #0c1b33;
             letter-spacing: 1px;
@@ -68,8 +63,8 @@
         }
         
         .cert-title-underline {
-            width: 52mm;
-            height: 4px;
+            width: 44mm;
+            height: 3.5px;
             background-color: #0a4f9f;
             margin: 6px auto 0 auto;
         }
@@ -213,14 +208,14 @@
 </head>
 <body>
     <div class="certificate-container">
-        <!-- Header with Logos and Title -->
-        <div class="cert-header">
-            <img src="file://{{ left_logo_path }}" class="logo-left">
-            <div class="cert-title-container">
-                <h1 class="cert-title">Certificate</h1>
-                <div class="cert-title-underline"></div>
-            </div>
-            <img src="file://{{ right_logo_path }}" class="logo-right">
+        <!-- Absolute Logos -->
+        <img src="file://{{ left_logo_path }}" class="logo-left">
+        <img src="file://{{ right_logo_path }}" class="logo-right">
+
+        <!-- Title -->
+        <div class="cert-title-container">
+            <h1 class="cert-title">Certificate</h1>
+            <div class="cert-title-underline"></div>
         </div>
         
         <!-- Serial Number -->
