@@ -5,6 +5,7 @@ let studentInstallmentRows = [];
 let currentSelectedStudentName = '';
 let currentStudentDetails = null;
 let generatedPdfUrl = null;
+let certEditorSkills = [];
 
 // ---------- STUDENTS & INTERNS VIEW ----------
 async function loadStudentData() {
@@ -400,7 +401,8 @@ async function loadStudentCertPrefills() {
             document.getElementById('certIssueDate').value = todayStr;
             
             // Build skills
-            renderEditorSkills(data.skills);
+            certEditorSkills = (data.skills || []).map(s => ({ name: s, rating: 'Excellent' }));
+            renderEditorSkills();
             
             // Set Paragraph Text
             const showDates = document.getElementById('certShowDatesToggle').checked;
@@ -414,36 +416,70 @@ async function loadStudentCertPrefills() {
     }
 }
 
-function renderEditorSkills(skillsList) {
+function renderEditorSkills() {
     const container = document.getElementById('certSkillsContainer');
     if (!container) return;
     
-    if (!skillsList || skillsList.length === 0) {
-        container.innerHTML = '<div style="color:#64748b; font-size:9.5pt;">No skills defined for this course.</div>';
+    if (certEditorSkills.length === 0) {
+        container.innerHTML = '<div style="color:#64748b; font-size:9.5pt; text-align: center; padding: 15px;">No skills added. Click "+ Add Skill" to add one.</div>';
         return;
     }
     
     let html = '';
-    skillsList.forEach((skill, idx) => {
+    certEditorSkills.forEach((skill, idx) => {
         html += `
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-color); padding-bottom: 6px;">
-                <span style="font-weight: 600; font-size: 9.5pt; color: var(--text-color);">${skill}</span>
+            <div class="skill-row-item" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px; width: 45%;">
+                    <button type="button" onclick="removeCertSkill(${idx})" style="background: none; border: none; color: #ef4444; font-size: 14pt; cursor: pointer; padding: 0 4px; line-height: 1;" title="Remove Skill">&times;</button>
+                    <input type="text" value="${skill.name}" oninput="updateSkillName(${idx}, this.value)" style="font-weight: 600; font-size: 9.5pt; color: var(--text-color); width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; box-sizing: border-box;" placeholder="Skill Name">
+                </div>
                 <div style="display: flex; gap: 10px;">
                     <label style="margin:0; font-size: 9pt; display: inline-flex; align-items: center; gap: 4px; cursor:pointer;">
-                        <input type="radio" name="skill_${idx}" value="Excellent" checked onchange="updateLivePreview()" style="width: auto; cursor:pointer;"> Excellent
+                        <input type="radio" name="skill_${idx}" value="Excellent" ${skill.rating === 'Excellent' ? 'checked' : ''} onchange="updateSkillRating(${idx}, this.value)" style="width: auto; cursor:pointer;"> Excellent
                     </label>
                     <label style="margin:0; font-size: 9pt; display: inline-flex; align-items: center; gap: 4px; cursor:pointer;">
-                        <input type="radio" name="skill_${idx}" value="Good" onchange="updateLivePreview()" style="width: auto; cursor:pointer;"> Good
+                        <input type="radio" name="skill_${idx}" value="Good" ${skill.rating === 'Good' ? 'checked' : ''} onchange="updateSkillRating(${idx}, this.value)" style="width: auto; cursor:pointer;"> Good
                     </label>
                     <label style="margin:0; font-size: 9pt; display: inline-flex; align-items: center; gap: 4px; cursor:pointer;">
-                        <input type="radio" name="skill_${idx}" value="Poor" onchange="updateLivePreview()" style="width: auto; cursor:pointer;"> Poor
+                        <input type="radio" name="skill_${idx}" value="Poor" ${skill.rating === 'Poor' ? 'checked' : ''} onchange="updateSkillRating(${idx}, this.value)" style="width: auto; cursor:pointer;"> Poor
                     </label>
                 </div>
-                <input type="hidden" class="skill-name-hidden" value="${skill}">
+                <input type="hidden" class="skill-name-hidden" value="${skill.name}">
             </div>
         `;
     });
     container.innerHTML = html;
+}
+
+function addCustomCertSkill() {
+    certEditorSkills.push({ name: 'New Skill', rating: 'Excellent' });
+    renderEditorSkills();
+    updateLivePreview();
+}
+
+function removeCertSkill(idx) {
+    certEditorSkills.splice(idx, 1);
+    renderEditorSkills();
+    updateLivePreview();
+}
+
+function updateSkillName(idx, name) {
+    if (certEditorSkills[idx]) {
+        certEditorSkills[idx].name = name;
+        const rows = document.querySelectorAll('.skill-row-item');
+        if (rows[idx]) {
+            const hidden = rows[idx].querySelector('.skill-name-hidden');
+            if (hidden) hidden.value = name;
+        }
+        updateLivePreview();
+    }
+}
+
+function updateSkillRating(idx, rating) {
+    if (certEditorSkills[idx]) {
+        certEditorSkills[idx].rating = rating;
+        updateLivePreview();
+    }
 }
 
 function onCertCourseChange() {
@@ -456,7 +492,8 @@ function onCertCourseChange() {
         const skills = JSON.parse(option.getAttribute('data-skills') || '[]');
         
         document.getElementById('certDurationInput').value = duration;
-        renderEditorSkills(skills);
+        certEditorSkills = skills.map(s => ({ name: s, rating: 'Excellent' }));
+        renderEditorSkills();
         
         if (currentStudentDetails) {
             currentStudentDetails.course_name = option.text;
