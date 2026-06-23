@@ -6,6 +6,7 @@ from .views import (
     UserDetailView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
+    LogoutView,
     DashboardAPIView,
     hybrid_view
 )
@@ -16,6 +17,7 @@ urlpatterns = [
     # Legacy / API Endpoints (backward compatibility)
     path('api/auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/logout/', LogoutView.as_view(), name='token_logout'),
     path('api/auth/me/', UserDetailView.as_view(), name='user_detail'),
     path('api/auth/dashboard/', DashboardAPIView.as_view(), name='dashboard_stats'),
     path('api/auth/password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),

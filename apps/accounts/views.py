@@ -67,6 +67,16 @@ class PasswordResetConfirmView(APIView):
         return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
 
 
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from django.contrib.auth.signals import user_logged_out
+        user_logged_out.send(sender=request.user.__class__, request=request, user=request.user)
+        return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+
+
+
 from student_certificate.models import Student
 from exit_formality.models import ExitRequest
 from salary.models import SalaryIncrementReminder

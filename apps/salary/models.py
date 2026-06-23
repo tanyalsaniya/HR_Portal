@@ -129,22 +129,32 @@ class SalarySlip(models.Model):
         unique_together = ('bitrix_user_id', 'month', 'year')
 
     def save(self, *args, **kwargs):
-        # Calculate payable_days = worked_days + weekend + cl + extra
-        self.payable_days = (
-            Decimal(self.worked_days or 0) +
-            Decimal(self.weekend or 0) +
-            Decimal(self.cl or 0) +
-            Decimal(self.extra or 0)
-        ).quantize(Decimal('0.01'))
-        
-        # Calculate payable_salary = (month_salary / month_days) * payable_days
-        if self.month_days and Decimal(self.month_days) > 0:
-            self.payable_salary = ((Decimal(self.month_salary or 0) / Decimal(self.month_days)) * Decimal(self.payable_days)).quantize(Decimal('0.01'))
-        else:
-            self.payable_salary = Decimal(self.month_salary or 0).quantize(Decimal('0.01'))
+        if not getattr(self, '_skip_recalculation', False):
+            # Calculate payable_days = worked_days + weekend + cl + extra
+            self.payable_days = (
+                Decimal(self.worked_days or 0) +
+                Decimal(self.weekend or 0) +
+                Decimal(self.cl or 0) +
+                Decimal(self.extra or 0)
+            ).quantize(Decimal('0.01'))
+            
+            # Calculate payable_salary = (month_salary / month_days) * payable_days
+            if self.month_days and Decimal(self.month_days) > 0:
+                self.payable_salary = ((Decimal(self.month_salary or 0) / Decimal(self.month_days)) * Decimal(self.payable_days)).quantize(Decimal('0.01'))
+            else:
+                self.payable_salary = Decimal(self.month_salary or 0).quantize(Decimal('0.01'))
 
-        # Calculate net_payable = payable_salary + extra_days_working - fine_advance
-        self.net_payable = (Decimal(self.payable_salary or 0) + Decimal(self.extra_days_working or 0) - Decimal(self.fine_advance or 0)).quantize(Decimal('0.01'))
+            # Calculate net_payable = payable_salary + extra_days_working - fine_advance
+            self.net_payable = (Decimal(self.payable_salary or 0) + Decimal(self.extra_days_working or 0) - Decimal(self.fine_advance or 0)).quantize(Decimal('0.01'))
+        else:
+            # Even when skipping, if payable_days is 0 or None, calculate it based on attendance
+            if not self.payable_days or self.payable_days == 0:
+                self.payable_days = (
+                    Decimal(self.worked_days or 0) +
+                    Decimal(self.weekend or 0) +
+                    Decimal(self.cl or 0) +
+                    Decimal(self.extra or 0)
+                ).quantize(Decimal('0.01'))
 
         if not self.payslip_no:
             from common.utils import generate_payslip_number
