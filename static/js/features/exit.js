@@ -1092,8 +1092,9 @@ async function openExitTemplateEditor() {
             selector.innerHTML = '<option value="">— Choose a template —</option>' +
                 exitTemplatesCache.map(t => `<option value="${t.id}">${t.title} (${t.name})</option>`).join('');
             
-            // Clear editor
-            document.getElementById('templateEditorTextarea').value = '';
+            // Clear visual editor
+            const visualEditor = document.getElementById('exitVisualTemplateEditor');
+            if (visualEditor) visualEditor.innerHTML = '';
             document.getElementById('templateEditorStatus').textContent = `${exitTemplatesCache.length} exit templates loaded`;
             activeEditorTemplateId = null;
             
@@ -1117,7 +1118,8 @@ function loadExitTemplateToEditor() {
     const selectedId = selector.value;
     
     if (!selectedId) {
-        document.getElementById('templateEditorTextarea').value = '';
+        const visualEditor = document.getElementById('exitVisualTemplateEditor');
+        if (visualEditor) visualEditor.innerHTML = '';
         document.getElementById('templateEditorStatus').textContent = 'No template selected';
         activeEditorTemplateId = null;
         return;
@@ -1127,7 +1129,22 @@ function loadExitTemplateToEditor() {
     if (!template) return;
     
     activeEditorTemplateId = template.id;
-    document.getElementById('templateEditorTextarea').value = template.html_content || '';
+    
+    // Populate the visual contenteditable editor (like onboarding)
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (visualEditor) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(template.html_content || '', 'text/html');
+        
+        let styles = '';
+        doc.querySelectorAll('style').forEach(s => {
+            styles += s.outerHTML;
+        });
+        
+        const bodyContent = doc.body ? doc.body.innerHTML : (template.html_content || '');
+        visualEditor.innerHTML = styles + bodyContent;
+    }
+    
     document.getElementById('templateEditorStatus').textContent = `Editing: ${template.title}`;
     document.getElementById('templateEditorLastSaved').textContent = template.updated_at
         ? `Last saved: ${new Date(template.updated_at).toLocaleString()}`
@@ -1143,9 +1160,35 @@ async function saveExitTemplateChanges() {
     const template = exitTemplatesCache.find(t => t.id == activeEditorTemplateId);
     if (!template) return;
     
-    const newContent = document.getElementById('templateEditorTextarea').value;
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (!visualEditor) return;
     
-    if (!confirm(`Are you sure you want to save changes to "${template.title}"? This will affect all future document generations using this template.`)) {
+    // Parse current content to separate styles and body content (like onboarding)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(visualEditor.innerHTML, 'text/html');
+    
+    let styles = '';
+    doc.querySelectorAll('style').forEach(s => {
+        styles += s.outerHTML;
+        s.remove();
+    });
+    
+    const bodyContent = doc.body ? doc.body.innerHTML : visualEditor.innerHTML;
+    
+    // Reconstruct valid full-page HTML for WeasyPrint
+    const newContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${template.title || 'Exit Document'}</title>
+    ${styles}
+</head>
+<body>
+    ${bodyContent}
+</body>
+</html>`;
+    
+    if (!confirm(`Save changes to "${template.title}"? This will affect all future documents generated using this template.`)) {
         return;
     }
     
@@ -1177,6 +1220,41 @@ async function saveExitTemplateChanges() {
     } catch (e) {
         console.error(e);
         showToast('Server error saving template.', 'error');
+    }
+}
+
+// ---- Exit visual editor toolbar helpers ----
+function execExitEditorCommand(command) {
+    document.execCommand(command, false, null);
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (visualEditor) visualEditor.focus();
+}
+
+function insertExitPlaceholderAtCursor(placeholder) {
+    if (!placeholder) return;
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (!visualEditor) return;
+    
+    visualEditor.focus();
+    
+    const sel = window.getSelection();
+    if (sel.getRangeAt && sel.rangeCount) {
+        let range = sel.getRangeAt(0);
+        
+        if (visualEditor.contains(range.commonAncestorContainer)) {
+            range.deleteContents();
+            const textNode = document.createTextNode(placeholder);
+            range.insertNode(textNode);
+            range = range.cloneRange();
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            visualEditor.appendChild(document.createTextNode(placeholder));
+        }
+    } else {
+        visualEditor.appendChild(document.createTextNode(placeholder));
     }
 }
 

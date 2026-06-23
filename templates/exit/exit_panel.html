@@ -3,18 +3,22 @@
     <div class="flex-row-header">
         <h2>Exit Clearances & Directory</h2>
         <div style="display: flex; gap: 10px;">
-            <button class="btn btn-secondary" id="manageExitTemplatesBtn" onclick="openExitTemplateEditor()" style="display: none;">Manage Templates</button>
+            <button class="btn btn-secondary" id="manageExitTemplatesBtn" onclick="openExitTemplateEditor()"
+                style="display: none;">Manage Templates</button>
             <button class="btn btn-primary" id="addExitBtn" onclick="openInitiateExitModal()">Initiate Exit</button>
         </div>
     </div>
 
     <!-- Filters and Search -->
-    <div style="background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+    <div
+        style="background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
         <div style="flex: 1; min-width: 200px;">
-            <input type="text" id="exitSearchInput" placeholder="Search by name, ID..." oninput="filterExitTable()" style="padding: 8px; font-size: 9.5pt;">
+            <input type="text" id="exitSearchInput" placeholder="Search by name, ID..." oninput="filterExitTable()"
+                style="padding: 8px; font-size: 9.5pt;">
         </div>
         <div>
-            <select id="exitStatusFilter" onchange="filterExitTable()" style="padding: 8px; font-size: 9.5pt; width: auto;">
+            <select id="exitStatusFilter" onchange="filterExitTable()"
+                style="padding: 8px; font-size: 9.5pt; width: auto;">
                 <option value="">All Statuses</option>
                 <option value="PENDING">Pending</option>
                 <option value="IN_PROGRESS">In Progress</option>
@@ -48,13 +52,19 @@
         </table>
     </div>
     <!-- Pagination Controls -->
-    <div class="pagination-footer" id="exitPaginationFooter" style="display: none; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent, #e2e8f0); background: #fafafa; margin-top: 15px; border-radius: 0 0 8px 8px;">
+    <div class="pagination-footer" id="exitPaginationFooter"
+        style="display: none; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent, #e2e8f0); background: #fafafa; margin-top: 15px; border-radius: 0 0 8px 8px;">
         <div style="font-size: 9pt; color: var(--text-secondary, #64748b);">
-            Showing <span id="exitPageStart">0</span> to <span id="exitPageEnd">0</span> of <span id="exitTotalCount">0</span> entries
+            Showing <span id="exitPageStart">0</span> to <span id="exitPageEnd">0</span> of <span
+                id="exitTotalCount">0</span> entries
         </div>
         <div style="display: flex; gap: 8px;">
-            <button id="exitPrevBtn" onclick="changeExitPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
-            <button id="exitNextBtn" onclick="changeExitPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;" disabled>Next</button>
+            <button id="exitPrevBtn" onclick="changeExitPage(-1)" class="btn"
+                style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;"
+                disabled>Previous</button>
+            <button id="exitNextBtn" onclick="changeExitPage(1)" class="btn"
+                style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;"
+                disabled>Next</button>
         </div>
     </div>
 </div>
@@ -64,7 +74,8 @@
     <div class="modal-content">
         <div class="flex-row-header">
             <h3 style="margin:0;">Initiate Exit Clearance</h3>
-            <button onclick="closeExitModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+            <button onclick="closeExitModal()"
+                style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
         </div>
         <form id="exitForm">
             <div>
@@ -119,69 +130,110 @@
 <!-- VIEW 5: EXIT PROCESS DETAILS & WORKFLOW -->
 <div id="exitDetailView" class="view-panel" style="display: none; padding: 0;">
     <!-- Profile Banner & Header -->
-    <div style="background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 25px 35px; border-radius: 16px 16px 0 0; position: relative; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px; box-shadow: var(--shadow-md); color: white;">
+    <div
+        style="background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 25px 35px; border-radius: 16px 16px 0 0; position: relative; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px; box-shadow: var(--shadow-md); color: white;">
         <div>
-            <h2 id="detEmpName" style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">Employee Name</h2>
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; font-size: 10pt; opacity: 0.95;">
-                <span style="font-weight: 700; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 999px; font-family: monospace; border: 1px solid rgba(255,255,255,0.25);">Emp ID: <span id="detEmpId">-</span></span>
+            <h2 id="detEmpName"
+                style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                Employee Name</h2>
+            <div
+                style="display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; font-size: 10pt; opacity: 0.95;">
+                <span
+                    style="font-weight: 700; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 999px; font-family: monospace; border: 1px solid rgba(255,255,255,0.25);">Emp
+                    ID: <span id="detEmpId">-</span></span>
                 <span style="opacity: 0.6;">•</span>
                 <span>LWD: <strong id="detLwd" style="color: white;">-</strong></span>
                 <span style="opacity: 0.6;">•</span>
                 <span>Resignation Date: <strong id="detResignDate" style="color: white;">-</strong></span>
             </div>
         </div>
-        <button class="btn" style="background-color: rgba(255, 255, 255, 0.15); color: white; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition-fast);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.25)'" onmouseout="this.style.backgroundColor='rgba(255,255,255,0.15)'" onclick="closeExitDetailModal()">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px; display: inline-block; vertical-align: text-bottom;"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/></svg>Back to Directory
+        <button class="btn"
+            style="background-color: rgba(255, 255, 255, 0.15); color: white; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition-fast);"
+            onmouseover="this.style.backgroundColor='rgba(255,255,255,0.25)'"
+            onmouseout="this.style.backgroundColor='rgba(255,255,255,0.15)'" onclick="closeExitDetailModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"
+                style="margin-right: 8px; display: inline-block; vertical-align: text-bottom;">
+                <path fill-rule="evenodd"
+                    d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+            </svg>Back to Directory
         </button>
     </div>
 
     <!-- Inner content card -->
-    <div class="card" style="width: 100%; padding: 25px; border-radius: 0 0 16px 16px; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); box-shadow: var(--shadow-md); margin-top: -25px;">
+    <div class="card"
+        style="width: 100%; padding: 25px; border-radius: 0 0 16px 16px; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); box-shadow: var(--shadow-md); margin-top: -25px;">
 
         <!-- Warning Banner for Absconding -->
-        <div id="abscondingBanner" class="alert alert-danger" style="display: none; background-color: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-weight: 500;">
+        <div id="abscondingBanner" class="alert alert-danger"
+            style="display: none; background-color: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-weight: 500;">
             ⚠️ ABSCONDING FLOW IN PROGRESS: Questionnaire links are disabled. Use the Admin Override option.
         </div>
 
         <!-- Timeline Widget -->
         <div style="margin-bottom: 30px;">
             <div style="display: flex; justify-content: space-between; position: relative; margin-top: 10px;">
-                <div style="position: absolute; top: 12px; left: 5%; width: 90%; height: 4px; background-color: #e2e8f0; z-index: 1;"></div>
-                <div id="timelineProgress" style="position: absolute; top: 12px; left: 5%; width: 0%; height: 4px; background-color: #22c55e; z-index: 1; transition: width 0.3s ease;"></div>
-                
+                <div
+                    style="position: absolute; top: 12px; left: 5%; width: 90%; height: 4px; background-color: #e2e8f0; z-index: 1;">
+                </div>
+                <div id="timelineProgress"
+                    style="position: absolute; top: 12px; left: 5%; width: 0%; height: 4px; background-color: #22c55e; z-index: 1; transition: width 0.3s ease;">
+                </div>
+
                 <div class="timeline-step" id="step_PENDING" style="text-align: center; width: 15%; z-index: 2;">
-                    <div class="step-dot" style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">1</div>
+                    <div class="step-dot"
+                        style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">
+                        1</div>
                     <div style="font-size: 7.5pt; font-weight: 600;">Pending</div>
                 </div>
                 <div class="timeline-step" id="step_IN_PROGRESS" style="text-align: center; width: 15%; z-index: 2;">
-                    <div class="step-dot" style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">2</div>
+                    <div class="step-dot"
+                        style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">
+                        2</div>
                     <div style="font-size: 7.5pt; font-weight: 600;">In Progress</div>
                 </div>
                 <div class="timeline-step" id="step_COMPLETED" style="text-align: center; width: 15%; z-index: 2;">
-                    <div class="step-dot" style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">3</div>
+                    <div class="step-dot"
+                        style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">
+                        3</div>
                     <div style="font-size: 7.5pt; font-weight: 600;">Completed</div>
                 </div>
-                <div class="timeline-step" id="step_CLEARANCES_DONE" style="text-align: center; width: 15%; z-index: 2;">
-                    <div class="step-dot" style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">4</div>
+                <div class="timeline-step" id="step_CLEARANCES_DONE"
+                    style="text-align: center; width: 15%; z-index: 2;">
+                    <div class="step-dot"
+                        style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">
+                        4</div>
                     <div style="font-size: 7.5pt; font-weight: 600;">Clearances</div>
                 </div>
                 <div class="timeline-step" id="step_FF_PROCESSED" style="text-align: center; width: 15%; z-index: 2;">
-                    <div class="step-dot" style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">5</div>
+                    <div class="step-dot"
+                        style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">
+                        5</div>
                     <div style="font-size: 7.5pt; font-weight: 600;">F&F Done</div>
                 </div>
                 <div class="timeline-step" id="step_FULLY_EXITED" style="text-align: center; width: 15%; z-index: 2;">
-                    <div class="step-dot" style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">6</div>
+                    <div class="step-dot"
+                        style="width: 28px; height: 28px; border-radius: 50%; background-color: #cbd5e1; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9pt; margin-bottom: 6px;">
+                        6</div>
                     <div style="font-size: 7.5pt; font-weight: 600;">Exited</div>
                 </div>
             </div>
         </div>
 
         <!-- Tabs Navigation -->
-        <div class="tabs-header-container" style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color, #e2e8f0); margin-bottom: 25px; padding-bottom: 0; flex-wrap: wrap;">
-            <button class="tab-item active" id="exitTabClearancesBtn" onclick="switchExitTab('clearances')" style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid var(--primary-color); color: var(--primary-color);">Exit Clearances</button>
-            <button class="tab-item" id="exitTabFfBtn" onclick="switchExitTab('ff')" style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; color: #64748b;">F&F Settlement</button>
-            <button class="tab-item" id="exitTabDocsBtn" onclick="switchExitTab('docs')" style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; color: #64748b;">Documents & Dispatch</button>
-            <button class="tab-item" id="exitTabFormBtn" onclick="switchExitTab('form')" style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; color: #64748b;">Employee Exit Form</button>
+        <div class="tabs-header-container"
+            style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color, #e2e8f0); margin-bottom: 25px; padding-bottom: 0; flex-wrap: wrap;">
+            <button class="tab-item active" id="exitTabClearancesBtn" onclick="switchExitTab('clearances')"
+                style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid var(--primary-color); color: var(--primary-color);">Exit
+                Clearances</button>
+            <button class="tab-item" id="exitTabFfBtn" onclick="switchExitTab('ff')"
+                style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; color: #64748b;">F&F
+                Settlement</button>
+            <button class="tab-item" id="exitTabDocsBtn" onclick="switchExitTab('docs')"
+                style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; color: #64748b;">Documents
+                & Dispatch</button>
+            <button class="tab-item" id="exitTabFormBtn" onclick="switchExitTab('form')"
+                style="padding: 12px 16px; font-weight: 700; border-radius: 10px 10px 0 0; border: none; background: none; font-size: 14px; cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent; color: #64748b;">Employee
+                Exit Form</button>
         </div>
 
 
@@ -190,8 +242,11 @@
         <div id="exitTabClearances" class="exit-tab-content">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-wrap: wrap;">
                 <!-- IT Checklist -->
-                <div class="panel-section" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">IT Revocation Checklist</h4>
+                <div class="panel-section"
+                    style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <h4
+                        style="margin-top: 0; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                        IT Revocation Checklist</h4>
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
                         <label style="display: flex; align-items: center; gap: 10px; font-weight: normal;">
                             <input type="checkbox" id="chkItEmail" style="width: auto;"> Corporate Email Deactivated
@@ -209,12 +264,16 @@
                             <input type="checkbox" id="chkItBackup" style="width: auto;"> Work Data Backup Completed
                         </label>
                     </div>
-                    <button class="btn btn-primary" style="font-size: 8.5pt; padding: 6px 12px;" onclick="saveItChecklist()">Save IT Checklist</button>
+                    <button class="btn btn-primary" style="font-size: 8.5pt; padding: 6px 12px;"
+                        onclick="saveItChecklist()">Save IT Checklist</button>
                 </div>
 
                 <!-- Department Clearances -->
-                <div class="panel-section" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
-                    <h4 style="margin-top: 0; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Department Clearances Tracker</h4>
+                <div class="panel-section"
+                    style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                    <h4
+                        style="margin-top: 0; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                        Department Clearances Tracker</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                         <div>
                             <label style="font-size: 8.5pt;">IT Clearance</label>
@@ -257,7 +316,8 @@
                             </select>
                         </div>
                     </div>
-                    <button class="btn btn-primary" style="font-size: 8.5pt; padding: 6px 12px;" onclick="saveClearances()">Save Clearances</button>
+                    <button class="btn btn-primary" style="font-size: 8.5pt; padding: 6px 12px;"
+                        onclick="saveClearances()">Save Clearances</button>
                 </div>
             </div>
         </div>
@@ -265,99 +325,126 @@
         <!-- TAB CONTENT 2: F&F SETTLEMENT LEDGER -->
         <div id="exitTabFf" class="exit-tab-content" style="display: none;">
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
-                <h4 style="margin-top: 0; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">F&F Settlement Ledger & Payout Calculator</h4>
+                <h4
+                    style="margin-top: 0; color: var(--primary-color); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+                    F&F Settlement Ledger & Payout Calculator</h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Calendar Days in Month</label>
-                        <input type="number" id="ffMonthDays" value="30" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" id="ffMonthDays" value="30" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Actual Worked Days</label>
-                        <input type="number" step="0.5" id="ffWorkedDays" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" step="0.5" id="ffWorkedDays" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Basic Per-Day Salary (INR)</label>
-                        <input type="number" id="ffPerDaySalary" readonly style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
+                        <input type="number" id="ffPerDaySalary" readonly
+                            style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Pro-rated Basic Salary (INR)</label>
-                        <input type="number" id="ffProportionalSalary" readonly style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
+                        <input type="number" id="ffProportionalSalary" readonly
+                            style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Encashable Leave Days</label>
-                        <input type="number" step="0.5" id="ffLeaveEncashDays" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" step="0.5" id="ffLeaveEncashDays" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Leave Encashment Amount</label>
-                        <input type="number" id="ffLeaveEncashAmount" readonly style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
+                        <input type="number" id="ffLeaveEncashAmount" readonly
+                            style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Bonus / Outstanding Arrears</label>
-                        <input type="number" id="ffBonusArrears" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" id="ffBonusArrears" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Gratuity Amount</label>
-                        <input type="number" id="ffGratuityAmount" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" id="ffGratuityAmount" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Notice Shortfall Days</label>
-                        <input type="number" step="0.5" id="ffNoticeShortDays" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" step="0.5" id="ffNoticeShortDays" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Notice Shortfall Recovery</label>
-                        <input type="number" id="ffNoticeShortAmount" readonly style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
+                        <input type="number" id="ffNoticeShortAmount" readonly
+                            style="padding: 8px; font-size: 9.5pt; background-color: #e2e8f0;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Outstanding Advance Recovery</label>
-                        <input type="number" id="ffAdvanceOutstanding" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" id="ffAdvanceOutstanding" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div>
                         <label style="font-weight: 600; font-size: 9pt;">Bond Penalty / Damages</label>
-                        <input type="number" id="ffBondPenalty" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" id="ffBondPenalty" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                     <div style="grid-column: span 2;">
                         <label style="font-weight: 600; font-size: 9pt;">TDS / Tax Deduction</label>
-                        <input type="number" id="ffTdsDeduction" value="0" oninput="calculateFfTotals()" style="padding: 8px; font-size: 9.5pt;">
+                        <input type="number" id="ffTdsDeduction" value="0" oninput="calculateFfTotals()"
+                            style="padding: 8px; font-size: 9.5pt;">
                     </div>
                 </div>
 
                 <!-- Custom Reimbursements -->
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; font-size: 9.5pt; display: flex; justify-content: space-between; align-items: center; color: var(--text-main);">
+                    <label
+                        style="font-weight: bold; font-size: 9.5pt; display: flex; justify-content: space-between; align-items: center; color: var(--text-main);">
                         Reimbursements & Additions
-                        <button class="btn" onclick="addReimbursementRow()" style="font-size: 8pt; padding: 3px 8px;">+ Add</button>
+                        <button class="btn" onclick="addReimbursementRow()" style="font-size: 8pt; padding: 3px 8px;">+
+                            Add</button>
                     </label>
-                    <div id="reimbursementsContainer" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;"></div>
+                    <div id="reimbursementsContainer"
+                        style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;"></div>
                 </div>
 
                 <!-- Custom Deductions -->
                 <div style="margin-bottom: 20px;">
-                    <label style="font-weight: bold; font-size: 9.5pt; display: flex; justify-content: space-between; align-items: center; color: var(--text-main);">
+                    <label
+                        style="font-weight: bold; font-size: 9.5pt; display: flex; justify-content: space-between; align-items: center; color: var(--text-main);">
                         Other Recoveries & Deductions
-                        <button class="btn" onclick="addDeductionRow()" style="font-size: 8pt; padding: 3px 8px;">+ Add</button>
+                        <button class="btn" onclick="addDeductionRow()" style="font-size: 8pt; padding: 3px 8px;">+
+                            Add</button>
                     </label>
-                    <div id="deductionsContainer" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;"></div>
+                    <div id="deductionsContainer"
+                        style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;"></div>
                 </div>
 
                 <!-- Ledger Summary -->
-                <div style="background-color: #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 9.5pt;">
+                <div
+                    style="background-color: #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 9.5pt;">
                     <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 6px;">
                         <span>Total Additions (A):</span>
                         <span id="lblTotalEarnings">INR 0.00</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 8px; color: #b91c1c;">
+                    <div
+                        style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 8px; color: #b91c1c;">
                         <span>Total Recoveries (B):</span>
                         <span id="lblTotalDeductions">INR 0.00</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; border-top: 2px solid #cbd5e1; padding-top: 8px; color: #166534;">
+                    <div
+                        style="display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; border-top: 2px solid #cbd5e1; padding-top: 8px; color: #166534;">
                         <span>Net Payable (A - B):</span>
                         <span id="lblNetPayable">INR 0.00</span>
                     </div>
                 </div>
 
                 <div style="display: flex; gap: 15px;">
-                    <button class="btn btn-primary" style="font-size: 9.5pt; padding: 10px 20px; flex: 1;" onclick="saveFfCalculations()">Draft calculations</button>
-                    <button class="btn btn-success" id="btnApproveFf" style="font-size: 9.5pt; padding: 10px 20px; flex: 1;" onclick="approveFfCalculations()">Approve settlement</button>
+                    <button class="btn btn-primary" style="font-size: 9.5pt; padding: 10px 20px; flex: 1;"
+                        onclick="saveFfCalculations()">Draft calculations</button>
+                    <button class="btn btn-success" id="btnApproveFf"
+                        style="font-size: 9.5pt; padding: 10px 20px; flex: 1;" onclick="approveFfCalculations()">Approve
+                        settlement</button>
                 </div>
             </div>
         </div>
@@ -366,67 +453,119 @@
         <div id="exitTabDocs" class="exit-tab-content" style="display: none;">
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
                 <h4 style="margin-top: 0; color: var(--primary-color);">Offboarding Actions & Documents Dispatch</h4>
-                
+
                 <!-- Documents Download Grid -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 25px;">
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input type="checkbox" id="chkEmailRelieving" value="RELIEVING_LETTER" checked style="width: auto; margin: 0; cursor: pointer;"> Relieving Letter</label>
+                <div
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 25px;">
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input
+                                type="checkbox" id="chkEmailRelieving" value="RELIEVING_LETTER" checked
+                                style="width: auto; margin: 0; cursor: pointer;"> Relieving Letter</label>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('relieving')" style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
-                            <button class="btn" onclick="generateDocument('relieving')" style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('relieving')"
+                                style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
+                            <button class="btn" onclick="generateDocument('relieving')"
+                                style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
                         </div>
                     </div>
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input type="checkbox" id="chkEmailExperience" value="EXPERIENCE_LETTER" checked style="width: auto; margin: 0; cursor: pointer;"> Experience Letter</label>
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input
+                                type="checkbox" id="chkEmailExperience" value="EXPERIENCE_LETTER" checked
+                                style="width: auto; margin: 0; cursor: pointer;"> Experience Letter</label>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('experience')" style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
-                            <button class="btn" onclick="generateDocument('experience')" style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('experience')"
+                                style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
+                            <button class="btn" onclick="generateDocument('experience')"
+                                style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
                         </div>
                     </div>
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input type="checkbox" id="chkEmailNotice" value="NOTICE_LETTER" checked style="width: auto; margin: 0; cursor: pointer;"> Notice Period Letter</label>
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input
+                                type="checkbox" id="chkEmailNotice" value="NOTICE_LETTER" checked
+                                style="width: auto; margin: 0; cursor: pointer;"> Notice Period Letter</label>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('notice')" style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
-                            <button class="btn" onclick="generateDocument('notice')" style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('notice')"
+                                style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
+                            <button class="btn" onclick="generateDocument('notice')"
+                                style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
                         </div>
                     </div>
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input type="checkbox" id="chkEmailNoc" value="NOC_LETTER" checked style="width: auto; margin: 0; cursor: pointer;"> NOC Letter (Admin)</label>
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input
+                                type="checkbox" id="chkEmailNoc" value="NOC_LETTER" checked
+                                style="width: auto; margin: 0; cursor: pointer;"> NOC Letter (Admin)</label>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('noc')" style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
-                            <button class="btn" id="btnGenNoc" onclick="generateDocument('noc')" style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('noc')"
+                                style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
+                            <button class="btn" id="btnGenNoc" onclick="generateDocument('noc')"
+                                style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
                         </div>
                     </div>
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input type="checkbox" id="chkEmailFfLetter" value="FF_SETTLEMENT_LETTER" checked style="width: auto; margin: 0; cursor: pointer;"> F&F Statement Letter</label>
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input
+                                type="checkbox" id="chkEmailFfLetter" value="FF_SETTLEMENT_LETTER" checked
+                                style="width: auto; margin: 0; cursor: pointer;"> F&F Statement Letter</label>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('ff-letter')" style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
-                            <button class="btn" onclick="generateDocument('ff-letter')" style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('ff-letter')"
+                                style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
+                            <button class="btn" onclick="generateDocument('ff-letter')"
+                                style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
                         </div>
                     </div>
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input type="checkbox" id="chkEmailFfSlip" value="FF_SALARY_SLIP" checked style="width: auto; margin: 0; cursor: pointer;"> Final Month Payslip</label>
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; font-size: 9pt; font-weight: 600; color: #334155; margin: 0; cursor: pointer;"><input
+                                type="checkbox" id="chkEmailFfSlip" value="FF_SALARY_SLIP" checked
+                                style="width: auto; margin: 0; cursor: pointer;"> Final Month Payslip</label>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('ff-slip')" style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
-                            <button class="btn" onclick="generateDocument('ff-slip')" style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
+                            <button class="btn btn-secondary" onclick="openExitLetterWorkspace('ff-slip')"
+                                style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
+                            <button class="btn" onclick="generateDocument('ff-slip')"
+                                style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Workflow Override Actions -->
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; border-top: 1px solid #cbd5e1; padding-top: 20px;">
+                <div
+                    style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; border-top: 1px solid #cbd5e1; padding-top: 20px;">
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn" id="btnResendToken" onclick="actionResendLink()" style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Resend Link</button>
-                        <button class="btn" id="btnExtendLwd" onclick="actionExtendLwd()" style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Extend LWD</button>
-                        <button class="btn" id="btnReopenExit" onclick="actionReopenExit()" style="background-color:#fef3c7; border:1px solid #f59e0b; color:#92400e; font-size:8.5pt;">Reopen Exit</button>
+                        <button class="btn" id="btnResendToken" onclick="actionResendLink()"
+                            style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Resend
+                            Link</button>
+                        <button class="btn" id="btnExtendLwd" onclick="actionExtendLwd()"
+                            style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Extend
+                            LWD</button>
+                        <button class="btn" id="btnReopenExit" onclick="actionReopenExit()"
+                            style="background-color:#fef3c7; border:1px solid #f59e0b; color:#92400e; font-size:8.5pt;">Reopen
+                            Exit</button>
                     </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 8.5pt; font-weight: normal; margin-right: 5px; cursor: pointer;" id="lblSendEmailOnExit">
-                            <input type="checkbox" id="chkSendEmailOnExit" checked style="width: auto; margin: 0;"> Email documents to employee
+                        <label
+                            style="display: inline-flex; align-items: center; gap: 6px; font-size: 8.5pt; font-weight: normal; margin-right: 5px; cursor: pointer;"
+                            id="lblSendEmailOnExit">
+                            <input type="checkbox" id="chkSendEmailOnExit" checked style="width: auto; margin: 0;">
+                            Email documents to employee
                         </label>
-                        <button class="btn" id="btnCancelExit" onclick="actionCancelExit()" style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Cancel Exit</button>
-                        <button class="btn" id="btnOverrideExit" onclick="actionOverrideExit()" style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Admin Override</button>
-                        <button class="btn btn-success" id="btnMarkExited" onclick="actionMarkExited()" style="font-size:8.5pt;">Mark Fully Exited</button>
+                        <button class="btn" id="btnCancelExit" onclick="actionCancelExit()"
+                            style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Cancel
+                            Exit</button>
+                        <button class="btn" id="btnOverrideExit" onclick="actionOverrideExit()"
+                            style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Admin
+                            Override</button>
+                        <button class="btn btn-success" id="btnMarkExited" onclick="actionMarkExited()"
+                            style="font-size:8.5pt;">Mark Fully Exited</button>
                     </div>
                 </div>
             </div>
@@ -435,67 +574,106 @@
         <!-- TAB CONTENT 4: EMPLOYEE EXIT FORM -->
         <div id="exitTabForm" class="exit-tab-content" style="display: none;">
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
-                <div style="font-weight: 700; font-size: 15px; border-left: 4px solid var(--primary-color); padding-left: 12px; margin-bottom: 20px; color: var(--text-main);">Submitted Exit Questionnaire</div>
-                
-                <div id="exitFormNoResponse" style="padding: 20px; text-align: center; color: #64748b; font-weight: 500; background-color: #ffffff; border: 1px dashed #cbd5e1; border-radius: 8px;">
+                <div
+                    style="font-weight: 700; font-size: 15px; border-left: 4px solid var(--primary-color); padding-left: 12px; margin-bottom: 20px; color: var(--text-main);">
+                    Submitted Exit Questionnaire</div>
+
+                <div id="exitFormNoResponse"
+                    style="padding: 20px; text-align: center; color: #64748b; font-weight: 500; background-color: #ffffff; border: 1px dashed #cbd5e1; border-radius: 8px;">
                     No response submitted by employee yet.
                 </div>
 
                 <div id="exitFormResponseDetails" style="display: none;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 25px;">
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 25px;">
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Submitted At</label>
-                            <div id="qDetSubmittedAt" style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Submitted
+                                At</label>
+                            <div id="qDetSubmittedAt"
+                                style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Personal Email Address</label>
-                            <div id="qDetPersonalEmail" style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Personal
+                                Email Address</label>
+                            <div id="qDetPersonalEmail"
+                                style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Reason for Leaving</label>
-                            <div id="qDetReasonDropdown" style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Reason for
+                                Leaving</label>
+                            <div id="qDetReasonDropdown"
+                                style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">KT Status</label>
-                            <div id="qDetKtStatus" style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">KT
+                                Status</label>
+                            <div id="qDetKtStatus"
+                                style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">KT Handed Over To</label>
-                            <div id="qDetKtHandover" style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">KT Handed
+                                Over To</label>
+                            <div id="qDetKtHandover"
+                                style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Will Recommend Company?</label>
-                            <div id="qDetRecommend" style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Will
+                                Recommend Company?</label>
+                            <div id="qDetRecommend"
+                                style="padding: 10px 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500;">
+                                -</div>
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
                         <div>
-                            <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Work Environment Rating (1-5)</label>
-                            <div id="qDetRatingEnv" style="font-size: 20px; font-weight: bold; color: var(--primary-color);">-</div>
+                            <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Work
+                                Environment Rating (1-5)</label>
+                            <div id="qDetRatingEnv"
+                                style="font-size: 20px; font-weight: bold; color: var(--primary-color);">-</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Management/Leadership Rating (1-5)</label>
-                            <div id="qDetRatingMgmt" style="font-size: 20px; font-weight: bold; color: var(--primary-color);">-</div>
+                            <label
+                                style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Management/Leadership
+                                Rating (1-5)</label>
+                            <div id="qDetRatingMgmt"
+                                style="font-size: 20px; font-weight: bold; color: var(--primary-color);">-</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Work-Life Balance Rating (1-5)</label>
-                            <div id="qDetRatingBalance" style="font-size: 20px; font-weight: bold; color: var(--primary-color);">-</div>
+                            <label style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">Work-Life
+                                Balance Rating (1-5)</label>
+                            <div id="qDetRatingBalance"
+                                style="font-size: 20px; font-weight: bold; color: var(--primary-color);">-</div>
                         </div>
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Reason Explanation / Details</label>
-                            <div id="qDetReasonDetails" style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; min-height: 50px; white-space: pre-wrap;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Reason
+                                Explanation / Details</label>
+                            <div id="qDetReasonDetails"
+                                style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; min-height: 50px; white-space: pre-wrap;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Knowledge Transfer (KT) Handover Notes</label>
-                            <div id="qDetKtNotes" style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; min-height: 50px; white-space: pre-wrap;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">Knowledge
+                                Transfer (KT) Handover Notes</label>
+                            <div id="qDetKtNotes"
+                                style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; min-height: 50px; white-space: pre-wrap;">
+                                -</div>
                         </div>
                         <div>
-                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">General Feedback & Suggestions</label>
-                            <div id="qDetFeedback" style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; min-height: 50px; white-space: pre-wrap;">-</div>
+                            <label style="font-weight: 600; font-size: 13px; color: var(--text-secondary);">General
+                                Feedback & Suggestions</label>
+                            <div id="qDetFeedback"
+                                style="padding: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; min-height: 50px; white-space: pre-wrap;">
+                                -</div>
                         </div>
                     </div>
                 </div>
@@ -507,18 +685,24 @@
 
 
 <!-- MODAL: PDF PREVIEW -->
-<div class="modal" id="pdfPreviewModal" style="display: none; align-items: center; justify-content: center; z-index: 10000; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);">
-    <div class="modal-content" style="width: 85%; height: 85%; max-width: 1000px; display: flex; flex-direction: column; overflow: hidden; padding: 0; border-radius: 12px; background: white; box-shadow: var(--shadow-lg);">
+<div class="modal" id="pdfPreviewModal"
+    style="display: none; align-items: center; justify-content: center; z-index: 10000; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);">
+    <div class="modal-content"
+        style="width: 85%; height: 85%; max-width: 1000px; display: flex; flex-direction: column; overflow: hidden; padding: 0; border-radius: 12px; background: white; box-shadow: var(--shadow-lg);">
         <!-- Header -->
-        <div class="flex-row-header" style="padding: 15px 25px; border-bottom: 1px solid var(--border-color, #e2e8f0); background-color: var(--card-bg, #ffffff); display: flex; justify-content: space-between; align-items: center;">
+        <div class="flex-row-header"
+            style="padding: 15px 25px; border-bottom: 1px solid var(--border-color, #e2e8f0); background-color: var(--card-bg, #ffffff); display: flex; justify-content: space-between; align-items: center;">
             <h3 style="margin: 0; color: var(--primary-color);" id="pdfPreviewTitle">Document Preview</h3>
             <div style="display: flex; gap: 10px; align-items: center;">
-                <button class="btn btn-primary" onclick="downloadPdfFromPreview()" style="font-size: 9pt; padding: 6px 15px; border-radius: 8px;">Download PDF</button>
-                <button onclick="closePdfPreview()" style="background: none; border: none; font-size: 20pt; cursor: pointer; color: #64748b; line-height: 1; padding: 0 5px;">&times;</button>
+                <button class="btn btn-primary" onclick="downloadPdfFromPreview()"
+                    style="font-size: 9pt; padding: 6px 15px; border-radius: 8px;">Download PDF</button>
+                <button onclick="closePdfPreview()"
+                    style="background: none; border: none; font-size: 20pt; cursor: pointer; color: #64748b; line-height: 1; padding: 0 5px;">&times;</button>
             </div>
         </div>
         <!-- Body -->
-        <div style="flex: 1; background-color: #f8fafc; display: flex; justify-content: center; align-items: center; position: relative; height: calc(100% - 60px);">
+        <div
+            style="flex: 1; background-color: #f8fafc; display: flex; justify-content: center; align-items: center; position: relative; height: calc(100% - 60px);">
             <iframe id="pdfPreviewIframe" style="width: 100%; height: 100%; border: none;"></iframe>
         </div>
     </div>
@@ -527,127 +711,168 @@
 <!-- VIEW: EXIT LETTER WORKSPACE (Side-by-Side Customization) -->
 <div id="exitLetterWorkspace" class="view-panel" style="display: none; padding: 0;">
     <!-- Workspace Header -->
-    <div style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%); padding: 20px 30px; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: var(--shadow-md); color: white;">
+    <div
+        style="background: linear-gradient(135deg, #6340e9 0%, #6340e9 50%, #6340e9 100%); padding: 20px 30px; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: var(--shadow-md); color: white;">
         <div>
-            <h2 id="workspaceTitle" style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">📄 Document Customization Workspace</h2>
-            <p style="margin: 4px 0 0; font-size: 9.5pt; opacity: 0.9;">Customize context variables and preview the document before generating the final PDF.</p>
+            <h2 id="workspaceTitle"
+                style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                📄 Document Customization Workspace</h2>
+            <p style="margin: 4px 0 0; font-size: 9.5pt; opacity: 0.9;">Customize context variables and preview the
+                document before generating the final PDF.</p>
         </div>
         <div style="display: flex; gap: 10px;">
-            <button class="btn" onclick="updateExitLetterPreview()" style="background-color: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">🔄 Refresh Preview</button>
-            <button class="btn" onclick="downloadCustomizedExitLetter()" style="background-color: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">⬇️ Generate & Download PDF</button>
-            <button class="btn" onclick="closeExitLetterWorkspace()" style="background-color: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">✕ Close</button>
+            <button class="btn" onclick="updateExitLetterPreview()"
+                style="background-color: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">🔄
+                Refresh Preview</button>
+            <button class="btn" onclick="downloadCustomizedExitLetter()"
+                style="background-color: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">⬇️
+                Generate & Download PDF</button>
+            <button class="btn" onclick="closeExitLetterWorkspace()"
+                style="background-color: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">✕
+                Close</button>
         </div>
     </div>
 
     <!-- Workspace Body: Side-by-Side -->
-    <div style="display: grid; grid-template-columns: 380px 1fr; gap: 0; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-top: none; border-radius: 0 0 16px 16px; min-height: 70vh; overflow: hidden;">
+    <div
+        style="display: grid; grid-template-columns: 380px 1fr; gap: 0; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-top: none; border-radius: 0 0 16px 16px; min-height: 70vh; overflow: hidden;">
         <!-- LEFT: Customization Form -->
-        <div style="padding: 20px; overflow-y: auto; max-height: 75vh; border-right: 1px solid var(--border-color, #e2e8f0); background-color: #f8fafc;">
+        <div
+            style="padding: 20px; overflow-y: auto; max-height: 75vh; border-right: 1px solid var(--border-color, #e2e8f0); background-color: #f8fafc;">
             <!-- Document Info -->
             <div style="margin-bottom: 18px;">
-                <label style="font-size: 8pt; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 4px; display: block;">Document Type</label>
-                <div id="wsDocTypeLabel" style="font-size: 10pt; font-weight: 600; color: var(--primary-color); background: linear-gradient(135deg, #e0e7ff, #eef2ff); padding: 8px 12px; border-radius: 8px;">-</div>
+                <label
+                    style="font-size: 8pt; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 4px; display: block;">Document
+                    Type</label>
+                <div id="wsDocTypeLabel"
+                    style="font-size: 10pt; font-weight: 600; color: var(--primary-color); background: linear-gradient(135deg, #e0e7ff, #eef2ff); padding: 8px 12px; border-radius: 8px;">
+                    -</div>
             </div>
 
             <!-- Date Override -->
             <div style="margin-bottom: 14px;">
                 <label style="font-size: 8pt; font-weight: 600; color: #475569;">Letter Date</label>
-                <input type="date" id="wsDate" style="padding: 6px; font-size: 9pt; width: 100%;" onchange="updateExitLetterPreview()">
+                <input type="date" id="wsDate" style="padding: 6px; font-size: 9pt; width: 100%;"
+                    onchange="updateExitLetterPreview()">
             </div>
 
             <!-- Employee Fields -->
             <fieldset style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
-                <legend style="font-size: 8.5pt; font-weight: 700; color: #334155; padding: 0 6px;">Employee Details</legend>
+                <legend style="font-size: 8.5pt; font-weight: 700; color: #334155; padding: 0 6px;">Employee Details
+                </legend>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">First Name</label>
-                        <input type="text" id="wsFirstName" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsFirstName" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Last Name</label>
-                        <input type="text" id="wsLastName" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsLastName" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Employee ID</label>
-                        <input type="text" id="wsEmpId" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsEmpId" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Designation</label>
-                        <input type="text" id="wsDesignation" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsDesignation" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Joining Date</label>
-                        <input type="date" id="wsJoiningDate" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="date" id="wsJoiningDate" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Last Working Day</label>
-                        <input type="date" id="wsLwd" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="date" id="wsLwd" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div style="grid-column: span 2;">
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Resignation Date</label>
-                        <input type="date" id="wsResignationDate" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="date" id="wsResignationDate" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                 </div>
             </fieldset>
 
             <!-- Company / Signatory -->
             <fieldset style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
-                <legend style="font-size: 8.5pt; font-weight: 700; color: #334155; padding: 0 6px;">Company & Signatory</legend>
+                <legend style="font-size: 8.5pt; font-weight: 700; color: #334155; padding: 0 6px;">Company & Signatory
+                </legend>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Company Name</label>
-                        <input type="text" id="wsCompanyName" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsCompanyName" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Company Address</label>
-                        <input type="text" id="wsCompanyAddress" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsCompanyAddress" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Signatory Name</label>
-                        <input type="text" id="wsSignatoryName" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsSignatoryName" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Signatory Designation</label>
-                        <input type="text" id="wsSignatoryDesignation" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="text" id="wsSignatoryDesignation" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                 </div>
             </fieldset>
 
             <!-- F&F / Salary Fields (shown conditionally for ff-letter and ff-slip) -->
-            <fieldset id="wsFfFieldsSection" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px; display: none;">
-                <legend style="font-size: 8.5pt; font-weight: 700; color: #334155; padding: 0 6px;">F&F / Salary Overrides</legend>
+            <fieldset id="wsFfFieldsSection"
+                style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px; display: none;">
+                <legend style="font-size: 8.5pt; font-weight: 700; color: #334155; padding: 0 6px;">F&F / Salary
+                    Overrides</legend>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div>
-                        <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Calendar Days in Month</label>
-                        <input type="number" id="wsSalaryMonthDays" value="30" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Calendar Days in
+                            Month</label>
+                        <input type="number" id="wsSalaryMonthDays" value="30" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Worked Days</label>
-                        <input type="number" id="wsSalaryWorkedDays" value="0" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsSalaryWorkedDays" value="0" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Leave Encash Days</label>
-                        <input type="number" id="wsLeaveEncashDays" value="0" step="0.5" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsLeaveEncashDays" value="0" step="0.5"
+                            style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Bonus / Arrears (₹)</label>
-                        <input type="number" id="wsBonusArrears" value="0" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsBonusArrears" value="0" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Gratuity (₹)</label>
-                        <input type="number" id="wsGratuity" value="0" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsGratuity" value="0" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Notice Shortfall Days</label>
-                        <input type="number" id="wsNoticeShortDays" value="0" step="0.5" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsNoticeShortDays" value="0" step="0.5"
+                            style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">Advance Recovery (₹)</label>
-                        <input type="number" id="wsAdvanceRecovery" value="0" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsAdvanceRecovery" value="0" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                     <div>
                         <label style="font-size: 7.5pt; font-weight: 600; color: #64748b;">TDS Deduction (₹)</label>
-                        <input type="number" id="wsTdsDeduction" value="0" style="padding: 5px; font-size: 9pt;" onchange="updateExitLetterPreview()">
+                        <input type="number" id="wsTdsDeduction" value="0" style="padding: 5px; font-size: 9pt;"
+                            onchange="updateExitLetterPreview()">
                     </div>
                 </div>
             </fieldset>
@@ -655,67 +880,239 @@
 
         <!-- RIGHT: Live Preview -->
         <div style="display: flex; flex-direction: column; background-color: #f1f5f9;">
-            <div style="padding: 10px 20px; border-bottom: 1px solid #e2e8f0; background-color: white; display: flex; justify-content: space-between; align-items: center;">
+            <div
+                style="padding: 10px 20px; border-bottom: 1px solid #e2e8f0; background-color: white; display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-size: 9pt; font-weight: 700; color: #334155;">📄 Live Document Preview</span>
                 <span id="wsPreviewStatus" style="font-size: 8pt; color: #94a3b8;">Ready</span>
             </div>
-            <div style="flex: 1; padding: 15px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto;">
-                <iframe id="wsPreviewIframe" style="width: 100%; height: 100%; min-height: 600px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"></iframe>
+            <div
+                style="flex: 1; padding: 15px; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto;">
+                <iframe id="wsPreviewIframe"
+                    style="width: 100%; height: 100%; min-height: 600px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"></iframe>
             </div>
         </div>
     </div>
 </div>
 
+<style>
+    #exitVisualTemplateEditor [style*="page-break-before: always"],
+    #exitVisualTemplateEditor [style*="page-break-before:always"] {
+        border-top: 2px dashed #c2410c !important;
+        margin-top: 30px !important;
+        margin-bottom: 30px !important;
+        padding-top: 15px !important;
+        position: relative !important;
+        height: 2px !important;
+        display: block !important;
+        clear: both !important;
+    }
+
+    #exitVisualTemplateEditor [style*="page-break-before: always"]::before,
+    #exitVisualTemplateEditor [style*="page-break-before:always"]::before {
+        content: "✂--- FORCED PAGE BREAK (A4) ---" !important;
+        position: absolute !important;
+        top: -10px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        background: white !important;
+        padding: 0 12px !important;
+        font-size: 9px !important;
+        color: #c2410c !important;
+        font-weight: 800 !important;
+        letter-spacing: 1.5px !important;
+        font-family: 'Inter', sans-serif !important;
+        white-space: nowrap !important;
+    }
+</style>
+
 <!-- VIEW: EXIT TEMPLATE EDITOR -->
 <div id="exitTemplateEditor" class="view-panel" style="display: none; padding: 0;">
     <!-- Editor Header -->
-    <div style="background: linear-gradient(135deg, #7c2d12 0%, #9a3412 50%, #c2410c 100%); padding: 20px 30px; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: var(--shadow-md); color: white;">
+    <div
+        style="background: linear-gradient(135deg, #7c2d12 0%, #9a3412 50%, #c2410c 100%); padding: 20px 30px; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; box-shadow: var(--shadow-md); color: white;">
         <div>
-            <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">🛠️ Exit Document Template Editor</h2>
-            <p style="margin: 4px 0 0; font-size: 9.5pt; opacity: 0.9;">Edit the HTML/Django templates used for exit document generation.</p>
+            <h2
+                style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.025em; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                🛠️ Exit Document Template Editor</h2>
+            <p style="margin: 4px 0 0; font-size: 9.5pt; opacity: 0.9;">Visually edit the templates used for exit
+                document generation — no coding required.</p>
         </div>
-        <button class="btn" onclick="closeExitTemplateEditor()" style="background-color: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">✕ Close Editor</button>
+        <button class="btn" onclick="closeExitTemplateEditor()"
+            style="background-color: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 9pt; cursor: pointer;">✕
+            Close Editor</button>
     </div>
 
     <!-- Editor Body -->
-    <div style="background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-top: none; border-radius: 0 0 16px 16px; padding: 20px 25px;">
+    <div
+        style="background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-top: none; border-radius: 0 0 16px 16px; padding: 20px 25px;">
         <!-- Template Selector -->
         <div style="display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 250px;">
-                <label style="font-size: 8.5pt; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">Select Template</label>
-                <select id="templateEditorSelector" onchange="loadExitTemplateToEditor()" style="padding: 8px; font-size: 9.5pt; width: 100%;">
+                <label
+                    style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Select
+                    Template to Edit</label>
+                <select id="templateEditorSelector" onchange="loadExitTemplateToEditor()"
+                    style="padding: 10px; font-size: 9.5pt; width: 100%; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main); font-weight: 600;">
                     <option value="">— Choose a template —</option>
                 </select>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-primary" onclick="saveExitTemplateChanges()" style="font-size: 9pt; padding: 8px 20px;">💾 Save Changes</button>
-                <button class="btn btn-secondary" onclick="previewExitTemplateInEditor()" style="font-size: 9pt; padding: 8px 20px;">👁️ Preview</button>
+                <button class="btn btn-primary" onclick="saveExitTemplateChanges()"
+                    style="font-size: 9pt; padding: 8px 20px;">💾 Save Changes</button>
             </div>
         </div>
 
         <!-- Available Variables Reference -->
         <details style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0;">
-            <summary style="padding: 10px 15px; font-size: 8.5pt; font-weight: 700; color: #475569; cursor: pointer; background-color: #f8fafc; border-radius: 8px;">📖 Available Template Variables (Click to expand)</summary>
-            <div style="padding: 12px 15px; font-size: 8pt; color: #64748b; line-height: 1.6; font-family: 'Courier New', monospace; max-height: 200px; overflow-y: auto; background-color: #fafafa;">
-                <strong>Employee:</strong> {{ employee.first_name }}, {{ employee.last_name }}, {{ employee.emp_id }}, {{ employee.designation }}, {{ employee.joining_date }}, {{ employee.department.name }}<br>
-                <strong>Exit Request:</strong> {{ exit_request.last_working_day }}, {{ exit_request.resignation_date }}, {{ exit_request.exit_type }}<br>
-                <strong>Dates & Tenure:</strong> {{ date }}, {{ today }}, {{ tenure_str }}<br>
-                <strong>Company:</strong> {{ company_name }}, {{ company_address }}, {{ signatory_name }}, {{ signatory_designation }}<br>
-                <strong>F&F Settlement:</strong> {{ ff.salary_proportional }}, {{ ff.leave_encashment_amount }}, {{ ff.bonus_arrears }}, {{ ff.gratuity_amount }}, {{ ff.notice_shortfall_amount }}, {{ ff.salary_advance_outstanding }}, {{ ff.bond_penalty }}, {{ ff.tds_deduction }}, {{ ff.total_earnings }}, {{ ff.total_deductions }}, {{ ff.net_payable }}<br>
-                <strong>Salary Prorated:</strong> {{ prorated.basic }}, {{ prorated.hra }}, {{ prorated.conveyance }}, {{ prorated.medical }}, {{ prorated.special }}, {{ prorated.monthly_bonus }}, {{ prorated.pf }}, {{ prorated.professional_tax }}, {{ prorated.tds }}, {{ gross_prorated }}, {{ deductions_prorated }}, {{ net_prorated }}<br>
-                <strong>Salary Structure:</strong> {{ salary_struct.basic }}, {{ salary_struct.hra }}, {{ salary_struct.gross }}, {{ salary_struct.net }}
+            <summary
+                style="padding: 10px 15px; font-size: 8.5pt; font-weight: 700; color: #475569; cursor: pointer; background-color: #f8fafc; border-radius: 8px;">
+                📖 Available Template Variables (Click to expand)</summary>
+            <div
+                style="padding: 12px 15px; font-size: 8pt; color: #64748b; line-height: 1.6; font-family: 'Courier New', monospace; max-height: 200px; overflow-y: auto; background-color: #fafafa;">
+                <strong>Employee:</strong> {{ employee.first_name }}, {{ employee.last_name }}, {{ employee.emp_id }},
+                {{ employee.designation }}, {{ employee.joining_date }}, {{ employee.department.name }}<br>
+                <strong>Exit Request:</strong> {{ exit_request.last_working_day }}, {{ exit_request.resignation_date }},
+                {{ exit_request.exit_type }}<br>
+                <strong>Dates &amp; Tenure:</strong> {{ date }}, {{ today }}, {{ tenure_str }}<br>
+                <strong>Company:</strong> {{ company_name }}, {{ company_address }}, {{ signatory_name }}, {{
+                signatory_designation }}<br>
+                <strong>F&amp;F Settlement:</strong> {{ ff.salary_proportional }}, {{ ff.leave_encashment_amount }}, {{
+                ff.bonus_arrears }}, {{ ff.gratuity_amount }}, {{ ff.notice_shortfall_amount }}, {{
+                ff.salary_advance_outstanding }}, {{ ff.bond_penalty }}, {{ ff.tds_deduction }}, {{ ff.total_earnings
+                }}, {{ ff.total_deductions }}, {{ ff.net_payable }}<br>
+                <strong>Salary Prorated:</strong> {{ prorated.basic }}, {{ prorated.hra }}, {{ prorated.conveyance }},
+                {{ prorated.medical }}, {{ prorated.special }}, {{ prorated.monthly_bonus }}, {{ prorated.pf }}, {{
+                prorated.professional_tax }}, {{ prorated.tds }}, {{ gross_prorated }}, {{ deductions_prorated }}, {{
+                net_prorated }}<br>
+                <strong>Salary Structure:</strong> {{ salary_struct.basic }}, {{ salary_struct.hra }}, {{
+                salary_struct.gross }}, {{ salary_struct.net }}
             </div>
         </details>
 
-        <!-- Code Editor -->
-        <div style="position: relative;">
-            <textarea id="templateEditorTextarea" rows="24" style="width: 100%; font-family: 'Courier New', Consolas, monospace; font-size: 9.5pt; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; background-color: #1e293b; color: #e2e8f0; resize: vertical; line-height: 1.6; tab-size: 4;" spellcheck="false" placeholder="Select a template to load its HTML content..."></textarea>
+        <!-- Visual Document Editor -->
+        <div style="margin-bottom: 20px;">
+            <label
+                style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 10px;">Visual
+                Document Editor (A4 Page View)</label>
+
+            <div class="visual-editor-container"
+                style="border: 1.5px solid var(--border-color); border-radius: 12px; overflow: hidden; background: var(--bg-card); display: flex; flex-direction: column;">
+                <!-- Editor Toolbar -->
+                <div class="editor-toolbar"
+                    style="background: var(--bg-main); border-bottom: 1.5px solid var(--border-color); padding: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <button type="button" onclick="execExitEditorCommand('bold')" title="Bold"
+                        style="padding: 6px 12px; border-radius: 6px; font-weight: bold; background: white; border: 1px solid var(--border-color); cursor: pointer; font-size: 12px;">B</button>
+                    <button type="button" onclick="execExitEditorCommand('italic')" title="Italic"
+                        style="padding: 6px 12px; border-radius: 6px; font-style: italic; background: white; border: 1px solid var(--border-color); cursor: pointer; font-size: 12px;">I</button>
+                    <button type="button" onclick="execExitEditorCommand('underline')" title="Underline"
+                        style="padding: 6px 12px; border-radius: 6px; text-decoration: underline; background: white; border: 1px solid var(--border-color); cursor: pointer; font-size: 12px;">U</button>
+
+                    <div style="width: 1.5px; height: 20px; background: var(--border-color); margin: 0 4px;"></div>
+
+                    <button type="button" onclick="execExitEditorCommand('justifyLeft')" title="Align Left"
+                        style="padding: 6px; border-radius: 6px; background: white; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor"
+                            stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M4 6h16M4 12h10M4 18h16" />
+                        </svg>
+                    </button>
+                    <button type="button" onclick="execExitEditorCommand('justifyCenter')" title="Align Center"
+                        style="padding: 6px; border-radius: 6px; background: white; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor"
+                            stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M4 6h16M7 12h10M4 18h16" />
+                        </svg>
+                    </button>
+                    <button type="button" onclick="execExitEditorCommand('justifyRight')" title="Align Right"
+                        style="padding: 6px; border-radius: 6px; background: white; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor"
+                            stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M4 6h16M10 12h10M4 18h16" />
+                        </svg>
+                    </button>
+
+                    <div style="width: 1.5px; height: 20px; background: var(--border-color); margin: 0 4px;"></div>
+
+                    <button type="button" onclick="execExitEditorCommand('insertUnorderedList')" title="Bullet List"
+                        style="padding: 6px; border-radius: 6px; background: white; border: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor"
+                            stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M9 6h11M9 12h11M9 18h11M5 6v.01M5 12v.01M5 18v.01" />
+                        </svg>
+                    </button>
+
+                    <div style="width: 1.5px; height: 20px; background: var(--border-color); margin: 0 4px;"></div>
+
+                    <!-- Placeholder Inserter — exit-specific variables -->
+                    <select onchange="insertExitPlaceholderAtCursor(this.value); this.value='';"
+                        style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; font-weight: 600; cursor: pointer; background: white; outline: none;">
+                        <option value="">Insert Placeholder...</option>
+                        <optgroup label="Employee">
+                            <option value="{{ employee.first_name }}">First Name</option>
+                            <option value="{{ employee.last_name }}">Last Name</option>
+                            <option value="{{ employee.emp_id }}">Employee ID</option>
+                            <option value="{{ employee.designation }}">Designation</option>
+                            <option value="{{ employee.joining_date }}">Joining Date</option>
+                            <option value="{{ employee.department.name }}">Department</option>
+                        </optgroup>
+                        <optgroup label="Exit Info">
+                            <option value="{{ exit_request.last_working_day }}">Last Working Day</option>
+                            <option value="{{ exit_request.resignation_date }}">Resignation Date</option>
+                            <option value="{{ exit_request.exit_type }}">Exit Type</option>
+                            <option value="{{ tenure_str }}">Tenure (years)</option>
+                        </optgroup>
+                        <optgroup label="Company">
+                            <option value="{{ company_name }}">Company Name</option>
+                            <option value="{{ company_address }}">Company Address</option>
+                            <option value="{{ signatory_name }}">Signatory Name</option>
+                            <option value="{{ signatory_designation }}">Signatory Designation</option>
+                        </optgroup>
+                        <optgroup label="Dates">
+                            <option value="{{ date }}">Today's Date</option>
+                            <option value="{{ today }}">Today (alt)</option>
+                        </optgroup>
+                        <optgroup label="F&amp;F Settlement">
+                            <option value="{{ ff.net_payable }}">Net Payable</option>
+                            <option value="{{ ff.total_earnings }}">Total Earnings</option>
+                            <option value="{{ ff.total_deductions }}">Total Deductions</option>
+                            <option value="{{ ff.salary_proportional }}">Pro-rated Salary</option>
+                            <option value="{{ ff.leave_encashment_amount }}">Leave Encashment</option>
+                            <option value="{{ ff.bonus_arrears }}">Bonus / Arrears</option>
+                            <option value="{{ ff.gratuity_amount }}">Gratuity</option>
+                            <option value="{{ ff.notice_shortfall_amount }}">Notice Shortfall</option>
+                            <option value="{{ ff.tds_deduction }}">TDS Deduction</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- Editable A4 Page Frame -->
+                <div
+                    style="background: #e2e8f0; padding: 30px; display: block; overflow-y: auto; max-height: 600px; text-align: center;">
+                    <div id="exitVisualTemplateEditor" contenteditable="true" style="width: 210mm; min-height: 297mm; display: block; background-color: white;
+                                box-shadow: 0 8px 16px rgba(15,23,42,0.1); padding: 20mm; margin: 0 auto;
+                                text-align: left; outline: none; color: black;
+                                font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.6;
+                                border-left: 1.5px solid #cbd5e1; border-right: 1.5px solid #cbd5e1;
+                                box-sizing: border-box;
+                                background-image: linear-gradient(to bottom, transparent 296.5mm, #cbd5e1 296.5mm, #cbd5e1 297mm);
+                                background-size: 100% 297mm; background-repeat: repeat-y; position: relative;">
+                        <!-- Document HTML content populated dynamically -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Editor Status Bar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 8pt; color: #94a3b8;">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 8pt; color: #94a3b8;">
             <span id="templateEditorStatus">No template loaded</span>
             <span id="templateEditorLastSaved">-</span>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
+            <button class="btn btn-primary" onclick="saveExitTemplateChanges()"
+                style="padding: 10px 20px; font-size: 12px; font-weight: 700; border-radius: 8px;">💾 Save Template
+                Changes</button>
         </div>
     </div>
 </div>
