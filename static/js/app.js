@@ -208,6 +208,7 @@ const viewToPath = {
     'salaryHistoryView': '/salaries/employee/',
     'exitView': '/exits/',
     'studentView': '/students/',
+    'studentDetailView': '/students/detail/',
     'logsView': '/logs/',
     'rolesView': '/roles/'
 };
@@ -222,6 +223,7 @@ const pathToView = {
     '/exits/': 'exitView',
     '/exits/detail/': 'exitDetailView',
     '/students/': 'studentView',
+    '/students/detail/': 'studentDetailView',
     '/logs/': 'logsView',
     '/roles/': 'rolesView'
 };
@@ -236,6 +238,7 @@ const views = [
     'exitView',
     'exitDetailView',
     'studentView',
+    'studentDetailView',
     'logsView',
     'rolesView',
     'exitLetterWorkspace',
@@ -247,8 +250,26 @@ function getEmployeeIdFromUrl() {
     return match ? parseInt(match[1]) : null;
 }
 
+function getEmployeeDetailIdFromUrl() {
+    const match = window.location.pathname.match(/^\/employees\/(\d+)\/?$/);
+    return match ? parseInt(match[1]) : null;
+}
+
+function getStudentIdFromUrl() {
+    const match = window.location.pathname.match(/^\/students\/(\d+)\/?$/);
+    return match ? parseInt(match[1]) : null;
+}
+
 function switchView(viewId, pushState = true, extraParams = {}) {
     showGlobalLoader(false);
+
+    const targetView = document.getElementById(viewId);
+    if (!targetView) {
+        console.warn(`View "${viewId}" was not found in the page.`);
+        showToast('This page section is not loaded. Please refresh the page.', 'error');
+        hideGlobalLoader();
+        return;
+    }
 
     views.forEach(v => {
         const el = document.getElementById(v);
@@ -265,28 +286,52 @@ function switchView(viewId, pushState = true, extraParams = {}) {
     });
 
     // Load dynamic data based on view
-    if (viewId === 'dashboardView') loadDashboardData();
-    else if (viewId === 'onboardingView') loadOnboardingData();
-    else if (viewId === 'onboardingFormView') loadOnboardingFormPage();
-    else if (viewId === 'salaryView') loadSalaryData();
-    else if (viewId === 'salaryHistoryView') {
-        const empId = extraParams.employeeId || getEmployeeIdFromUrl();
-        if (empId) {
-            loadDedicatedEmployeeSalaryHistory(empId);
+    try {
+        if (viewId === 'dashboardView') loadDashboardData();
+        else if (viewId === 'onboardingView') loadOnboardingData();
+        else if (viewId === 'onboardingFormView') loadOnboardingFormPage();
+        else if (viewId === 'employeeDetailView' && typeof openEmployeeProfileDetail === 'function') {
+            const empId = extraParams.employeeId || getEmployeeDetailIdFromUrl();
+            if (empId) {
+                openEmployeeProfileDetail(empId, extraParams.employeeTab || 'personal', false);
+            }
         }
+        else if (viewId === 'salaryView') loadSalaryData();
+        else if (viewId === 'salaryHistoryView') {
+            const empId = extraParams.employeeId || getEmployeeIdFromUrl();
+            if (empId) {
+                loadDedicatedEmployeeSalaryHistory(empId);
+            }
+        }
+        else if (viewId === 'exitView') loadExitData();
+        else if (viewId === 'studentView') loadStudentData();
+        else if (viewId === 'studentDetailView' && extraParams.studentId && !extraParams.skipStudentDetailLoad && typeof openStudentProfileDetail === 'function') {
+            openStudentProfileDetail(extraParams.studentId, extraParams.studentTab || 'personal', false);
+        }
+        else if (viewId === 'logsView') loadLogsData();
+        else if (viewId === 'rolesView') loadRolesData();
+    } catch (e) {
+        console.error(`Error loading view "${viewId}":`, e);
+        showToast('Unable to load this page section. Please refresh and try again.', 'error');
     }
-    else if (viewId === 'exitView') loadExitData();
-    else if (viewId === 'studentView') loadStudentData();
-    else if (viewId === 'logsView') loadLogsData();
-    else if (viewId === 'rolesView') loadRolesData();
 
     // Update URL without page reload
     if (pushState) {
         let path = viewToPath[viewId] || '/';
         if (viewId === 'salaryHistoryView' && extraParams.employeeId) {
             path = `/salaries/employee/${extraParams.employeeId}/`;
+        } else if (viewId === 'employeeDetailView' && extraParams.employeeId) {
+            path = `/employees/${extraParams.employeeId}/`;
+        } else if (viewId === 'studentDetailView' && extraParams.studentId) {
+            path = `/students/${extraParams.studentId}/`;
         }
-        history.pushState({ viewId: viewId, employeeId: extraParams.employeeId || null }, '', path);
+        history.pushState({
+            viewId: viewId,
+            employeeId: extraParams.employeeId || null,
+            employeeTab: extraParams.employeeTab || null,
+            studentId: extraParams.studentId || null,
+            studentTab: extraParams.studentTab || null
+        }, '', path);
     }
 
     setTimeout(() => {
@@ -299,15 +344,27 @@ function switchView(viewId, pushState = true, extraParams = {}) {
 // Handle browser Back/Forward navigation
 window.addEventListener('popstate', (event) => {
     if (event.state && event.state.viewId) {
-        switchView(event.state.viewId, false, { employeeId: event.state.employeeId });
+        switchView(event.state.viewId, false, {
+            employeeId: event.state.employeeId,
+            employeeTab: event.state.employeeTab,
+            studentId: event.state.studentId,
+            studentTab: event.state.studentTab
+        });
     } else {
         let viewId = 'dashboardView';
         if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
             viewId = 'salaryHistoryView';
+        } else if (getEmployeeDetailIdFromUrl()) {
+            viewId = 'employeeDetailView';
+        } else if (getStudentIdFromUrl()) {
+            viewId = 'studentDetailView';
         } else {
             viewId = pathToView[window.location.pathname] || 'dashboardView';
         }
-        switchView(viewId, false);
+        switchView(viewId, false, {
+            employeeId: getEmployeeDetailIdFromUrl(),
+            studentId: getStudentIdFromUrl()
+        });
     }
 });
 

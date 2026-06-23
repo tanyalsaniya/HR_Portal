@@ -586,9 +586,11 @@ function renderDocumentsChecklist(docList, bondPeriod) {
     }).join('');
 }
 
-async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
+async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldSwitchView = true) {
     currentDetailEmployeeId = empId;
-    switchView('employeeDetailView');
+    if (shouldSwitchView) {
+        switchView('employeeDetailView', true, { employeeId: empId, employeeTab: tabToFocus });
+    }
     
     try {
         const res = await apiFetch(`/employees/${empId}/`);
@@ -1597,89 +1599,31 @@ async function updateLetterPreview() {
                 return pages[num - 1];
             }
             
-            function getMirrorParent(originalParent, activePage) {
-                if (!originalParent || originalParent === originalBody) {
-                    return activePage;
-                }
-                
-                const path = [];
-                let curr = originalParent;
-                while (curr && curr !== originalBody) {
-                    path.unshift(curr);
-                    curr = curr.parentNode;
-                }
-                
-                let currentTarget = activePage;
-                path.forEach(origNode => {
-                    let mirror = null;
-                    for (let child of currentTarget.children) {
-                        if (child.tagName === origNode.tagName && 
-                            child.className === origNode.className && 
-                            !child.dataset.finalized) {
-                            mirror = child;
-                            break;
+            const children = Array.from(originalBody.childNodes);
+            children.forEach(child => {
+                if (child.nodeType === Node.ELEMENT_NODE) {
+                    if (child.tagName === 'SCRIPT' || child.tagName === 'STYLE' || child.id === 'a4-preview-styles') {
+                        return;
+                    }
+                    
+                    const styleAttr = child.getAttribute('style') || '';
+                    const hasPageBreak = styleAttr.includes('page-break-before: always') || 
+                                         styleAttr.includes('page-break-before:always') ||
+                                         child.style.pageBreakBefore === 'always';
+                                         
+                    if (hasPageBreak) {
+                        currentPageNum++;
+                        const isEmptyPageBreak = !child.textContent.trim() && child.children.length === 0;
+                        if (!isEmptyPageBreak) {
+                            const page = getOrCreatePage(currentPageNum);
+                            page.appendChild(child.cloneNode(true));
                         }
-                    }
-                    if (!mirror) {
-                        mirror = origNode.cloneNode(false);
-                        currentTarget.appendChild(mirror);
-                    }
-                    currentTarget = mirror;
-                });
-                
-                return currentTarget;
-            }
-            
-            function processNode(node, parentInPage) {
-                if (!node) return;
-                
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || node.id === 'a4-preview-styles') {
                         return;
                     }
                 }
                 
-                let hasPageBreak = false;
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const styleAttr = node.getAttribute('style') || '';
-                    hasPageBreak = styleAttr.includes('page-break-before: always') || 
-                                   styleAttr.includes('page-break-before:always') ||
-                                   node.style.pageBreakBefore === 'always';
-                }
-                
-                if (hasPageBreak) {
-                    currentPageNum++;
-                }
-                
-                if (node.nodeType === Node.TEXT_NODE) {
-                    const activePage = getOrCreatePage(currentPageNum);
-                    const targetParent = getMirrorParent(parentInPage, activePage);
-                    targetParent.appendChild(node.cloneNode(true));
-                    return;
-                }
-                
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const isTableOrRow = ['TABLE', 'TR', 'THEAD', 'TBODY', 'TH', 'TD', 'UL', 'OL', 'LI'].includes(node.tagName);
-                    const isSpecialBlock = node.classList.contains('header') || 
-                                           node.classList.contains('signature-section') ||
-                                           node.classList.contains('details-table');
-                    const isLeaf = node.childNodes.length === 0;
-                    
-                    if (isLeaf || isTableOrRow || isSpecialBlock) {
-                        const activePage = getOrCreatePage(currentPageNum);
-                        const targetParent = getMirrorParent(parentInPage, activePage);
-                        targetParent.appendChild(node.cloneNode(true));
-                        return;
-                    }
-                    
-                    Array.from(node.childNodes).forEach(child => {
-                        processNode(child, node);
-                    });
-                }
-            }
-            
-            Array.from(originalBody.childNodes).forEach(child => {
-                processNode(child, originalBody);
+                const page = getOrCreatePage(currentPageNum);
+                page.appendChild(child.cloneNode(true));
             });
             
             pages.forEach((page, index) => {
@@ -2170,4 +2114,45 @@ function previewProfilePhoto(input) {
             placeholder.style.display = 'block';
         }
     }
+}
+
+// -----------------------------------------------------------------------
+// triggerExitFormality(empId)
+// Called from the employee row "Initiate Exit" dropdown button.
+// Opens the shared Initiate Exit modal (defined in exit.js / layout) and
+// pre-selects the correct employee in the dropdown.
+// -----------------------------------------------------------------------
+async function triggerExitFormality(empId) {
+    // Open the modal (function defined in exit.js, loaded globally)
+    if (typeof openInitiateExitModal === 'function') {
+        openInitiateExitModal();
+    } else {
+        showToast('Exit modal is not available. Please go to the Exit page.', 'error');
+        return;
+    }
+
+    // Wait for the employee select dropdown to be populated, then pre-select
+    const maxWait = 50; // 50 * 100ms = 5 seconds
+    let waited = 0;
+    const interval = setInterval(() => {
+        waited++;
+        const select = document.getElementById('exitEmployeeSelect');
+        if (!select) {
+            if (waited >= maxWait) clearInterval(interval);
+            return;
+        }
+        // Options loaded when more than the placeholder exist
+        if (select.options.length > 1) {
+            clearInterval(interval);
+            const strId = String(empId);
+            for (let i = 0; i < select.options.length; i++) {
+                if (String(select.options[i].value) === strId) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+        } else if (waited >= maxWait) {
+            clearInterval(interval);
+        }
+    }, 100);
 }

@@ -68,6 +68,33 @@
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html[data-theme="dark"], :root[data-theme="dark"], [data-theme="dark"] {
+  --bg-main: #0b0f19;
+  --bg-card: #111827;
+  --bg-sidebar: #111827;
+  --bg-header: #111827;
+  
+  --text-main: #f9fafb;
+  --text-secondary: #cbd5e1;
+  --text-muted: #9ca3af;
+  --text-light: #6b7280;
+  
+  --border-color: #1f2937;
+  --border-accent: #374151;
+  
+  --primary-light: rgba(124, 58, 237, 0.15);
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  
+  --status-active-bg: rgba(16, 185, 129, 0.1);
+  --status-pending-bg: rgba(245, 158, 11, 0.1);
+  --status-inactive-bg: rgba(107, 114, 128, 0.1);
+  --status-danger-bg: rgba(239, 68, 68, 0.1);
+  --status-blue-bg: rgba(59, 130, 246, 0.1);
+}
+
 /* ==========================================================================
    GLOBAL RESETS & SCROLLBARS
    ========================================================================== */
@@ -572,7 +599,7 @@ body {
   border: 1.5px solid var(--border-accent);
   border-radius: var(--border-radius-pill);
   outline: none;
-  background-color: #ffffff;
+  background-color: var(--bg-card);
   color: var(--text-main);
   transition: all var(--transition-fast);
 }
@@ -808,7 +835,7 @@ body {
   color: var(--text-muted);
   letter-spacing: 0.05em;
   border-bottom: 1.5px solid var(--border-color);
-  background-color: #f8fafc;
+  background-color: var(--bg-main);
 }
 
 .table td, .data-table td {
@@ -824,7 +851,7 @@ body {
 }
 
 .table tbody tr:hover td, .data-table tbody tr:hover td {
-  background-color: #f8fafc;
+  background-color: var(--bg-main);
 }
 
 /* Specific Cell Layouts */
@@ -1507,7 +1534,7 @@ body {
   position: absolute;
   right: 0;
   top: 100%;
-  background-color: #ffffff;
+  background-color: var(--bg-card);
   border: 1px solid var(--border-accent);
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
   border-radius: var(--border-radius-md);
@@ -1543,4 +1570,378 @@ body {
 .premium-dropdown-item:hover {
   background-color: var(--primary-light);
   color: var(--primary-color);
+}
+
+/* ==========================================================================
+   COMPREHENSIVE DARK MODE OVERRIDES
+   Fixes all hardcoded light colors in panel components and theme.css itself.
+   ========================================================================== */
+
+/* ─── Global element dark mode ─────────────────────────────────────────── */
+[data-theme="dark"] body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  border-color: var(--border-accent);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-light);
+}
+
+/* ─── Sidebar footer buttons ────────────────────────────────────────────── */
+[data-theme="dark"] .sidebar {
+  background-color: var(--bg-sidebar) !important;
+  border-right-color: var(--border-color) !important;
+}
+
+/* ─── People / onboarding tabs ──────────────────────────────────────────── */
+[data-theme="dark"] .people-tabs-container {
+  background-color: var(--border-color);
+}
+
+[data-theme="dark"] .people-tab-btn {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .people-tab-btn:hover {
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .people-tab-btn.active {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Search input ──────────────────────────────────────────────────────── */
+[data-theme="dark"] .search-input-wrapper input {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  border-color: var(--border-accent);
+}
+
+/* ─── Action buttons ────────────────────────────────────────────────────── */
+[data-theme="dark"] .btn-premium-action {
+  background-color: var(--bg-card);
+  border-color: var(--border-accent);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .btn-premium-action:hover {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  border-color: var(--text-light);
+}
+
+[data-theme="dark"] .btn-secondary {
+  background-color: var(--bg-card);
+  border-color: var(--border-accent);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .btn-icon-only {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .btn-icon-only:hover {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* ─── Onboarding policy banner ──────────────────────────────────────────── */
+[data-theme="dark"] .onboarding-policy-banner {
+  background-color: var(--bg-card);
+  border-color: var(--border-accent);
+}
+
+/* ─── Status pills ──────────────────────────────────────────────────────── */
+[data-theme="dark"] .status-pill.draft {
+  background-color: var(--border-color);
+  border-color: var(--border-accent);
+  color: var(--text-muted);
+}
+[data-theme="dark"] .status-pill.draft::before { background-color: var(--text-light); }
+
+[data-theme="dark"] .status-pill.action-needed {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+[data-theme="dark"] .status-pill.action-needed::before { background-color: #ef4444; }
+
+[data-theme="dark"] .status-pill.synced {
+  background-color: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+[data-theme="dark"] .status-pill.synced::before { background-color: #10b981; }
+
+[data-theme="dark"] .status-pill.pending {
+  background-color: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fcd34d;
+}
+[data-theme="dark"] .status-pill.pending::before { background-color: #f59e0b; }
+
+/* ─── Progress bars ─────────────────────────────────────────────────────── */
+[data-theme="dark"] .premium-progress-track {
+  background-color: var(--border-accent);
+}
+
+/* ─── Dropdown dot menu ─────────────────────────────────────────────────── */
+[data-theme="dark"] .btn-dot-menu:hover {
+  background-color: var(--border-color);
+  color: var(--text-main);
+}
+
+/* ─── Login page ────────────────────────────────────────────────────────── */
+[data-theme="dark"] .login-input {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  border-color: var(--border-accent);
+}
+
+[data-theme="dark"] .login-left {
+  background: var(--bg-main);
+}
+
+[data-theme="dark"] .login-card {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+/* ─── Cards ─────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .card {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .welcome-card {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .callout-box {
+  background-color: var(--primary-light);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+/* ─── Tables ────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .table th,
+[data-theme="dark"] .data-table th {
+  background-color: var(--bg-main);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .table td,
+[data-theme="dark"] .data-table td {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .table tbody tr:hover td,
+[data-theme="dark"] .data-table tbody tr:hover td {
+  background-color: var(--bg-main);
+}
+
+[data-theme="dark"] .user-cell-avatar {
+  background-color: var(--primary-light);
+}
+
+/* ─── Tab group ─────────────────────────────────────────────────────────── */
+[data-theme="dark"] .tab-group {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .tab-badge {
+  background-color: var(--bg-main);
+  color: var(--text-muted);
+}
+
+/* ─── Activity timeline ─────────────────────────────────────────────────── */
+[data-theme="dark"] .activity-item::after {
+  background-color: var(--border-color);
+}
+
+/* ─── Toast container ───────────────────────────────────────────────────── */
+[data-theme="dark"] .toast {
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+/* ─── Slideover (notifications) ─────────────────────────────────────────── */
+[data-theme="dark"] .slideover {
+  background-color: var(--bg-card);
+  border-left-color: var(--border-color);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.4);
+}
+
+/* ─── Header / Navbar ───────────────────────────────────────────────────── */
+[data-theme="dark"] .header,
+[data-theme="dark"] .navbar {
+  background-color: rgba(17, 24, 39, 0.9);
+  border-bottom-color: var(--border-color);
+}
+
+/* ─── Modal ─────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .modal-content {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+/* ─── Table wrapper ─────────────────────────────────────────────────────── */
+[data-theme="dark"] .table-responsive {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+/* ─── Module perms group ─────────────────────────────────────────────────── */
+[data-theme="dark"] .module-perms-group {
+  background-color: var(--bg-main);
+  border-color: var(--border-color);
+}
+
+/* ─── Smooth color-scheme transitions ────────────────────────────────────── */
+[data-theme="dark"] * {
+  border-color: inherit;
+}
+
+/* ==========================================================================
+   PANEL-SPECIFIC DARK MODE OVERRIDES
+   Targets hardcoded inline styles in panel HTML files.
+   ========================================================================== */
+
+/* ─── Page titles in panels ─────────────────────────────────────────────── */
+[data-theme="dark"] h2[style*="#0f172a"],
+[data-theme="dark"] h3[style*="#0f172a"],
+[data-theme="dark"] h2[style*="#1e293b"],
+[data-theme="dark"] h3[style*="#1e293b"],
+[data-theme="dark"] h4[style*="#0f172a"],
+[data-theme="dark"] h4[style*="#1e293b"] {
+  color: var(--text-main) !important;
+}
+
+[data-theme="dark"] p[style*="#64748b"],
+[data-theme="dark"] p[style*="#475569"],
+[data-theme="dark"] span[style*="#64748b"],
+[data-theme="dark"] span[style*="#475569"],
+[data-theme="dark"] div[style*="color: #64748b"],
+[data-theme="dark"] div[style*="color: #475569"] {
+  color: var(--text-muted) !important;
+}
+
+/* ─── Pagination footers ────────────────────────────────────────────────── */
+[data-theme="dark"] .pagination-footer {
+  background-color: var(--bg-main) !important;
+  border-top-color: var(--border-color) !important;
+}
+
+/* ─── Table wrapper divs with hardcoded white backgrounds ────────────────── */
+[data-theme="dark"] #subTabOnboarding,
+[data-theme="dark"] #subTabAllEmployees,
+[data-theme="dark"] div[style*="background: #ffffff"],
+[data-theme="dark"] div[style*="background:#ffffff"],
+[data-theme="dark"] div[style*="background-color: #ffffff"],
+[data-theme="dark"] div[style*="background-color:#ffffff"],
+[data-theme="dark"] div[style*="background: white"],
+[data-theme="dark"] div[style*="background-color: white"],
+[data-theme="dark"] div[style*="background: rgb(255, 255, 255)"],
+[data-theme="dark"] div[style*="background-color: rgb(255, 255, 255)"],
+[data-theme="dark"] div[style*="background:rgb(255, 255, 255)"],
+[data-theme="dark"] div[style*="background-color:rgb(255, 255, 255)"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ─── Table header rows ─────────────────────────────────────────────────── */
+[data-theme="dark"] tr[style*="background: #fafafa"],
+[data-theme="dark"] tr[style*="background-color: #fafafa"],
+[data-theme="dark"] div[style*="background: #fafafa"],
+[data-theme="dark"] div[style*="background-color: #fafafa"] {
+  background: var(--bg-main) !important;
+}
+
+/* ─── Pagination buttons ─────────────────────────────────────────────────── */
+[data-theme="dark"] button[style*="background: #fff"],
+[data-theme="dark"] button[style*="background:#fff"],
+[data-theme="dark"] button[style*="background-color: #fff"],
+[data-theme="dark"] button[style*="background-color:#fff"] {
+  background: var(--bg-card) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-accent) !important;
+}
+
+/* ─── Inline-styled inputs / selects with hardcoded white ────────────────── */
+[data-theme="dark"] input[style*="background-color: #ffffff"],
+[data-theme="dark"] input[style*="background: #ffffff"],
+[data-theme="dark"] input[style*="background: white"],
+[data-theme="dark"] input[style*="background-color: white"],
+[data-theme="dark"] select[style*="background: #ffffff"],
+[data-theme="dark"] select[style*="background:#ffffff"],
+[data-theme="dark"] select[style*="background-color: #fff"],
+[data-theme="dark"] select[style*="background-color: white"],
+[data-theme="dark"] select[style*="background: white"],
+[data-theme="dark"] select[style*="background:white"] {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-accent) !important;
+}
+
+/* ─── Inline-styled buttons with white background ────────────────────────── */
+[data-theme="dark"] button[style*="background-color: #ffffff"],
+[data-theme="dark"] button[style*="background-color:#ffffff"] {
+  background-color: var(--bg-card) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-accent) !important;
+}
+
+/* ─── Exit form detail boxes ─────────────────────────────────────────────── */
+[data-theme="dark"] div[id^="qDet"] {
+  background-color: var(--bg-main) !important;
+  border-color: var(--border-accent) !important;
+  color: var(--text-main) !important;
+}
+
+[data-theme="dark"] #exitFormNoResponse {
+  background-color: var(--bg-main) !important;
+  border-color: var(--border-accent) !important;
+  color: var(--text-muted) !important;
+}
+
+/* ─── Card/filterDrawerCard ─────────────────────────────────────────────── */
+[data-theme="dark"] #filterDrawerCard,
+[data-theme="dark"] .card[style*="background-color: var(--card-bg)"] {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ─── File inputs ────────────────────────────────────────────────────────── */
+[data-theme="dark"] input[type="file"] {
+  background-color: var(--bg-main) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-accent) !important;
+}
+
+/* ─── Salary / exit panel white wrappers ─────────────────────────────────── */
+[data-theme="dark"] div[style*="background: #ffffff; border: 1px solid #e2e8f0"],
+[data-theme="dark"] div[style*="background-color: #ffffff; border: 1px solid #e2e8f0"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border-accent) !important;
 }

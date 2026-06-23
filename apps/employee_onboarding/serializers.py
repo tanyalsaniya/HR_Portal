@@ -16,11 +16,20 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class EmployeeDocumentSerializer(serializers.ModelSerializer):
     uploaded_by_username = serializers.ReadOnlyField(source='uploaded_by.username')
     file_name = serializers.SerializerMethodField()
+    employee = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = EmployeeDocument
         fields = '__all__'
         read_only_fields = ('uploaded_by', 'upload_date')
+
+    def to_internal_value(self, data):
+        emp_id_val = data.get('employee') or data.get('employee_id')
+        if emp_id_val and 'bitrix_user_id' not in data:
+            if hasattr(data, 'copy'):
+                data = data.copy()
+            data['bitrix_user_id'] = emp_id_val
+        return super().to_internal_value(data)
 
     def get_file_name(self, obj):
         return obj.file.name.split('/')[-1] if obj.file else ""
@@ -39,6 +48,7 @@ class EmployeeDocumentSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        validated_data.pop('employee', None)
         request = self.context.get('request')
         if request and request.user:
             validated_data['uploaded_by'] = request.user

@@ -1,7 +1,7 @@
 # apps/student_certificate/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import StudentViewSet, StudentFeeInstallmentViewSet, CourseViewSet, StudentCertificateViewSet, BitrixActiveStudentsView
+from .views import StudentViewSet, StudentFeeInstallmentViewSet, CourseViewSet, StudentCertificateViewSet, BitrixActiveStudentsView, StudentDocumentViewSet
 from accounts.views import hybrid_view
 
 # API Router
@@ -10,6 +10,7 @@ router.register('api/student/students', StudentViewSet, basename='student')
 router.register('api/student/installments', StudentFeeInstallmentViewSet, basename='studentfeeinstallment')
 router.register('api/student/courses', CourseViewSet, basename='course')
 router.register('api/student/certificates', StudentCertificateViewSet, basename='studentcertificate')
+router.register('api/student/documents', StudentDocumentViewSet, basename='studentdocument')
 
 urlpatterns = [
     # Router endpoints

@@ -21,10 +21,10 @@ def send_student_welcome_email(student_id):
     if not recipient_email:
         return "No email for student."
 
-    subject = f"Welcome to MTLV Training Program – {student.program_name}"
+    subject = f"Welcome to Devex Hub Pvt Ltd. Training Program – {student.program_name}"
     body = f"""Dear {student.name},
 
-Welcome to the MTLV Training Program! We are excited to have you join us.
+Welcome to the Devex Hub Pvt Ltd. Training Program! We are excited to have you join us.
 
 Please find your training details below:
 - Program Name: {student.program_name}
@@ -41,7 +41,7 @@ If you have any questions, feel free to contact the training department.
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
     try:
         send_mail(

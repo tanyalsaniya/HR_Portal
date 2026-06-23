@@ -59,10 +59,10 @@ def check_onboarding_status():
             recipient_email = emp.personal_email or emp.work_email or emp.email
             if recipient_email:
                 try:
-                    subject = "Onboarding Complete – Welcome to the MTLV Team"
+                    subject = "Onboarding Complete – Welcome to the Devex Hub Pvt Ltd. Team"
                     body = f"""Dear {emp.first_name},
 
-Congratulations! You have successfully completed your onboarding period at MTLV.
+Congratulations! You have successfully completed your onboarding period at Devex Hub Pvt Ltd.
 
 Your details have been moved to the All Employees directory, and your salary has been activated.
 
@@ -70,7 +70,7 @@ We are excited to have you as a full member of our team and wish you a successfu
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
                     send_mail(
                         subject=subject,
@@ -170,18 +170,18 @@ def check_document_completion():
                 # Employee gets email only
                 recipient_email = emp.personal_email or emp.work_email or emp.email
                 if recipient_email:
-                    subject = "Reminder: Pending Documents – MTLV HR"
+                    subject = "Reminder: Pending Documents – Devex Hub Pvt Ltd. HR"
                     missing_docs_str = "\n".join(f"- {d}" for d in missing_docs)
                     body = f"""Dear {emp.first_name},
 
-This is a reminder that the following required documents are pending to complete your onboarding formalities at MTLV:
+This is a reminder that the following required documents are pending to complete your onboarding formalities at Devex Hub Pvt Ltd.:
 {missing_docs_str}
 
 Please upload them via the employee portal or submit them to the HR team.
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
                     send_mail(
                         subject=subject,
@@ -440,7 +440,7 @@ If you have any questions, feel free to reach out to the HR department.
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
         email = EmailMessage(
             subject=subject,
@@ -479,21 +479,21 @@ def send_certificate_email(student_id):
     if not recipient_email:
         return "No email for student."
         
-    subject = f"Your Internship Certificate – MTLV"
+    subject = f"Your Internship Certificate – Devex Hub Pvt Ltd."
     if student.cert_type == 'TRAINING_CERT':
-        subject = f"Your Training Completion Certificate – MTLV"
+        subject = f"Your Training Completion Certificate – Devex Hub Pvt Ltd."
     elif student.cert_type == 'PROJECT_CERT':
-        subject = f"Your Project Completion Certificate – MTLV"
+        subject = f"Your Project Completion Certificate – Devex Hub Pvt Ltd."
         
     body = f"""Dear {student.name},
 
-Please find attached your completion certificate for the {student.program_name} program at MTLV.
+Please find attached your completion certificate for the {student.program_name} program at Devex Hub Pvt Ltd.
 
 We appreciate your hard work and dedication, and wish you all the best in your future endeavors.
 
 Best Regards,
 HR Team
-MTLV
+Devex Hub Pvt Ltd.
 """
     email = EmailMessage(
         subject=subject,

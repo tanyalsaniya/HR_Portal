@@ -186,19 +186,20 @@ def format_bitrix_student_data(bitrix_student_dict):
         print(formatted['course_name'])
     """
     return {
-        'bitrix_id': bitrix_student_dict.get('ID'),
-        'name': bitrix_student_dict.get('NAME') or '',
-        'email': bitrix_student_dict.get('EMAIL') or bitrix_student_dict.get('UF_EMAIL') or '',
-        'phone': bitrix_student_dict.get('PHONE') or bitrix_student_dict.get('UF_PHONE') or '',
+        'bitrix_id': bitrix_student_dict.get('ID') or bitrix_student_dict.get('id'),
+        'name': (bitrix_student_dict.get('NAME') or bitrix_student_dict.get('title') or '').strip(),
+        'email': bitrix_student_dict.get('EMAIL') or bitrix_student_dict.get('UF_EMAIL') or bitrix_student_dict.get('ufCrm6_1761731565702') or '',
+        'phone': bitrix_student_dict.get('PHONE') or bitrix_student_dict.get('UF_PHONE') or bitrix_student_dict.get('ufCrm6_1761731546152') or '',
         'status': bitrix_student_dict.get('STATUS') or bitrix_student_dict.get('UF_STATUS') or 'ACTIVE',
-        'joining_date': bitrix_student_dict.get('UF_JOINING_DATE') or bitrix_student_dict.get('UF_START_DATE') or '',
-        'completion_date': bitrix_student_dict.get('UF_COMPLETION_DATE') or bitrix_student_dict.get('UF_END_DATE') or '',
-        'institute': bitrix_student_dict.get('INSTITUTE') or bitrix_student_dict.get('UF_INSTITUTE') or '',
-        'course_name': bitrix_student_dict.get('COURSE') or bitrix_student_dict.get('UF_COURSE_NAME') or '',
-        'mentor': bitrix_student_dict.get('MENTOR') or bitrix_student_dict.get('UF_MENTOR') or '',
-        'father_name': bitrix_student_dict.get('FATHER_NAME') or bitrix_student_dict.get('UF_FATHER_NAME') or '',
+        'joining_date': (bitrix_student_dict.get('UF_JOINING_DATE') or bitrix_student_dict.get('UF_START_DATE') or bitrix_student_dict.get('ufCrm6_1761735340146') or '')[:10],
+        'completion_date': (bitrix_student_dict.get('UF_COMPLETION_DATE') or bitrix_student_dict.get('UF_END_DATE') or bitrix_student_dict.get('ufCrm6_1761735481170') or '')[:10],
+        'institute': bitrix_student_dict.get('INSTITUTE') or bitrix_student_dict.get('UF_INSTITUTE') or bitrix_student_dict.get('ufCrm6_1761732176981') or '',
+        'course_name': bitrix_student_dict.get('COURSE') or bitrix_student_dict.get('UF_COURSE_NAME') or bitrix_student_dict.get('ufCrm6_1761731874888') or '',
+        'mentor': bitrix_student_dict.get('MENTOR') or bitrix_student_dict.get('UF_MENTOR') or bitrix_student_dict.get('ufCrm6_1761815392532') or '',
+        'father_name': bitrix_student_dict.get('FATHER_NAME') or bitrix_student_dict.get('UF_FATHER_NAME') or bitrix_student_dict.get('ufCrm6_1761731958409') or '',
         'raw_data': bitrix_student_dict  # Keep raw data for reference
     }
+
 
 
 def get_student_status_category(bitrix_student):
@@ -223,13 +224,15 @@ def get_student_status_category(bitrix_student):
     from datetime import datetime, date
     
     # Get the stage from the CRM
-    stage = bitrix_student.get('STAGE_ID') or bitrix_student.get('UF_STAGE') or ''
+    stage = bitrix_student.get('stageId') or bitrix_student.get('STAGE_ID') or bitrix_student.get('UF_STAGE') or ''
+
     
     # Normalize stage (remove prefix if present)
     stage_normalized = stage.split(':')[-1] if stage else ''
     
     # Check completion date
-    completion_date_str = bitrix_student.get('UF_COMPLETION_DATE') or bitrix_student.get('closedate')
+    completion_date_str = bitrix_student.get('ufCrm6_1761735481170') or bitrix_student.get('UF_COMPLETION_DATE') or bitrix_student.get('closedate')
+
     completion_date = None
     
     if completion_date_str:

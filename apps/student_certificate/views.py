@@ -15,9 +15,9 @@ from rest_framework.exceptions import ValidationError
 from openpyxl import Workbook
 
 from roles.permissions import HasModelPermission
-from .models import Student, StudentFeeInstallment, Course, StudentCertificate
+from .models import Student, StudentFeeInstallment, Course, StudentCertificate, StudentDocument
 from .serializers import (
-    StudentSerializer, StudentFeeInstallmentSerializer, CourseSerializer, StudentCertificateSerializer
+    StudentSerializer, StudentFeeInstallmentSerializer, CourseSerializer, StudentCertificateSerializer, StudentDocumentSerializer
 )
 from .services import (
     generate_student_certificate_pdf, 
@@ -823,6 +823,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         phone = request.data.get('phone', '')
         institute = request.data.get('institute', '')
         course_name = request.data.get('course_name') or request.data.get('course_at_institute') or 'General'
+        course_name = str(course_name)
         joining_date_str = request.data.get('start_date') or request.data.get('joining_date')
         completion_date_str = request.data.get('completion_date')
         father_name = request.data.get('father_name', '')
@@ -856,7 +857,11 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         # Find or create department
         from employee_onboarding.models import Department
-        dept = Department.objects.first()
+        dept = Department.objects.filter(name__iexact="Training").first()
+        if not dept:
+            dept = Department.objects.filter(name__iexact="Software Engineering").first()
+        if not dept:
+            dept = Department.objects.first()
         if not dept:
             dept = Department.objects.create(name="Training")
             
@@ -1021,86 +1026,88 @@ class BitrixActiveStudentsView(APIView):
 
     def get(self, request):
         try:
+            start = request.query_params.get('start', 0)
+            try:
+                start = int(start)
+            except ValueError:
+                start = 0
+
             from django.core.cache import cache
-            
-            # Check for force refresh
             force_refresh = request.GET.get('refresh', '').lower() == 'true'
-            cache_key = 'bitrix_active_students_list'
+            cache_key = f'bitrix_active_students_list_page_{start}'
             
             if not force_refresh:
                 cached_data = cache.get(cache_key)
                 if cached_data is not None:
                     return Response(cached_data)
 
-            active_students = []
-            start = 0
+            import requests
+            payload = {
+                'entityTypeId': self.ENTITY_TYPE_ID,
+                'start': start,
+                'filter': {
+                    'stageId': list(self.INCLUDED_STAGES)
+                },
+                'select': ['*', 'uf_*']
+            }
             
-            # Fetch only required fields to optimize payload size
-            select_fields = [
-                'id', 'title', 'stageId',
-                'ufCrm6_1761731565702',  # email
-                'ufCrm6_1761731546152',  # phone
-                'ufCrm6_1761731874888',  # course_id
-                'ufCrm6_1761734468448',  # start_date
-                'ufCrm6_1761735481170',  # completion_date
-                'ufCrm6_1761731958409',  # father_name
-                'ufCrm6_1761732176981',  # institute
-                'ufCrm6_1761732340679'   # total_fees
-            ]
+            response = requests.post(self.BITRIX_URL, json=payload, timeout=30)
+            if response.status_code != 200:
+                return Response(
+                    {'error': f"Bitrix API returned {response.status_code}: {response.text}"},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
 
-            while True:
-                # Build request params with select and stage filters
-                query_params = {
-                    'entityTypeId': self.ENTITY_TYPE_ID,
-                    'start': start,
-                }
-                
-                # Add select fields to urllib format (e.g. select[0]=id)
-                for i, field in enumerate(select_fields):
-                    query_params[f'select[{i}]'] = field
-                
-                # Add stage filter for included stages to urllib format (e.g. filter[stageId][0]=DT1044_20:CLIENT)
-                for i, stage in enumerate(self.INCLUDED_STAGES):
-                    query_params[f'filter[stageId][{i}]'] = stage
+            data = response.json()
+            items = data.get('result', {}).get('items', [])
+            active_students = []
+            for item in items:
+                active_students.append({
+                    'id': item.get('id'),
+                    'name': (item.get('title') or '').strip(),
+                    'email': item.get('ufCrm6_1761731565702') or '',
+                    'phone': item.get('ufCrm6_1761731546152') or '',
+                    'course_id': item.get('ufCrm6_1761731874888'),
+                    'start_date': (item.get('ufCrm6_1761735340146') or '')[:10],
+                    'completion_date': (item.get('ufCrm6_1761735481170') or '')[:10],
+                    'father_name': item.get('ufCrm6_1761731958409') or '',
+                    'institute': item.get('ufCrm6_1761732176981') or '',
+                    'total_fees': item.get('ufCrm6_1761732340679') or '0',
+                    'stage': item.get('stageId', ''),
+                })
 
-                params = urllib.parse.urlencode(query_params)
-                url = f"{self.BITRIX_URL}?{params}"
-                req = urllib.request.Request(url)
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
+            next_offset = data.get('next', None)
 
-                items = data.get('result', {}).get('items', [])
-                if not items:
-                    break
-
-                for item in items:
-                    if not self._is_currently_enrolled(item):
-                        continue
-                    active_students.append({
-                        'id': item.get('id'),
-                        'name': (item.get('title') or '').strip(),
-                        'email': item.get('ufCrm6_1761731565702') or '',
-                        'phone': item.get('ufCrm6_1761731546152') or '',
-                        'course_id': item.get('ufCrm6_1761731874888'),
-                        'start_date': (item.get('ufCrm6_1761734468448') or '')[:10],
-                        'completion_date': (item.get('ufCrm6_1761735481170') or '')[:10],
-                        'father_name': item.get('ufCrm6_1761731958409') or '',
-                        'institute': item.get('ufCrm6_1761732176981') or '',
-                        'total_fees': item.get('ufCrm6_1761732340679') or '0',
-                        'stage': item.get('stageId', ''),
-                    })
-
-                next_offset = data.get('next')
-                if not next_offset:
-                    break
-                start = next_offset
-
-            response_data = {'count': len(active_students), 'results': active_students}
+            response_data = {
+                'count': len(active_students),
+                'results': active_students,
+                'next': next_offset
+            }
             
             # Cache the response for 5 minutes (300 seconds)
             cache.set(cache_key, response_data, 300)
-            
+
             return Response(response_data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+
+class StudentDocumentViewSet(viewsets.ModelViewSet):
+    serializer_class = StudentDocumentSerializer
+    permission_classes = [HasModelPermission]
+
+    def get_queryset(self):
+        queryset = StudentDocument.objects.all().order_by('-upload_date')
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            queryset = queryset.filter(student_id=student_id)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 

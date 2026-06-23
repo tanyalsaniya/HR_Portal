@@ -8,7 +8,8 @@ from .views import (
     PasswordResetConfirmView,
     LogoutView,
     DashboardAPIView,
-    hybrid_view
+    hybrid_view,
+    client_log_view
 )
 
 from .user_views import UserViewSet
@@ -34,4 +35,5 @@ urlpatterns = [
     # Root dashboard
     path('', hybrid_view(DashboardAPIView), name='dashboard'),
     path('dashboard/', hybrid_view(DashboardAPIView), name='dashboard_view'),
+    path('api/client-log/', client_log_view, name='client_log'),
 ]

@@ -194,3 +194,54 @@ class OnboardingModuleTests(APITestCase):
         called_args = mock_email_delay.call_args[0][0]
         self.assertEqual(called_args['first_name'], 'Test')
         self.assertEqual(called_args['work_email'], 'test@test.com')
+
+    def test_employee_document_upload_and_list(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.hr_user)
+        
+        # Test document upload
+        test_file = SimpleUploadedFile("resume.pdf", b"pdf content", content_type="application/pdf")
+        payload = {
+            'employee': '10',
+            'doc_type': 'RESUME',
+            'file': test_file,
+            'label': 'My Resume'
+        }
+        url = reverse('employeedocument-list')
+        res = self.client.post(url, payload, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        
+        # Test document list filtering
+        url_list = reverse('employeedocument-list') + '?employee_id=10'
+        res_list = self.client.get(url_list)
+        self.assertEqual(res_list.status_code, status.HTTP_200_OK)
+        # Should return list containing the uploaded document
+        data = res_list.json()
+        results = data.get('results', data)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['bitrix_user_id'], '10')
+        self.assertEqual(results[0]['doc_type'], 'RESUME')
+
+    def test_letter_templates_sync(self):
+        from employee_onboarding.models import LetterTemplate
+        
+        # Verify templates don't exist initially in test DB
+        self.assertEqual(LetterTemplate.objects.count(), 0)
+        
+        # Authenticate and query template list endpoint
+        self.client.force_authenticate(user=self.hr_user)
+        url = reverse('lettertemplate-list')
+        res = self.client.get(url)
+        
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # Should auto-seed the templates
+        self.assertTrue(LetterTemplate.objects.filter(name='OFFER_LETTER').exists())
+        self.assertTrue(LetterTemplate.objects.filter(name='APPOINTMENT_LETTER').exists())
+        self.assertTrue(LetterTemplate.objects.filter(name='BOND_LETTER').exists())
+        
+        # Verify database content of OFFER_LETTER contains "Offer Letter"
+        offer_template = LetterTemplate.objects.get(name='OFFER_LETTER')
+        self.assertIn("Offer Letter", offer_template.html_content)
+        self.assertIn("SALARY BREAKUP", offer_template.html_content)
+        self.assertIn("IN-HAND", offer_template.html_content)
+        self.assertIn("Company Representative (Sign)", offer_template.html_content)

@@ -135,7 +135,7 @@ def get_exit_letter_context(exit_request, custom_context=None):
     net_prorated = gross_prorated - deductions_prorated
     
     # Standard signatory & company info
-    company_name = custom_context.get('company_name', getattr(settings, 'COMPANY_NAME', 'MTLV Solutions Private Limited'))
+    company_name = custom_context.get('company_name', getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'))
     company_address = custom_context.get('company_address', getattr(settings, 'COMPANY_ADDRESS', 'HR Division, Secure Enterprise Operations, India'))
     signatory_name = custom_context.get('signatory_name', getattr(settings, 'LETTER_SIGNATORY_NAME', 'Head of HR Operations'))
     signatory_designation = custom_context.get('signatory_designation', getattr(settings, 'LETTER_SIGNATORY_DESIGNATION', 'Authorized Signatory'))
