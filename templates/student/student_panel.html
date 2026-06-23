@@ -102,7 +102,7 @@
     <div id="studentTabBitrix" style="display: none;">
         <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
             <p style="margin: 0; color: #64748b; font-size: 9.5pt;">Live data from Bitrix24 CRM — showing ONLY currently enrolled (ongoing) students. Excludes completed and failed students.</p>
-            <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadBitrixStudents()">↻ Refresh</button>
+            <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadBitrixStudents(true)">↻ Refresh</button>
         </div>
         <div class="table-responsive">
             <table class="data-table">
@@ -213,7 +213,7 @@
                 <div class="cert-preview-frame" id="certLivePreview" style="width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0,0,0,0.08); aspect-ratio: 210/297; position: relative; background-image: url('/static/images/certificate_1.png'); background-size: 100% 100%; overflow: hidden; background-repeat: no-repeat; background-color: #ffffff; box-sizing: border-box; display: flex; flex-direction: column; padding: 115px 51px 35px 51px; font-family: 'Inter', sans-serif;">
                     <!-- Absolute Logos -->
                     <img src="/static/images/DevEx Hub logo.png" style="position: absolute; top: 51px; left: 60px; max-height: 38px; width: auto;" alt="Logo Left">
-                    <img src="/static/images/(accreditationpartner logo.png" style="position: absolute; top: 30px; right: 60px; max-height: 47px; width: auto;" alt="Logo Right">
+                    <img src="/static/images/(accreditationpartner logo.png" style="position: absolute; top: 51px; right: 60px; max-height: 47px; width: auto;" alt="Logo Right">
 
                     <!-- Title -->
                     <div style="text-align: center; margin-bottom: 15px;">

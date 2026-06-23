@@ -1,17 +1,18 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
+
 <head>
     <script>
         // Immediately restore theme before CSS renders to prevent flash
-        (function() {
+        (function () {
             const theme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', theme);
             document.documentElement.style.colorScheme = theme;
         })();
 
         // Global JavaScript error logger
-        window.onerror = function(message, source, lineno, colno, error) {
+        window.onerror = function (message, source, lineno, colno, error) {
             fetch('/api/client-log/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -26,7 +27,7 @@
             }).catch(e => console.error('Failed to log client error', e));
             return false;
         };
-        window.onunhandledrejection = function(event) {
+        window.onunhandledrejection = function (event) {
             fetch('/api/client-log/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -44,7 +45,8 @@
     <!-- Google Fonts Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <!-- Premium stylesheet system -->
     <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=4.0">
     <style>
@@ -98,7 +100,9 @@
             flex-grow: 1;
         }
 
-        .sidebar-item { margin-bottom: 5px; }
+        .sidebar-item {
+            margin-bottom: 5px;
+        }
 
         .sidebar-link {
             display: flex;
@@ -185,10 +189,21 @@
         }
 
         /* Theme toggle icon states */
-        #themeToggleBtn .icon-moon { display: block; }
-        #themeToggleBtn .icon-sun  { display: none; }
-        [data-theme="dark"] #themeToggleBtn .icon-moon { display: none; }
-        [data-theme="dark"] #themeToggleBtn .icon-sun  { display: block; }
+        #themeToggleBtn .icon-moon {
+            display: block;
+        }
+
+        #themeToggleBtn .icon-sun {
+            display: none;
+        }
+
+        [data-theme="dark"] #themeToggleBtn .icon-moon {
+            display: none;
+        }
+
+        [data-theme="dark"] #themeToggleBtn .icon-sun {
+            display: block;
+        }
 
         .badge {
             position: absolute;
@@ -216,12 +231,14 @@
             border-left: 1px solid var(--border-color);
             z-index: 200;
             transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: -8px 0 24px rgba(0,0,0,0.08);
+            box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
             display: flex;
             flex-direction: column;
         }
 
-        .slideover.open { right: 0; }
+        .slideover.open {
+            right: 0;
+        }
 
         .slideover-header {
             padding: 1.25rem 1.5rem;
@@ -247,18 +264,39 @@
             border-left: 3px solid transparent;
         }
 
-        .notif-item:hover { background-color: var(--bg-main); }
+        .notif-item:hover {
+            background-color: var(--bg-main);
+        }
 
         .notif-item.unread {
             border-left-color: var(--primary-color);
             background-color: var(--primary-light);
         }
 
-        .notif-item.notif-info.unread    { border-left-color: #3b82f6; background-color: rgba(59,130,246,0.06); }
-        .notif-item.notif-success.unread { border-left-color: #10b981; background-color: rgba(16,185,129,0.06); }
-        .notif-item.notif-warning.unread { border-left-color: #f59e0b; background-color: rgba(245,158,11,0.06); }
-        .notif-item.notif-urgent.unread  { border-left-color: #ef4444; background-color: rgba(239,68,68,0.06); }
-        .notif-item.notif-error.unread   { border-left-color: #b91c1c; background-color: rgba(185,28,28,0.06); }
+        .notif-item.notif-info.unread {
+            border-left-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.06);
+        }
+
+        .notif-item.notif-success.unread {
+            border-left-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.06);
+        }
+
+        .notif-item.notif-warning.unread {
+            border-left-color: #f59e0b;
+            background-color: rgba(245, 158, 11, 0.06);
+        }
+
+        .notif-item.notif-urgent.unread {
+            border-left-color: #ef4444;
+            background-color: rgba(239, 68, 68, 0.06);
+        }
+
+        .notif-item.notif-error.unread {
+            border-left-color: #b91c1c;
+            background-color: rgba(185, 28, 28, 0.06);
+        }
 
         .notif-text {
             font-size: 0.8125rem;
@@ -290,7 +328,7 @@
             border-left: 4px solid var(--primary-color);
             padding: 0.875rem 1.25rem;
             border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -306,9 +344,17 @@
             opacity: 1;
         }
 
-        .toast-success { border-left-color: #10b981; }
-        .toast-warning { border-left-color: #f59e0b; }
-        .toast-error   { border-left-color: #ef4444; }
+        .toast-success {
+            border-left-color: #10b981;
+        }
+
+        .toast-warning {
+            border-left-color: #f59e0b;
+        }
+
+        .toast-error {
+            border-left-color: #ef4444;
+        }
 
         .toast-close {
             background: none;
@@ -321,7 +367,10 @@
             line-height: 1;
             transition: color 0.15s;
         }
-        .toast-close:hover { color: var(--text-main); }
+
+        .toast-close:hover {
+            color: var(--text-main);
+        }
 
         /* ─── Utility Classes ─────────────────────────── */
         .flex-row-header {
@@ -342,9 +391,11 @@
         /* ─── Modal ───────────────────────────────────── */
         .modal {
             position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background-color: rgba(0,0,0,0.45);
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.45);
             backdrop-filter: blur(4px);
             display: none;
             align-items: center;
@@ -359,7 +410,7 @@
             padding: 2rem;
             width: 520px;
             max-width: 92vw;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
 
         .form-grid {
@@ -368,7 +419,9 @@
             gap: 1rem;
         }
 
-        .form-group-full { grid-column: span 2; }
+        .form-group-full {
+            grid-column: span 2;
+        }
 
         /* ─── Form Controls ───────────────────────────── */
         label {
@@ -379,7 +432,9 @@
             color: var(--text-secondary);
         }
 
-        input, select, textarea {
+        input,
+        select,
+        textarea {
             width: 100%;
             padding: 0.625rem 0.875rem;
             border: 1.5px solid var(--border-accent);
@@ -393,7 +448,9 @@
             transition: border-color 0.18s ease, box-shadow 0.18s ease;
         }
 
-        input:focus, select:focus, textarea:focus {
+        input:focus,
+        select:focus,
+        textarea:focus {
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
         }
@@ -416,6 +473,7 @@
             background-color: var(--primary-color);
             color: #fff;
         }
+
         .btn-primary:hover {
             background-color: var(--primary-hover);
             box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
@@ -507,7 +565,10 @@
             color: var(--text-secondary);
         }
 
-        .perm-checkbox-item input { width: auto; cursor: pointer; }
+        .perm-checkbox-item input {
+            width: auto;
+            cursor: pointer;
+        }
 
         .role-card-footer {
             display: flex;
@@ -525,12 +586,19 @@
             height: 24px;
         }
 
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
 
         .slider {
             position: absolute;
             cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background-color: var(--border-accent);
             transition: 0.3s;
             border-radius: 24px;
@@ -548,8 +616,13 @@
             border-radius: 50%;
         }
 
-        input:checked + .slider { background-color: var(--primary-color); }
-        input:checked + .slider:before { transform: translateX(20px); }
+        input:checked+.slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
 
         /* ─── Active Tab ──────────────────────────────── */
         .active-tab {
@@ -560,7 +633,8 @@
         /* ─── Loading Bar ─────────────────────────────── */
         .loading-bar {
             position: fixed;
-            top: 0; left: 0;
+            top: 0;
+            left: 0;
             height: 3px;
             width: 0%;
             background: linear-gradient(90deg, #7c3aed, #a78bfa, #c084fc);
@@ -584,16 +658,26 @@
         }
 
         @keyframes pulse-loading {
-            0%   { filter: brightness(1); }
-            50%  { filter: brightness(1.3); }
-            100% { filter: brightness(1); }
+            0% {
+                filter: brightness(1);
+            }
+
+            50% {
+                filter: brightness(1.3);
+            }
+
+            100% {
+                filter: brightness(1);
+            }
         }
 
         /* ─── Loader Overlay ──────────────────────────── */
         .global-loader-overlay {
             position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
             background-color: rgba(248, 250, 252, 0.72);
             backdrop-filter: blur(2px);
             display: flex;
@@ -624,12 +708,18 @@
         }
 
         @keyframes spin-premium {
-            0%   { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
+
 <body>
 
     <!-- GLOBAL LOADING SYSTEM ELEMENTS -->
@@ -640,67 +730,115 @@
 
     <div class="portal-layout">
         <!-- SIDEBAR -->
-        <div class="sidebar" style="width: 250px; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100;">
-            <div class="sidebar-brand" style="padding: 24px 20px; display: flex; align-items: center; gap: 8px; border-bottom: none;">
+        <div class="sidebar"
+            style="width: 250px; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100;">
+            <div class="sidebar-brand"
+                style="padding: 24px 20px; display: flex; align-items: center; gap: 8px; border-bottom: none;">
                 <!-- SVG logo for Devex Hub -->
                 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="8" fill="#7c3aed"/>
-                    <path d="M8 22V10H12.5L16 16L19.5 10H24V22H20V15L16 20L12 15V22H8Z" fill="white"/>
+                    <rect width="32" height="32" rx="8" fill="#7c3aed" />
+                    <path d="M8 22V10H12.5L16 16L19.5 10H24V22H20V15L16 20L12 15V22H8Z" fill="white" />
                 </svg>
-                <span class="sidebar-brand-text" style="font-size: 16pt; font-weight: 800; color: var(--text-color); letter-spacing: -0.04em;">Devex Hub</span>
+                <span class="sidebar-brand-text"
+                    style="font-size: 16pt; font-weight: 800; color: var(--text-color); letter-spacing: -0.04em;">Devex
+                    Hub</span>
             </div>
-            <ul class="sidebar-menu" style="list-style: none; padding: 10px 0; margin: 0; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+            <ul class="sidebar-menu"
+                style="list-style: none; padding: 10px 0; margin: 0; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
                 <li class="sidebar-item" id="dashboardLink">
                     <a class="sidebar-link active" data-view="dashboardView" onclick="switchView('dashboardView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="9"></rect>
+                            <rect x="14" y="3" width="7" height="5"></rect>
+                            <rect x="14" y="12" width="7" height="9"></rect>
+                            <rect x="3" y="16" width="7" height="5"></rect>
+                        </svg>
                         Dashboard
                     </a>
                 </li>
                 <li class="sidebar-item" id="onboardingLink" style="display: none;">
                     <a class="sidebar-link" data-view="onboardingView" onclick="switchView('onboardingView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
                         Employees
                     </a>
                 </li>
                 <li class="sidebar-item" id="salaryLink" style="display: none;">
                     <a class="sidebar-link" data-view="salaryView" onclick="switchView('salaryView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12" y2="6"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                            <line x1="12" y1="18" x2="12" y2="6"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
                         Salaries & Slip
                     </a>
                 </li>
                 <li class="sidebar-item" id="exitLink" style="display: none;">
                     <a class="sidebar-link" data-view="exitView" onclick="switchView('exitView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
                         Exit Tracker
                     </a>
                 </li>
                 <li class="sidebar-item" id="studentLink" style="display: none;">
                     <a class="sidebar-link" data-view="studentView" onclick="switchView('studentView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5-10 5z"></path><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 10v6M2 10l10-5 10 5-10 5-10 5z"></path>
+                            <path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path>
+                        </svg>
                         Students / Interns
                     </a>
                 </li>
                 <li class="sidebar-item" id="adminLogsLink" style="display: none;">
                     <a class="sidebar-link" data-view="logsView" onclick="switchView('logsView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
                         Audit Logs
                     </a>
                 </li>
                 <li class="sidebar-item" id="adminRolesLink" style="display: none;">
                     <a class="sidebar-link" data-view="rolesView" onclick="switchView('rolesView')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
                         Roles & Permissions
                     </a>
                 </li>
             </ul>
-            
-            <div style="padding: 14px 16px; border-top: 1px solid var(--sidebar-border); background: var(--sidebar-bg); display: flex; align-items: center; gap: 10px;">
+
+            <div
+                style="padding: 14px 16px; border-top: 1px solid var(--sidebar-border); background: var(--sidebar-bg); display: flex; align-items: center; gap: 10px;">
                 <!-- Avatar -->
-                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #7c3aed; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10pt; flex-shrink: 0;" id="avatarInitials">HR</div>
+                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #7c3aed; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10pt; flex-shrink: 0;"
+                    id="avatarInitials">HR</div>
                 <!-- Name & Email -->
                 <div style="display: flex; flex-direction: column; overflow: hidden; flex-grow: 1; min-width: 0;">
-                    <span id="usernameLabel" style="font-weight: 700; font-size: 9pt; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">User</span>
-                    <span id="userEmailLabel" style="font-size: 7.5pt; color: var(--sidebar-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">email@company.com</span>
+                    <span id="usernameLabel"
+                        style="font-weight: 700; font-size: 9pt; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">User</span>
+                    <span id="userEmailLabel"
+                        style="font-size: 7.5pt; color: var(--sidebar-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;">email@company.com</span>
                 </div>
                 <!-- Action Buttons -->
                 <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
@@ -709,14 +847,24 @@
                         style="width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; color: var(--sidebar-text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, color 0.15s;"
                         onmouseover="this.style.background='var(--sidebar-active-bg)'; this.style.color='var(--sidebar-active-text)';"
                         onmouseout="this.style.background='transparent'; this.style.color='var(--sidebar-text)';">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
                     </button>
                     <!-- Logout icon button -->
                     <button title="Logout" onclick="logout()"
                         style="width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; color: var(--sidebar-text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, color 0.15s;"
                         onmouseover="this.style.background='var(--sidebar-active-bg)'; this.style.color='var(--sidebar-active-text)';"
                         onmouseout="this.style.background='transparent'; this.style.color='var(--sidebar-text)';">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -729,15 +877,30 @@
                 <div style="font-weight: 600; font-size: 14pt;" id="pageTitle">HR Panel</div>
                 <div class="header-actions">
                     <!-- Theme Toggle: moon=light mode, sun=dark mode -->
-                    <button class="btn-icon" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark Mode" aria-label="Toggle Theme">
+                    <button class="btn-icon" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark Mode"
+                        aria-label="Toggle Theme">
                         <!-- Moon icon (shown in light mode) -->
-                        <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                        <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                        </svg>
                         <!-- Sun icon (shown in dark mode) -->
-                        <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                        <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="4" />
+                            <path
+                                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                        </svg>
                     </button>
                     <!-- Bell Notifications -->
                     <button class="btn-icon" onclick="toggleNotifPanel()" title="Notifications">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                        </svg>
                         <span class="badge" id="notifBadge" style="display: none;">0</span>
                     </button>
                 </div>
@@ -767,8 +930,13 @@
         <div class="slideover-header">
             <h3 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--text-main);">Notifications</h3>
             <div style="display:flex; align-items:center; gap:12px;">
-                <button onclick="markAllNotifsRead()" style="background:none; border:none; font-size:0.75rem; color:var(--primary-color); font-weight:600; cursor:pointer; font-family:inherit;">Mark all read</button>
-                <button onclick="toggleNotifPanel()" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:var(--text-secondary); line-height:1; padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; transition:background 0.15s;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='none'">&times;</button>
+                <button onclick="markAllNotifsRead()"
+                    style="background:none; border:none; font-size:0.75rem; color:var(--primary-color); font-weight:600; cursor:pointer; font-family:inherit;">Mark
+                    all read</button>
+                <button onclick="toggleNotifPanel()"
+                    style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:var(--text-secondary); line-height:1; padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; transition:background 0.15s;"
+                    onmouseover="this.style.background='var(--bg-main)'"
+                    onmouseout="this.style.background='none'">&times;</button>
             </div>
         </div>
         <div class="slideover-body" id="notifList">
@@ -777,7 +945,7 @@
     </div>
 
 
-        <!-- LOAD CENTRAL APP JS -->
+    <!-- LOAD CENTRAL APP JS -->
     <script src="{% static 'js/app.js' %}?v=4.0"></script>
 
     <!-- LOAD FEATURES JS SCRIPTS -->
@@ -817,10 +985,10 @@
                         const initials = nameParts.map(p => p.charAt(0)).join('').substring(0, 2).toUpperCase();
                         avatarInitials.textContent = initials || 'HR';
                     }
-                    
+
                     // Apply dynamic permissions on sidebar and dashboard items
                     applyPermissionsToUI();
-                    
+
                     // Initialize view based on current URL path (support reloading and deep-linking)
                     const pathMap = typeof pathToView !== 'undefined' ? pathToView : {};
                     let initialView = 'dashboardView';
@@ -839,7 +1007,7 @@
                         const el = document.getElementById(initialView);
                         if (el) el.style.display = 'block';
                     }
-                    
+
                     if (typeof checkNotifications === 'function') {
                         checkNotifications();
                         setInterval(checkNotifications, 30000);
@@ -854,4 +1022,5 @@
         });
     </script>
 </body>
+
 </html>

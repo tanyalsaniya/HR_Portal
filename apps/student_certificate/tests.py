@@ -4,6 +4,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 import datetime
+from unittest.mock import patch
 
 from employee_onboarding.models import Department
 from roles.models import Role
@@ -167,3 +168,57 @@ class StudentCertificateTestCase(APITestCase):
         self.assertTrue(cert.pdf_file)
         self.assertTrue(cert.student.cert_pdf)
         self.assertEqual(cert.student.status, 'COMPLETED')
+
+    @patch('requests.post')
+    def test_bitrix_active_students_caching(self, mock_post):
+        from unittest.mock import MagicMock
+        from django.core.cache import cache
+
+        # Prepare mock response data
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'result': {
+                'items': [
+                    {
+                        'id': '101',
+                        'title': 'Test Bitrix Student',
+                        'stageId': 'DT1044_20:CLIENT',
+                        'ufCrm6_1761731565702': 'test@bitrix.com',
+                        'ufCrm6_1761731546152': '1234567890',
+                        'ufCrm6_1761731874888': '1',
+                        'ufCrm6_1761735340146': '2025-01-01',
+                        'ufCrm6_1761735481170': '2025-07-01',
+                        'ufCrm6_1761731958409': 'Father Name',
+                        'ufCrm6_1761732176981': 'Institute X',
+                        'ufCrm6_1761732340679': '15000'
+                    }
+                ]
+            },
+            'next': None
+        }
+        mock_post.return_value = mock_response
+
+        # Clear cache first to ensure a clean state
+        cache.delete('bitrix_active_students_list_page_0')
+
+        url = '/api/student/bitrix-active/'
+        
+        # First call: Should fetch from API and cache
+        response1 = self.client.get(url)
+        self.assertEqual(response1.status_code, 200)
+        self.assertEqual(mock_post.call_count, 1)
+        data1 = response1.json()
+        self.assertEqual(data1['count'], 1)
+        self.assertEqual(data1['results'][0]['name'], 'Test Bitrix Student')
+
+        # Second call: Should return from cache (post call count remains 1)
+        response2 = self.client.get(url)
+        self.assertEqual(response2.status_code, 200)
+        self.assertEqual(mock_post.call_count, 1)  # No extra call to post
+        
+        # Third call: with refresh=true, should bypass cache and call api again (post call count becomes 2)
+        response3 = self.client.get(url + '?refresh=true')
+        self.assertEqual(response3.status_code, 200)
+        self.assertEqual(mock_post.call_count, 2)
+

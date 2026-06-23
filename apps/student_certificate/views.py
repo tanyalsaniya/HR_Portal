@@ -1070,6 +1070,15 @@ class BitrixActiveStudentsView(APIView):
             bitrix_start = (start // 50) * 50
             relative_start = start - bitrix_start
 
+            from django.core.cache import cache
+            force_refresh = request.GET.get('refresh', '').lower() == 'true'
+            cache_key = f'bitrix_active_students_list_page_{start}'
+            
+            if not force_refresh:
+                cached_data = cache.get(cache_key)
+                if cached_data is not None:
+                    return Response(cached_data)
+
             import requests
             payload = {
                 'entityTypeId': self.ENTITY_TYPE_ID,
@@ -1120,12 +1129,17 @@ class BitrixActiveStudentsView(APIView):
             else:
                 next_offset = None
 
-            return Response({
+            response_data = {
                 'count': len(active_students),
                 'total': total,
                 'results': active_students,
                 'next': next_offset
-            })
+            }
+            
+            # Cache the response for 5 minutes (300 seconds)
+            cache.set(cache_key, response_data, 300)
+
+            return Response(response_data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 

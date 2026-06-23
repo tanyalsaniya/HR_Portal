@@ -26,7 +26,6 @@ async function loadStudentData() {
             const studList = data.results || [];
             currentStudentList = studList;
             studentTotalCount = data.total || 0;
-            
             const tbody = document.getElementById('studentTableBody');
             if (tbody) {
                 if (studList.length === 0) {
@@ -34,7 +33,7 @@ async function loadStudentData() {
                     updateStudentPaginationControls();
                     return;
                 }
-                
+
                 tbody.innerHTML = studList.map((s, index) => `
                     <tr onclick="handleStudentRowClick(event, ${index})" style="cursor: pointer;">
                         <td>${s.name || '-'}</td>
@@ -46,7 +45,6 @@ async function loadStudentData() {
                         </td>
                     </tr>
                 `).join('');
-                
                 updateStudentPaginationControls();
             }
         } else {
@@ -67,19 +65,19 @@ async function loadStudentData() {
 function updateStudentPaginationControls() {
     const pageStart = studentTotalCount === 0 ? 0 : (studentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
     const pageEnd = Math.min(studentCurrentPage * STUDENT_PAGE_SIZE, studentTotalCount);
-    
     const startEl = document.getElementById('studentPageStart');
     const endEl = document.getElementById('studentPageEnd');
     const totalEl = document.getElementById('studentTotalCount');
     const prevBtn = document.getElementById('studentPrevBtn');
     const nextBtn = document.getElementById('studentNextBtn');
-    
+
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
     if (totalEl) totalEl.textContent = studentTotalCount;
     if (prevBtn) prevBtn.disabled = studentCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = pageEnd >= studentTotalCount;
 }
+
 
 function openStudentModal() {
     const modal = document.getElementById('studentModal');
@@ -310,7 +308,7 @@ function switchStudentTab(tab, selectedStudentId = null) {
     }
 }
 
-async function loadBitrixStudents() {
+async function loadBitrixStudents(forceRefresh = false) {
     const tbody = document.getElementById('bitrixStudentTableBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
@@ -342,7 +340,6 @@ async function loadBitrixStudents() {
                     <td><span style="font-size:7.5pt; padding:2px 8px; border-radius:10px; background:#e0f2fe; color:#0369a1; font-weight:600;">${s.stage.split(':').pop()}</span></td>
                 </tr>
             `).join('');
-            
             updateBitrixStudentPaginationControls();
         } else {
             tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch data from Bitrix24.</td></tr>';
@@ -356,13 +353,12 @@ async function loadBitrixStudents() {
 function updateBitrixStudentPaginationControls() {
     const pageStart = bitrixStudentTotalCount === 0 ? 0 : (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
     const pageEnd = Math.min(bitrixStudentCurrentPage * STUDENT_PAGE_SIZE, bitrixStudentTotalCount);
-    
     const startEl = document.getElementById('bitrixStudentPageStart');
     const endEl = document.getElementById('bitrixStudentPageEnd');
     const totalEl = document.getElementById('bitrixStudentTotalCount');
     const prevBtn = document.getElementById('bitrixStudentPrevBtn');
     const nextBtn = document.getElementById('bitrixStudentNextBtn');
-    
+
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
     if (totalEl) totalEl.textContent = bitrixStudentTotalCount;
@@ -871,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editStudentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentStudentDetails) return;
-            
+
             showToast('Saving changes...');
             const enrolledCourseVal = document.getElementById('editStudEnrolledCourse').value;
             const data = {
@@ -929,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('doc_type', document.getElementById('studentUploadDocType').value);
             formData.append('label', document.getElementById('studentUploadDocLabel').value);
             formData.append('remarks', document.getElementById('studentUploadDocRemarks').value);
-            
+
             const fileInput = document.getElementById('studentUploadDocFile');
             if (fileInput.files.length > 0) {
                 formData.append('file', fileInput.files[0]);
@@ -965,10 +961,10 @@ async function handleStudentRowClick(event, index) {
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
         return;
     }
-    
+
     const s = currentStudentList[index];
     if (!s) return;
-    
+
     switchView('studentDetailView', false);
     showGlobalLoader(true);
     try {
@@ -1032,7 +1028,7 @@ async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shou
             if (deptEl) deptEl.textContent = student.department_details ? student.department_details.name : 'Training';
             const certNoEl = document.getElementById('detailStudentCertNo');
             if (certNoEl) certNoEl.textContent = student.cert_no || 'Pending';
-            
+
             // Student type badge styling
             const typeBadge = document.getElementById('detailStudentTypeBadge');
             if (typeBadge) {
@@ -1066,7 +1062,7 @@ async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shou
                 const el = document.getElementById(id);
                 if (el) el.value = val || '';
             };
-            
+
             setVal('editStudName', student.name);
             setVal('editStudEmail', student.email);
             setVal('editStudPhone', student.phone);
@@ -1142,11 +1138,11 @@ async function loadStudentDetailSelects(enrolledCourseId, deptId) {
 function switchStudentProfileTab(tabId) {
     activeStudentProfileTab = tabId;
     const tabs = ['personal', 'docs', 'installments', 'certificates'];
-    
+
     tabs.forEach(t => {
         const btn = document.getElementById(`sTab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
         const block = document.getElementById(`studentTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
-        
+
         if (t === tabId) {
             if (btn) {
                 btn.classList.add('active');
@@ -1190,16 +1186,16 @@ function toggleStudentDocLabelField() {
 
 async function loadStudentDocumentsList() {
     if (!currentStudentDetails) return;
-    
+
     try {
         const res = await apiFetch(`/api/student/documents/?student_id=${currentStudentDetails.id}`);
         if (res.ok) {
             const docs = await res.json();
             const docList = docs.results || docs;
-            
+
             // Render interactive checklist
             renderStudentDocumentsChecklist(docList);
-            
+
             // Render attachments table
             const tbody = document.getElementById('studentDocsTableBody');
             if (tbody) {
@@ -1207,7 +1203,7 @@ async function loadStudentDocumentsList() {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No documents uploaded yet.</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = docList.map(d => `
                     <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${getDocTypeLabel(d.doc_type)}</td>
@@ -1244,7 +1240,7 @@ function getDocTypeLabel(docType) {
 function renderStudentDocumentsChecklist(docList) {
     const container = document.getElementById('studentDocumentsChecklistContainer');
     if (!container) return;
-    
+
     const requiredDocs = [
         { type: 'RESUME', name: 'Resume / CV', desc: 'Verify professional/academic experience.' },
         { type: 'AADHAAR', name: 'ID Proof (Aadhaar Card)', desc: 'Government identity verification.' },
@@ -1252,16 +1248,16 @@ function renderStudentDocumentsChecklist(docList) {
         { type: 'JOINING_LETTER', name: 'Signed Joining Letter', desc: 'Acceptance of student guidelines.' },
         { type: 'FEE_RECEIPT', name: 'Fee Receipt', desc: 'Payment receipt confirmation.' }
     ];
-    
+
     container.innerHTML = requiredDocs.map(req => {
         const doc = docList.find(d => d.doc_type === req.type);
         const isUploaded = !!doc;
-        
+
         const badgeBg = isUploaded ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
         const badgeTextColor = isUploaded ? '#10b981' : '#ef4444';
         const badgeBorderColor = isUploaded ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
         const badgeText = isUploaded ? 'Uploaded' : 'Missing';
-        
+
         return `
             <div style="background-color: var(--bg-card); border: 1.5px solid ${isUploaded ? '#e2e8f0' : badgeBorderColor}; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-sm); transition: all 0.2s;" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow-sm)'">
                 <div>
@@ -1288,7 +1284,7 @@ function renderStudentDocumentsChecklist(docList) {
 
 async function deleteStudentDoc(docId) {
     if (!confirm('Are you sure you want to delete this document?')) return;
-    
+
     showToast('Deleting document...');
     try {
         const res = await apiFetch(`/api/student/documents/${docId}/`, {
@@ -1308,20 +1304,20 @@ async function deleteStudentDoc(docId) {
 // ---------- FEE INSTALLMENTS TAB LOGIC ----------
 async function loadStudentInstallmentsList() {
     if (!currentStudentDetails) return;
-    
+
     try {
         const res = await apiFetch(`/api/student/installments/?student_id=${currentStudentDetails.id}`);
         if (res.ok) {
             const list = await res.json();
             const instList = list.results || list;
-            
+
             const tbody = document.getElementById('studentInstallmentsTableBody');
             if (tbody) {
                 if (instList.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-light);">No fee installments defined.</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = instList.map(inst => `
                     <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">Installment ${inst.installment_number}</td>
@@ -1353,20 +1349,20 @@ async function loadStudentInstallmentsList() {
 // ---------- CERTIFICATES TAB LOGIC ----------
 async function loadStudentCertificatesList() {
     if (!currentStudentDetails) return;
-    
+
     try {
         const res = await apiFetch(`/api/student/certificates/?student_id=${currentStudentDetails.id}`);
         if (res.ok) {
             const list = await res.json();
             const certs = list.results || list;
-            
+
             const tbody = document.getElementById('studentCertificatesTableBody');
             if (tbody) {
                 if (certs.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = certs.map(c => `
                     <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${c.serial_no}</td>
