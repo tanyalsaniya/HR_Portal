@@ -273,13 +273,14 @@ function switchStudentTab(tab, selectedStudentId = null) {
     }
 }
 
-async function loadBitrixStudents() {
+async function loadBitrixStudents(forceRefresh = false) {
     const tbody = document.getElementById('bitrixStudentTableBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
 
     try {
-        const res = await apiFetch('/api/student/bitrix-active/');
+        const url = forceRefresh ? '/api/student/bitrix-active/?refresh=true' : '/api/student/bitrix-active/';
+        const res = await apiFetch(url);
         if (res.ok) {
             const data = await res.json();
             const students = data.results || [];

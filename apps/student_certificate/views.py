@@ -1021,13 +1021,49 @@ class BitrixActiveStudentsView(APIView):
 
     def get(self, request):
         try:
+            from django.core.cache import cache
+            
+            # Check for force refresh
+            force_refresh = request.GET.get('refresh', '').lower() == 'true'
+            cache_key = 'bitrix_active_students_list'
+            
+            if not force_refresh:
+                cached_data = cache.get(cache_key)
+                if cached_data is not None:
+                    return Response(cached_data)
+
             active_students = []
             start = 0
+            
+            # Fetch only required fields to optimize payload size
+            select_fields = [
+                'id', 'title', 'stageId',
+                'ufCrm6_1761731565702',  # email
+                'ufCrm6_1761731546152',  # phone
+                'ufCrm6_1761731874888',  # course_id
+                'ufCrm6_1761734468448',  # start_date
+                'ufCrm6_1761735481170',  # completion_date
+                'ufCrm6_1761731958409',  # father_name
+                'ufCrm6_1761732176981',  # institute
+                'ufCrm6_1761732340679'   # total_fees
+            ]
+
             while True:
-                params = urllib.parse.urlencode({
+                # Build request params with select and stage filters
+                query_params = {
                     'entityTypeId': self.ENTITY_TYPE_ID,
                     'start': start,
-                })
+                }
+                
+                # Add select fields to urllib format (e.g. select[0]=id)
+                for i, field in enumerate(select_fields):
+                    query_params[f'select[{i}]'] = field
+                
+                # Add stage filter for included stages to urllib format (e.g. filter[stageId][0]=DT1044_20:CLIENT)
+                for i, stage in enumerate(self.INCLUDED_STAGES):
+                    query_params[f'filter[stageId][{i}]'] = stage
+
+                params = urllib.parse.urlencode(query_params)
                 url = f"{self.BITRIX_URL}?{params}"
                 req = urllib.request.Request(url)
                 with urllib.request.urlopen(req, timeout=30) as resp:
@@ -1059,7 +1095,12 @@ class BitrixActiveStudentsView(APIView):
                     break
                 start = next_offset
 
-            return Response({'count': len(active_students), 'results': active_students})
+            response_data = {'count': len(active_students), 'results': active_students}
+            
+            # Cache the response for 5 minutes (300 seconds)
+            cache.set(cache_key, response_data, 300)
+            
+            return Response(response_data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
