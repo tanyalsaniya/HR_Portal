@@ -857,7 +857,11 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         # Find or create department
         from employee_onboarding.models import Department
-        dept = Department.objects.first()
+        dept = Department.objects.filter(name__iexact="Training").first()
+        if not dept:
+            dept = Department.objects.filter(name__iexact="Software Engineering").first()
+        if not dept:
+            dept = Department.objects.first()
         if not dept:
             dept = Department.objects.create(name="Training")
             

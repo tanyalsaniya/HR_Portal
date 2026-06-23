@@ -245,6 +245,11 @@ function getEmployeeIdFromUrl() {
     return match ? parseInt(match[1]) : null;
 }
 
+function getEmployeeDetailIdFromUrl() {
+    const match = window.location.pathname.match(/^\/employees\/(\d+)\/?$/);
+    return match ? parseInt(match[1]) : null;
+}
+
 function getStudentIdFromUrl() {
     const match = window.location.pathname.match(/^\/students\/(\d+)\/?$/);
     return match ? parseInt(match[1]) : null;
@@ -280,6 +285,12 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         if (viewId === 'dashboardView') loadDashboardData();
         else if (viewId === 'onboardingView') loadOnboardingData();
         else if (viewId === 'onboardingFormView') loadOnboardingFormPage();
+        else if (viewId === 'employeeDetailView' && typeof openEmployeeProfileDetail === 'function') {
+            const empId = extraParams.employeeId || getEmployeeDetailIdFromUrl();
+            if (empId) {
+                openEmployeeProfileDetail(empId, extraParams.employeeTab || 'personal', false);
+            }
+        }
         else if (viewId === 'salaryView') loadSalaryData();
         else if (viewId === 'salaryHistoryView') {
             const empId = extraParams.employeeId || getEmployeeIdFromUrl();
@@ -304,12 +315,15 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         let path = viewToPath[viewId] || '/';
         if (viewId === 'salaryHistoryView' && extraParams.employeeId) {
             path = `/salaries/employee/${extraParams.employeeId}/`;
+        } else if (viewId === 'employeeDetailView' && extraParams.employeeId) {
+            path = `/employees/${extraParams.employeeId}/`;
         } else if (viewId === 'studentDetailView' && extraParams.studentId) {
             path = `/students/${extraParams.studentId}/`;
         }
         history.pushState({
             viewId: viewId,
             employeeId: extraParams.employeeId || null,
+            employeeTab: extraParams.employeeTab || null,
             studentId: extraParams.studentId || null,
             studentTab: extraParams.studentTab || null
         }, '', path);
@@ -327,6 +341,7 @@ window.addEventListener('popstate', (event) => {
     if (event.state && event.state.viewId) {
         switchView(event.state.viewId, false, {
             employeeId: event.state.employeeId,
+            employeeTab: event.state.employeeTab,
             studentId: event.state.studentId,
             studentTab: event.state.studentTab
         });
@@ -334,12 +349,17 @@ window.addEventListener('popstate', (event) => {
         let viewId = 'dashboardView';
         if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
             viewId = 'salaryHistoryView';
+        } else if (getEmployeeDetailIdFromUrl()) {
+            viewId = 'employeeDetailView';
         } else if (getStudentIdFromUrl()) {
             viewId = 'studentDetailView';
         } else {
             viewId = pathToView[window.location.pathname] || 'dashboardView';
         }
-        switchView(viewId, false, { studentId: getStudentIdFromUrl() });
+        switchView(viewId, false, {
+            employeeId: getEmployeeDetailIdFromUrl(),
+            studentId: getStudentIdFromUrl()
+        });
     }
 });
 

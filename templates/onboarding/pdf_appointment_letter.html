@@ -10,187 +10,311 @@
             @bottom-right {
                 content: "Page " counter(page) " of " counter(pages);
                 font-family: Arial, sans-serif;
-                font-size: 9pt;
+                font-size: 8pt;
                 color: #555;
             }
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 11pt;
-            line-height: 1.6;
-            color: #333;
-        }
-        .header {
-            text-align: center;
-            border-bottom: 2px solid #0056b3;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-        }
-        .company-name {
-            font-size: 20pt;
-            font-weight: bold;
-            color: #0056b3;
-        }
-        .company-sub {
             font-size: 10pt;
-            color: #555;
+            line-height: 1.6;
+            color: #000;
+        }
+        .title {
+            font-weight: bold;
+            font-size: 14pt;
+            margin-bottom: 25px;
+            text-align: center;
         }
         .date {
-            text-align: right;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
-        .subject {
-            font-weight: bold;
-            text-decoration: underline;
-            margin-bottom: 25px;
+        .address {
+            margin-bottom: 15px;
         }
         .salutation {
             margin-bottom: 15px;
         }
-        .content {
-            margin-bottom: 30px;
+        .intro {
+            margin-bottom: 15px;
+            text-align: justify;
         }
-        .section-title {
-            font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 5px;
-            color: #0056b3;
-        }
-        .details-table {
+        .list-item {
+            margin-bottom: 15px;
+            display: table;
             width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        .details-table td {
-            padding: 8px;
-            border: 1px solid #ddd;
-        }
-        .details-table td.label {
-            font-weight: bold;
-            background-color: #f9f9f9;
-            width: 30%;
-        }
-        .signature-section {
-            margin-top: 50px;
             page-break-inside: avoid;
         }
-        .signature-line {
-            width: 200px;
-            border-top: 1px solid #333;
-            margin-top: 40px;
+        .list-number {
+            display: table-cell;
+            width: 25px;
+            font-weight: bold;
+            vertical-align: top;
+        }
+        .list-content {
+            display: table-cell;
+            vertical-align: top;
+            text-align: justify;
+        }
+        .nested-list-item {
+            margin-top: 8px;
+            margin-bottom: 8px;
+            display: table;
+            width: 100%;
+        }
+        .nested-list-number {
+            display: table-cell;
+            width: 25px;
+            font-weight: bold;
+            vertical-align: top;
+        }
+        .nested-list-content {
+            display: table-cell;
+            vertical-align: top;
+            text-align: justify;
+        }
+        .double-nested-list-item {
+            margin-top: 6px;
+            margin-bottom: 6px;
+            display: table;
+            width: 100%;
+        }
+        .double-nested-list-number {
+            display: table-cell;
+            width: 20px;
+            font-weight: bold;
+            vertical-align: top;
+        }
+        .double-nested-list-content {
+            display: table-cell;
+            vertical-align: top;
+            text-align: justify;
+        }
+        .signature-row {
+            margin-top: 30px;
+            display: table;
+            width: 100%;
+            page-break-inside: avoid;
+        }
+        .signature-col {
+            display: table-cell;
+            vertical-align: bottom;
+            font-size: 9.5pt;
+        }
+        .salary-table {
+            width: 55%;
+            margin: 20px auto 30px auto;
+            border-collapse: collapse;
+            font-size: 10pt;
+        }
+        .salary-table td {
+            padding: 6px 12px;
+            border: 1px solid #000;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="company-name">{{ company_name }}</div>
-        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    <div class="title">Appointment Letter</div>
+    
+    <div class="date">Date: {{ date }}</div>
+    <div class="address">{{ address }}</div>
+    <div class="salutation">Dear {{ name }},</div>
+    
+    <div class="intro">
+        We are pleased to offer you a position of <strong>{{ designation }}</strong> at <strong>{{ company_name }}</strong>. (Hereinafter to be referred as a “Company”), commencing from <strong>{{ joining_date }}</strong> or another mutually agreed upon date and you will report to Mr. Prince Parbhakar, The Project Manager at {{ company_name }}.
     </div>
     
-    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
-    
-    <div class="salutation">Dear {{ employee.first_name }} {{ employee.last_name }},</div>
-    
-    <div class="subject">Subject: Letter of Appointment - {{ employee.emp_id }}</div>
-    
-    <div class="content">
-        <p>Following your acceptance of our offer of employment, we are pleased to appoint you as <strong>{{ employee.designation }}</strong> at <strong>{{ company_name }}</strong>, with effect from <strong>{{ employee.joining_date|date:"F d, Y" }}</strong>.</p>
-        
-        <div class="section-title">1. Duties and Responsibilities</div>
-        <p>Your responsibilities will be those associated with your designation, as well as any other tasks assigned by your department supervisor. You will be based at our main office, and your working hours will conform to the department schedule.</p>
-        
-        <div class="section-title">2. Probationary Period</div>
-        <p>You will be on probation for a period of six (6) months from your date of joining. Upon successful completion of the probation, your services will be confirmed in writing. The company reserves the right to extend the probation period if your performance is deemed unsatisfactory.</p>
-        
-        <div class="section-title">3. Notice Period</div>
-        <p>During your probationary period, either party may terminate this agreement by giving 15 days' notice in writing. Upon confirmation, the notice period required for termination or resignation by either party will be <strong>{{ employee.notice_period_days }} days</strong>.</p>
-        
-        <div class="section-title">4. Code of Conduct & Confidentiality</div>
-        <p>You agree to adhere to all policies, rules, and guidelines set by the company. You must maintain the highest standards of integrity, professional conduct, and confidentiality regarding all business secrets and client information.</p>
-        
-        {% if salary %}
-        <div style="page-break-before: always;"></div>
-        <div class="header">
-            <div class="company-name">{{ company_name }}</div>
-            <div class="company-sub">HR Division • Annexure A: CTC Salary Structure</div>
+    <div class="intro">
+        Please note that your employment with the company shall be governed by the policies, rules and regulations of the company as specifically mentioned herein by way of references and in force or as amended or altered time to time/ duly notified. The terms and conditions mentioned below:
+    </div>
+
+    <div class="list-item">
+        <div class="list-number">1.</div>
+        <div class="list-content">
+            <strong>Remuneration:</strong> The Company is pleased to offer you INR {{ ctc }} CTC per month. Your compensation is confidential and should not be disclosed or discussed with any other employee of the organization. It may be adjusted periodically in accordance with the company’s prevailing employee remuneration guidelines.
         </div>
-        <p>Salary Structure details for <strong>{{ employee.first_name }} {{ employee.last_name }}</strong>:</p>
-        <table class="details-table">
-            <thead>
-                <tr style="background-color: #0056b3; color: white; font-weight: bold;">
-                    <td>Earnings Component</td>
-                    <td>Monthly (Rs.)</td>
-                    <td>Deductions Component</td>
-                    <td>Monthly (Rs.)</td>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td class="label">Basic Salary</td>
-                    <td>{{ basic }}</td>
-                    <td class="label">Provident Fund (PF)</td>
-                    <td>{{ pf }}</td>
-                </tr>
-                <tr>
-                    <td class="label">House Rent Allowance (HRA)</td>
-                    <td>{{ hra }}</td>
-                    <td class="label">Professional Tax (PT)</td>
-                    <td>{{ professional_tax }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Conveyance Allowance</td>
-                    <td>{{ conveyance }}</td>
-                    <td class="label">TDS (Income Tax)</td>
-                    <td>{{ tds }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Medical Allowance</td>
-                    <td>{{ medical }}</td>
-                    <td class="label">Other Deductions</td>
-                    <td>
-                        {% for ded in other_deductions %}
-                            {{ ded.label }}: {{ ded.amount }}<br>
-                        {% empty %}
-                            0.00
-                        {% endfor %}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="label">Special Allowance</td>
-                    <td>{{ special }}</td>
-                    <td></td>
-                    <td></td>
-                </tr>
-                {% if monthly_bonus > 0 %}
-                <tr>
-                    <td class="label">Monthly Bonus</td>
-                    <td>{{ monthly_bonus }}</td>
-                    <td></td>
-                    <td></td>
-                </tr>
-                {% endif %}
-                <tr style="font-weight: bold; background-color: #f9f9f9;">
-                    <td>Gross Salary (A)</td>
-                    <td>{{ gross_salary }}</td>
-                    <td>Total Deductions (B)</td>
-                    <td>{{ total_deductions }}</td>
-                </tr>
-                <tr style="font-weight: bold; background-color: #e6f2ff; color: #0056b3;">
-                    <td colspan="2">Net Take-Home Salary (A - B)</td>
-                    <td colspan="2">Rs. {{ net_salary }} / month</td>
-                </tr>
-            </tbody>
-        </table>
-        {% endif %}
-        
-        <p>Please sign and return the duplicate copy of this letter as confirmation of your agreement to these terms.</p>
     </div>
     
-    <div class="signature-section">
-        <p>For <strong>{{ company_name }}</strong>,</p>
-        <div class="signature-line">
-            <strong>{{ signatory_name }}</strong><br>
-            {{ signatory_designation }}
+    <div class="list-item">
+        <div class="list-number">2.</div>
+        <div class="list-content">
+            <strong>Probation:</strong> You will be on probation for 3 months from the date of joining the company. The company retains the right to terminate the employment of any employee immediately for just cause, without prior notice or compensation in lieu of notice. If the termination is for reasons other than just cause, the company will comply with the legal requirement to provide the minimum notice period stipulated by law.
+        </div>
+    </div>
+    
+    <div class="list-item">
+        <div class="list-number">3.</div>
+        <div class="list-content">
+            <strong>General Policy:</strong> This role required a full time commitment, Monday to Friday, with a total of 9 hours per day, incorporating a 45 minutes lunch break from 1:30PM to 2:15PM.
+        </div>
+    </div>
+    
+    <div class="list-item">
+        <div class="list-number">4.</div>
+        <div class="list-content">
+            <strong>Leave Policy:</strong>
+            <div class="nested-list-item">
+                <div class="nested-list-number">A.</div>
+                <div class="nested-list-content">During the probation period, employees are not eligible for paid leave.</div>
+            </div>
+            <div class="nested-list-item">
+                <div class="nested-list-number">B.</div>
+                <div class="nested-list-content">As a regular employee, you may take up to 1 full day leave and 1 half day or 2 short leaves per month, subject to prior approval and adherence to company policies.</div>
+            </div>
+            <div class="nested-list-item">
+                <div class="nested-list-number">C.</div>
+                <div class="nested-list-content">
+                    <strong>Sandwich:-</strong>
+                    <div class="double-nested-list-item">
+                        <div class="double-nested-list-number">1.</div>
+                        <div class="double-nested-list-content">If an employee takes leave on Friday and Monday then it will be counted as a sandwich leave and there is no relaxation in this situation.</div>
+                    </div>
+                    <div class="double-nested-list-item">
+                        <div class="double-nested-list-number">2.</div>
+                        <div class="double-nested-list-content">If the employee leaves on Friday, Saturday, Sunday OR Saturday, Sunday, Monday then it will also be considered as a sandwich leave but we will give exemption once in every 3 months.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="nested-list-item">
+                <div class="nested-list-number">D.</div>
+                <div class="nested-list-content">Carried forward leaves are limited to one financial year and Six leaves encashment will be allowed at the end of the year.</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="list-item">
+        <div class="list-number">5.</div>
+        <div class="list-content">
+            <strong>Non-Disclosure of Information:</strong> As a part of your employment, you agree to keep all company information confidential, including business strategies, and financial data. Unauthorized disclosure may lead to disciplinary action, including termination and potential legal consequences.
+        </div>
+    </div>
+    
+    <div class="list-item">
+        <div class="list-number">6.</div>
+        <div class="list-content">
+            <strong>Proprietary Information and Inventions Agreement:</strong> As a condition of your employment, you will be required to sign the Company’s Proprietary Information and Inventions Agreement.
+        </div>
+    </div>
+    
+    <div class="list-item">
+        <div class="list-number">7.</div>
+        <div class="list-content">
+            <strong>Tax Matters:</strong>
+            <div class="nested-list-item">
+                <div class="nested-list-number">&bull;</div>
+                <div class="nested-list-content">
+                    <strong>Tax Advice:</strong> You are encouraged to obtain your own tax advice regarding your compensation from the Company. You agree that the Company does not have a duty to design its compensation policies in a manner that minimizes your tax liabilities, and you will not make any claim against the Company or its Board of Directors related to tax liabilities arising from your compensation.
+                </div>
+            </div>
+            <div class="nested-list-item">
+                <div class="nested-list-number">&bull;</div>
+                <div class="nested-list-content">
+                    <strong>Interpretation, Amendment and Enforcement:</strong> This letter agreement supersedes and replaces any prior agreements, representations or understandings (whether written, oral, implied or otherwise) between you and the Company and constitutes the complete agreement between you and the Company regarding the subject matter set forth herein. This letter agreement may not be amended or modified, except by an express written agreement signed by both you and a duly authorized officer of the Company. You may indicate your agreement with these terms and accept this offer by signing and dating this agreement or before (<strong>{{ joining_date }}</strong>). Upon your acceptance of this employment offer, <strong>{{ company_name }}</strong> will provide you with the necessary paperwork and instructions.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 25px; text-align: left; page-break-inside: avoid;">
+        <p>Sincerely,</p>
+    </div>
+    
+    <div style="margin-top: 35px; text-align: left; page-break-inside: avoid;">
+        <div>……………………………………</div>
+        <div style="margin-top: 4px;">Applicant (Sign)</div>
+    </div>
+
+    <div class="signature-row" style="margin-top: 50px;">
+        <div class="signature-col" style="width: 33%; text-align: left;">
+            <div style="display: inline-block; text-align: left;">
+                <div>……………………………………</div>
+                <div style="margin-top: 4px;">Company Representative (Sign)</div>
+                <div style="margin-top: 4px;">Date – {{ date }}</div>
+            </div>
+        </div>
+        <div class="signature-col" style="width: 34%; text-align: center;">
+            <div style="display: inline-block; text-align: center;">
+                <div>……………………………………</div>
+                <div style="margin-top: 4px;">(CTO)</div>
+            </div>
+        </div>
+        <div class="signature-col" style="width: 33%; text-align: right;">
+            <div style="display: inline-block; text-align: center;">
+                <div>………………………………….</div>
+                <div style="margin-top: 4px;">(HR Department)</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="page-break-before: always;"></div>
+    
+    <div style="font-weight: bold; font-size: 14pt; margin-top: 15px; margin-bottom: 25px; text-align: center;">SALARY BREAKUP</div>
+    
+    <table class="salary-table">
+        <tbody>
+            <tr>
+                <td style="width: 65%;">CTC</td>
+                <td style="width: 35%;">{{ ctc }}</td>
+            </tr>
+            <tr>
+                <td>ESI - EMPLOYER SHARE</td>
+                <td>{{ esi_employer }}</td>
+            </tr>
+            <tr>
+                <td>PF - EMPLOYER SHARE</td>
+                <td>{{ pf_employer }}</td>
+            </tr>
+            <tr>
+                <td>GROSS</td>
+                <td>{{ gross_salary }}</td>
+            </tr>
+            <tr>
+                <td>PF - EMPLOYEE SHARE</td>
+                <td>{{ pf_employee }}</td>
+            </tr>
+            <tr>
+                <td>ESI - EMPLOYEE SHARE</td>
+                <td>{{ esi_employee }}</td>
+            </tr>
+            <tr>
+                <td>LWF</td>
+                <td>{{ lwf }}</td>
+            </tr>
+            <tr>
+                <td>PROFESSIONAL TAX</td>
+                <td>{{ professional_tax }}</td>
+            </tr>
+            <tr>
+                <td>IN-HAND</td>
+                <td>{{ in_hand }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top: 35px; text-align: left; page-break-inside: avoid;">
+        <div>……………………………………</div>
+        <div style="margin-top: 4px;">Applicant (Sign)</div>
+    </div>
+
+    <div class="signature-row" style="margin-top: 50px;">
+        <div class="signature-col" style="width: 33%; text-align: left;">
+            <div style="display: inline-block; text-align: left;">
+                <div>……………………………………</div>
+                <div style="margin-top: 4px;">Company Representative (Sign)</div>
+                <div style="margin-top: 4px;">Date – {{ date }}</div>
+            </div>
+        </div>
+        <div class="signature-col" style="width: 34%; text-align: center;">
+            <div style="display: inline-block; text-align: center;">
+                <div>……………………………………</div>
+                <div style="margin-top: 4px;">(CTO)</div>
+            </div>
+        </div>
+        <div class="signature-col" style="width: 33%; text-align: right;">
+            <div style="display: inline-block; text-align: center;">
+                <div>………………………………….</div>
+                <div style="margin-top: 4px;">(HR Department)</div>
+            </div>
         </div>
     </div>
 </body>

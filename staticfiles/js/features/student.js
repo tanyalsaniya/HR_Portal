@@ -1112,7 +1112,7 @@ async function loadStudentDetailSelects(enrolledCourseId, deptId) {
             if (res.ok) {
                 const depts = await res.json();
                 const deptList = depts.results || depts;
-                let html = deptList.map(d => `<option value="${d.id}">${d.id}</option>`).join('');
+                let html = deptList.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
                 deptSelect.innerHTML = html;
                 deptSelect.value = deptId || '';
             }
