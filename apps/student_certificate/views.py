@@ -1032,10 +1032,22 @@ class BitrixActiveStudentsView(APIView):
             except ValueError:
                 start = 0
 
+            limit = request.query_params.get('limit', 10)
+            try:
+                limit = int(limit)
+            except ValueError:
+                limit = 10
+
+            # Bitrix24 REST API requires the 'start' parameter to be a multiple of 50.
+            # We calculate the nearest lower multiple of 50 for Bitrix and slice the rest.
+            bitrix_start = (start // 50) * 50
+            relative_start = start - bitrix_start
+
             import requests
             payload = {
                 'entityTypeId': self.ENTITY_TYPE_ID,
-                'start': start,
+                'start': bitrix_start,
+                'limit': 50, # Bitrix default/max limit
                 'filter': {
                     'stageId': list(self.INCLUDED_STAGES)
                 },
@@ -1051,6 +1063,7 @@ class BitrixActiveStudentsView(APIView):
 
             data = response.json()
             items = data.get('result', {}).get('items', [])
+            total = data.get('total', len(items))
             active_students = []
             for item in items:
                 active_students.append({
@@ -1067,10 +1080,16 @@ class BitrixActiveStudentsView(APIView):
                     'stage': item.get('stageId', ''),
                 })
 
-            next_offset = data.get('next', None)
+            active_students = active_students[relative_start : relative_start + limit]
+
+            if start + limit < total:
+                next_offset = start + limit
+            else:
+                next_offset = None
 
             return Response({
                 'count': len(active_students),
+                'total': total,
                 'results': active_students,
                 'next': next_offset
             })

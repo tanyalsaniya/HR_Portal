@@ -86,14 +86,14 @@
                 </tbody>
             </table>
         </div>
-        <!-- Pagination controls -->
-        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent); background: #fafafa;">
             <div style="font-size: 9pt; color: var(--text-secondary);">
-                Showing records <span id="studentPageStart">0</span> to <span id="studentPageEnd">0</span>
+                Showing <span id="studentPageStart">0</span> to <span id="studentPageEnd">0</span> of <span id="studentTotalCount">0</span> entries
             </div>
             <div style="display: flex; gap: 8px;">
-                <button class="btn" id="studentPrevBtn" onclick="changeStudentPage(-1)" disabled>Previous</button>
-                <button class="btn" id="studentNextBtn" onclick="changeStudentPage(1)" disabled>Next</button>
+                <button id="studentPrevBtn" onclick="changeStudentPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="studentNextBtn" onclick="changeStudentPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Next</button>
             </div>
         </div>
     </div>
@@ -125,14 +125,14 @@
                 </tbody>
             </table>
         </div>
-        <!-- Pagination controls -->
-        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent); background: #fafafa;">
             <div style="font-size: 9pt; color: var(--text-secondary);">
-                Showing records <span id="bitrixStudentPageStart">0</span> to <span id="bitrixStudentPageEnd">0</span>
+                Showing <span id="bitrixStudentPageStart">0</span> to <span id="bitrixStudentPageEnd">0</span> of <span id="bitrixStudentTotalCount">0</span> entries
             </div>
             <div style="display: flex; gap: 8px;">
-                <button class="btn" id="bitrixStudentPrevBtn" onclick="changeBitrixStudentPage(-1)" disabled>Previous</button>
-                <button class="btn" id="bitrixStudentNextBtn" onclick="changeBitrixStudentPage(1)" disabled>Next</button>
+                <button id="bitrixStudentPrevBtn" onclick="changeBitrixStudentPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="bitrixStudentNextBtn" onclick="changeBitrixStudentPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Next</button>
             </div>
         </div>
     </div>

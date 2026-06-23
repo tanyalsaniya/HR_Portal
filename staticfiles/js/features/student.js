@@ -8,29 +8,30 @@ let generatedPdfUrl = null;
 let certEditorSkills = [];
 let currentStudentList = [];
 
-let studentDirectoryStart = 0;
-let studentDirectoryNext = null;
-let bitrixStudentStart = 0;
-let bitrixStudentNext = null;
+let studentCurrentPage = 1;
+let studentTotalCount = 0;
+let bitrixStudentCurrentPage = 1;
+let bitrixStudentTotalCount = 0;
+const STUDENT_PAGE_SIZE = 10;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
 async function loadStudentData() {
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
     // Load ongoing students from Bitrix24 API with pagination
     try {
-        const res = await apiFetch(`/api/student/bitrix-active/?start=${studentDirectoryStart}`);
+        const start = (studentCurrentPage - 1) * STUDENT_PAGE_SIZE;
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${start}&limit=${STUDENT_PAGE_SIZE}`);
         if (res.ok) {
             const data = await res.json();
             const studList = data.results || [];
             currentStudentList = studList;
-            studentDirectoryNext = data.next !== undefined ? data.next : null;
+            studentTotalCount = data.total || 0;
             
             const tbody = document.getElementById('studentTableBody');
             if (tbody) {
                 if (studList.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#64748b;">No ongoing students found.</td></tr>';
-                    // Update pagination controls
-                    updateStudentDirectoryPagination(0);
+                    updateStudentPaginationControls();
                     return;
                 }
                 
@@ -46,8 +47,7 @@ async function loadStudentData() {
                     </tr>
                 `).join('');
                 
-                // Update pagination controls
-                updateStudentDirectoryPagination(studList.length);
+                updateStudentPaginationControls();
             }
         } else {
             const tbody = document.getElementById('studentTableBody');
@@ -64,19 +64,21 @@ async function loadStudentData() {
     }
 }
 
-function updateStudentDirectoryPagination(count) {
-    const pageStart = count === 0 ? 0 : studentDirectoryStart + 1;
-    const pageEnd = count === 0 ? 0 : studentDirectoryStart + count;
+function updateStudentPaginationControls() {
+    const pageStart = studentTotalCount === 0 ? 0 : (studentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
+    const pageEnd = Math.min(studentCurrentPage * STUDENT_PAGE_SIZE, studentTotalCount);
     
     const startEl = document.getElementById('studentPageStart');
     const endEl = document.getElementById('studentPageEnd');
+    const totalEl = document.getElementById('studentTotalCount');
     const prevBtn = document.getElementById('studentPrevBtn');
     const nextBtn = document.getElementById('studentNextBtn');
     
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (studentDirectoryStart === 0);
-    if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
+    if (totalEl) totalEl.textContent = studentTotalCount;
+    if (prevBtn) prevBtn.disabled = studentCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= studentTotalCount;
 }
 
 function openStudentModal() {
@@ -283,12 +285,12 @@ function switchStudentTab(tab, selectedStudentId = null) {
     if (tab === 'directory') {
         if (dirTab) dirTab.style.display = 'block';
         if (dirBtn) dirBtn.classList.add('active');
-        studentDirectoryStart = 0;
+        studentCurrentPage = 1;
         loadStudentData(); // Load Bitrix ongoing students
     } else if (tab === 'bitrix') {
         if (bitrixTab) bitrixTab.style.display = 'block';
         if (bitrixBtn) bitrixBtn.classList.add('active');
-        bitrixStudentStart = 0;
+        bitrixStudentCurrentPage = 1;
         loadBitrixStudents();
     } else {
         if (certTab) certTab.style.display = 'block';
@@ -307,14 +309,15 @@ async function loadBitrixStudents() {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
 
     try {
-        const res = await apiFetch(`/api/student/bitrix-active/?start=${bitrixStudentStart}`);
+        const start = (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE;
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${start}&limit=${STUDENT_PAGE_SIZE}`);
         if (res.ok) {
             const data = await res.json();
             const students = data.results || [];
-            bitrixStudentNext = data.next !== undefined ? data.next : null;
+            bitrixStudentTotalCount = data.total || 0;
             if (students.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No active students found.</td></tr>';
-                updateBitrixStudentPagination(0);
+                updateBitrixStudentPaginationControls();
                 return;
             }
 
@@ -333,7 +336,7 @@ async function loadBitrixStudents() {
                 </tr>
             `).join('');
             
-            updateBitrixStudentPagination(students.length);
+            updateBitrixStudentPaginationControls();
         } else {
             tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch data from Bitrix24.</td></tr>';
         }
@@ -343,19 +346,21 @@ async function loadBitrixStudents() {
     }
 }
 
-function updateBitrixStudentPagination(count) {
-    const pageStart = count === 0 ? 0 : bitrixStudentStart + 1;
-    const pageEnd = count === 0 ? 0 : bitrixStudentStart + count;
+function updateBitrixStudentPaginationControls() {
+    const pageStart = bitrixStudentTotalCount === 0 ? 0 : (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
+    const pageEnd = Math.min(bitrixStudentCurrentPage * STUDENT_PAGE_SIZE, bitrixStudentTotalCount);
     
     const startEl = document.getElementById('bitrixStudentPageStart');
     const endEl = document.getElementById('bitrixStudentPageEnd');
+    const totalEl = document.getElementById('bitrixStudentTotalCount');
     const prevBtn = document.getElementById('bitrixStudentPrevBtn');
     const nextBtn = document.getElementById('bitrixStudentNextBtn');
     
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (bitrixStudentStart === 0);
-    if (nextBtn) nextBtn.disabled = (bitrixStudentNext === null);
+    if (totalEl) totalEl.textContent = bitrixStudentTotalCount;
+    if (prevBtn) prevBtn.disabled = bitrixStudentCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= bitrixStudentTotalCount;
 }
 
 async function loadCoursesSelect(elementId) {
@@ -1369,20 +1374,14 @@ async function loadStudentCertificatesList() {
 }
 
 function changeStudentPage(direction) {
-    if (direction === 1 && studentDirectoryNext !== null) {
-        studentDirectoryStart = studentDirectoryNext;
-    } else if (direction === -1) {
-        studentDirectoryStart = Math.max(0, studentDirectoryStart - 50);
-    }
+    const maxPage = Math.ceil(studentTotalCount / STUDENT_PAGE_SIZE) || 1;
+    studentCurrentPage = Math.max(1, Math.min(maxPage, studentCurrentPage + direction));
     loadStudentData();
 }
 
 function changeBitrixStudentPage(direction) {
-    if (direction === 1 && bitrixStudentNext !== null) {
-        bitrixStudentStart = bitrixStudentNext;
-    } else if (direction === -1) {
-        bitrixStudentStart = Math.max(0, bitrixStudentStart - 50);
-    }
+    const maxPage = Math.ceil(bitrixStudentTotalCount / STUDENT_PAGE_SIZE) || 1;
+    bitrixStudentCurrentPage = Math.max(1, Math.min(maxPage, bitrixStudentCurrentPage + direction));
     loadBitrixStudents();
 }
 
