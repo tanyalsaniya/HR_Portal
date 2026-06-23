@@ -153,7 +153,12 @@ async function attemptTokenRefresh(refreshToken) {
     return false;
 }
 
-function logout() {
+async function logout() {
+    try {
+        await apiFetch('/auth/logout/', { method: 'POST' });
+    } catch (e) {
+        console.error('Logout error:', e);
+    }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     window.location.href = '/login/';

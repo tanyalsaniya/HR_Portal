@@ -240,9 +240,22 @@ class SalaryExportView(APIView):
         else:
             # Export empty template using active employees & structures
             import calendar
+            from exit_formality.models import ExitRequest
             month_days_val = calendar.monthrange(year, month)[1]
             users = BitrixClient.get_all_users()
-            employees = [BitrixEmployeeMock(u) for u in users if BitrixEmployeeMock(u).status != 'Exited']
+            
+            employees = []
+            for u in users:
+                emp = BitrixEmployeeMock(u)
+                if emp.status != 'Exited':
+                    employees.append(emp)
+                else:
+                    # Include exited employees if they have a pending/active exit request
+                    has_pending_exit = ExitRequest.objects.filter(
+                        bitrix_user_id=emp.bitrix_id
+                    ).exclude(status__in=['CANCELLED', 'FULLY_EXITED']).exists()
+                    if has_pending_exit:
+                        employees.append(emp)
             for emp in employees:
                 struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
                 if not struct:
@@ -284,7 +297,7 @@ class SalaryExportView(APIView):
                         cell.protection = locked_style
                     else:
                         cell.protection = unlocked_style
-                    row_idx += 1
+                row_idx += 1
 
         response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response['Content-Disposition'] = f'attachment; filename="salary_sheet_{month}_{year}.xlsx"'
@@ -377,8 +390,15 @@ class SalaryImportView(APIView):
                             if mock_emp.name.lower().strip() == name_str.lower():
                                 employee = mock_emp
                                 break
-                        if not employee or employee.status == 'Exited':
-                            raise ValueError("Employee is exited or not found in Bitrix24")
+                        if not employee:
+                            raise ValueError("Employee not found in Bitrix24")
+                        if employee.status == 'Exited':
+                            from exit_formality.models import ExitRequest
+                            has_pending_exit = ExitRequest.objects.filter(
+                                bitrix_user_id=employee.bitrix_id
+                            ).exclude(status__in=['CANCELLED', 'FULLY_EXITED']).exists()
+                            if not has_pending_exit:
+                                raise ValueError("Employee is exited and has no pending exit request in the system")
 
                         # Parse data
                         month_days = parse_decimal(ws.cell(row=r_idx, column=4).value, "Month days")
@@ -442,9 +462,10 @@ class SalaryImportView(APIView):
                             slip.bank_name = bank_name
                             slip.status = 'draft' # Re-review needed
                             slip.uploaded_batch = batch
+                            slip._skip_recalculation = True
                             slip.save()
                         else:
-                            slip = SalarySlip.objects.create(
+                            slip = SalarySlip(
                                 bitrix_user_id=employee.bitrix_id,
                                 month=month,
                                 year=year,
@@ -464,6 +485,8 @@ class SalaryImportView(APIView):
                                 status='draft',
                                 uploaded_batch=batch
                             )
+                            slip._skip_recalculation = True
+                            slip.save()
                         
                         generate_payslip_pdf(slip)
                         transaction.savepoint_commit(sid)
@@ -898,8 +921,8 @@ class SalaryEmployeeSummaryView(APIView):
 
         slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
         
-        total_credited = slips.aggregate(models.Sum('net_payable'))['net_payable__sum'] or Decimal('0.00')
-        total_deductions = slips.aggregate(models.Sum('fine_advance'))['fine_advance__sum'] or Decimal('0.00')
+        total_credited = sum((slip.net_payable or Decimal('0.00') for slip in slips), Decimal('0.00'))
+        total_deductions = sum((slip.fine_advance or Decimal('0.00') for slip in slips), Decimal('0.00'))
         total_payslips = slips.count()
         last_paid_slip = slips.filter(payment_status='paid', payment_date__isnull=False).order_by('-payment_date').first()
         last_payment_date = last_paid_slip.payment_date.strftime('%Y-%m-%d') if last_paid_slip else '-'
