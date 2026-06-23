@@ -74,10 +74,10 @@ class HasModelPermission(permissions.BasePermission):
                 return 'exit.delete' in user_perms
 
         # 6. Student Certificate module
-        if 'Student' in view_name:
+        if 'Student' in view_name or 'Course' in view_name or 'Bitrix' in view_name:
             if action in ['export_excel', 'bulk_generate_zip']:
                 return 'student.export' in user_perms
-            if action in ['list', 'retrieve']:
+            if action in ['list', 'retrieve'] or (action is None and request.method == 'GET'):
                 return 'student.read' in user_perms
             if action == 'create':
                 return 'student.create' in user_perms

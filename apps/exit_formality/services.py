@@ -27,7 +27,7 @@ def get_exit_letter_context(exit_request, custom_context=None):
     
     # Overrides for employee
     emp_overrides = {}
-    for field in ['first_name', 'last_name', 'designation']:
+    for field in ['first_name', 'last_name', 'designation', 'emp_id']:
         if field in custom_context:
             emp_overrides[field] = custom_context[field]
     if 'joining_date' in custom_context:
@@ -135,7 +135,7 @@ def get_exit_letter_context(exit_request, custom_context=None):
     net_prorated = gross_prorated - deductions_prorated
     
     # Standard signatory & company info
-    company_name = custom_context.get('company_name', getattr(settings, 'COMPANY_NAME', 'MTLV Solutions Private Limited'))
+    company_name = custom_context.get('company_name', getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'))
     company_address = custom_context.get('company_address', getattr(settings, 'COMPANY_ADDRESS', 'HR Division, Secure Enterprise Operations, India'))
     signatory_name = custom_context.get('signatory_name', getattr(settings, 'LETTER_SIGNATORY_NAME', 'Head of HR Operations'))
     signatory_designation = custom_context.get('signatory_designation', getattr(settings, 'LETTER_SIGNATORY_DESIGNATION', 'Authorized Signatory'))
@@ -190,11 +190,11 @@ def generate_exit_document_pdf(exit_request, doc_type, custom_context=None, user
     html_string = render_exit_letter_to_html(exit_request, doc_type, custom_context)
     pdf_bytes = HTML(string=html_string).write_pdf()
     
-    filename = f"{doc_type.lower()}_{exit_request.employee.emp_id}_{int(datetime.datetime.now().timestamp())}.pdf"
+    filename = f"{doc_type.lower()}_{exit_request.bitrix_user_id}_{int(datetime.datetime.now().timestamp())}.pdf"
     content_file = ContentFile(pdf_bytes, name=filename)
     
     doc = EmployeeDocument.objects.create(
-        employee=exit_request.employee,
+        bitrix_user_id=exit_request.bitrix_user_id,
         doc_type=doc_type,
         file=content_file,
         uploaded_by=user

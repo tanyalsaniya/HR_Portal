@@ -4,7 +4,7 @@ import logging
 import datetime
 from celery import shared_task
 from django.conf import settings
-from .models import Employee, EmployeeDocument
+from .models import EmployeeDocument
 
 logger = logging.getLogger(__name__)
 
@@ -13,111 +13,24 @@ def get_bitrix_webhook():
 
 @shared_task(bind=True, max_retries=3)
 def sync_employee_to_bitrix24(self, employee_id):
-    try:
-        employee = Employee.objects.get(id=employee_id)
-    except Employee.DoesNotExist:
-        return f"Employee with ID {employee_id} not found."
-
-    webhook = get_bitrix_webhook()
-    if not webhook:
-        employee.bitrix_sync_status = 'Failed'
-        employee.bitrix_sync_error = "Bitrix24 webhook URL is not configured in .env"
-        employee.save()
-        return "Sync skipped: Bitrix24 webhook URL is not configured."
-
-    employee.bitrix_sync_status = 'Pending'
-    employee.save()
-
-    # Search if Contact already exists or create/update
-    try:
-        contact_id = employee.bitrix_contact_id
-        
-        # If not set, check if we can find by email
-        if not contact_id:
-            search_url = f"{webhook.rstrip('/')}/crm.contact.list"
-            search_payload = {
-                'filter': {'EMAIL': employee.email},
-                'select': ['ID']
-            }
-            try:
-                res = requests.post(search_url, json=search_payload, timeout=10)
-                if res.ok:
-                    results = res.json().get('result', [])
-                    if results:
-                        contact_id = results[0]['ID']
-                        employee.bitrix_contact_id = contact_id
-            except Exception as e:
-                logger.warning(f"Error searching Bitrix24 contacts: {e}")
-
-        # Update or Create fields payload
-        status_value = 'Completed' if employee.onboarding_complete else 'Pending'
-        payload = {
-            'fields': {
-                'NAME': employee.first_name,
-                'LAST_NAME': employee.last_name,
-                'EMAIL': [{'VALUE': employee.email, 'VALUE_TYPE': 'WORK'}],
-                'PHONE': [{'VALUE': employee.phone, 'VALUE_TYPE': 'WORK'}],
-                'POST': employee.designation,
-                'COMMENTS': f"Employee ID: {employee.emp_id}. Joined: {employee.joining_date}.",
-                'UF_ONBOARDING_STATUS': status_value,
-                'UF_CRM_ONBOARDING_STATUS': status_value
-            }
-        }
-
-        if contact_id:
-            update_url = f"{webhook.rstrip('/')}/crm.contact.update"
-            payload['id'] = contact_id
-            response = requests.post(update_url, json=payload, timeout=10)
-            action = "updated"
-        else:
-            create_url = f"{webhook.rstrip('/')}/crm.contact.add"
-            response = requests.post(create_url, json=payload, timeout=10)
-            action = "created"
-
-        if response.ok:
-            result_data = response.json()
-            if not contact_id:
-                employee.bitrix_contact_id = str(result_data.get('result'))
-            employee.bitrix_sync_status = 'Synced'
-            employee.bitrix_sync_error = None
-            employee.save()
-            
-            # Log audit event
-            from audit_logs.signals import log_action
-            log_action(None, "SYSTEM", employee, f"Bitrix24 contact {action} successfully (Contact ID: {employee.bitrix_contact_id}).")
-            return f"Sync success: Contact {action}."
-        else:
-            raise Exception(f"Bitrix24 API returned error: {response.text}")
-            
-    except Exception as exc:
-        logger.error(f"Bitrix24 sync error: {exc}")
-        employee.bitrix_sync_status = 'Failed'
-        employee.bitrix_sync_error = str(exc)
-        employee.save()
-        
-        # Retry logic for network timeouts
-        try:
-            self.retry(exc=exc, countdown=60)
-        except self.MaxRetriesExceededError:
-            pass
-            
-        return f"Sync failed: {exc}"
+    logger.info(f"sync_employee_to_bitrix24 called for {employee_id} (No-op in pure API mode)")
+    return "Sync success (no-op in pure API mode)."
 
 @shared_task
 def update_bitrix24_onboarding_status(employee_id):
-    # Triggers CRM sync which updates status field values
-    return sync_employee_to_bitrix24(employee_id)
+    logger.info(f"update_bitrix24_onboarding_status called for {employee_id} (No-op in pure API mode)")
+    return "Status update success (no-op in pure API mode)."
 
 @shared_task
 def attach_document_to_bitrix24_timeline(document_id):
     try:
         doc = EmployeeDocument.objects.get(id=document_id)
-        employee = doc.employee
+        bitrix_user_id = doc.bitrix_user_id
     except EmployeeDocument.DoesNotExist:
         return "Document not found."
 
     webhook = get_bitrix_webhook()
-    if not webhook or not employee.bitrix_contact_id:
+    if not webhook or not bitrix_user_id:
         return "Sync skipped: Webhook or contact ID missing."
 
     import base64
@@ -131,7 +44,7 @@ def attach_document_to_bitrix24_timeline(document_id):
         payload = {
             'fields': {
                 'OWNER_TYPE_ID': 3,  # Contact
-                'OWNER_ID': employee.bitrix_contact_id,
+                'OWNER_ID': bitrix_user_id,
                 'TYPE_ID': 6,  # Document activity
                 'SUBJECT': f"Generated {doc.get_doc_type_display()}",
                 'COMPLETED': 'Y',
@@ -152,3 +65,214 @@ def attach_document_to_bitrix24_timeline(document_id):
     except Exception as e:
         logger.error(f"Error attaching document to Bitrix24: {e}")
         return f"Attachment failed: {e}"
+
+
+@shared_task
+def send_onboarding_welcome_email(employee_data):
+    """
+    Sends a welcome and confirmation email to the newly created employee contact,
+    with an inline welcome image banner, onboarding date, and checklist of required documents.
+    """
+    from django.core.mail import EmailMultiAlternatives
+    from django.conf import settings
+    from email.mime.image import MIMEImage
+    
+    first_name = employee_data.get('first_name') or ''
+    last_name = employee_data.get('last_name') or ''
+    full_name = f"{first_name} {last_name}".strip() or "Employee"
+    
+    emp_id = employee_data.get('emp_id') or employee_data.get('bitrix_contact_id') or 'N/A'
+    dept_name = employee_data.get('department_name') or 'N/A'
+    manager_name = employee_data.get('manager_name') or 'Prince Parbhakar'
+    joining_date = employee_data.get('joining_date') or 'N/A'
+    reporting_time = employee_data.get('reporting_time') or '10:00 AM'
+    location = employee_data.get('location') or 'Mohali Office'
+    
+    recipient_email = employee_data.get('personal_email') or employee_data.get('work_email') or employee_data.get('email')
+    if not recipient_email:
+        logger.warning(f"No recipient email found for onboarding welcome email to {full_name}.")
+        return "Failed: No recipient email."
+        
+    company_name = getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.')
+    
+    subject = f"Welcome to {company_name}! - Onboarding Initiated Successfully"
+    
+    # HTML Email body
+    html_content = f"""
+    <html>
+      <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0;">
+        <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
+          <div style="text-align: center; background-color: #f8fafc; padding: 10px 0;">
+            <img src="cid:welcome_banner" alt="Welcome to the Team" style="max-width: 100%; height: auto; display: block;" />
+          </div>
+          <div style="padding: 30px;">
+            <p style="font-size: 16px; margin-top: 0;">Dear {full_name},</p>
+            <p style="font-size: 14px;">Welcome to {company_name}!</p>
+            <p style="font-size: 14px;">We are pleased to inform you that your onboarding process has been initiated successfully by the HR team. We are excited to have you join us.</p>
+            
+            <p style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; color: #1e293b;">Please find your joining details below:</p>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 25px;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #475569; width: 180px;">Employee ID:</td>
+                <td style="padding: 6px 0; color: #0f172a;">{emp_id}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Department:</td>
+                <td style="padding: 6px 0; color: #0f172a;">{dept_name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Reporting Manager:</td>
+                <td style="padding: 6px 0; color: #0f172a;">{manager_name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Joining Date:</td>
+                <td style="padding: 6px 0; color: #0f172a;">{joining_date}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Reporting Time:</td>
+                <td style="padding: 6px 0; color: #0f172a;">{reporting_time}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Work Location:</td>
+                <td style="padding: 6px 0; color: #0f172a;">{location}</td>
+              </tr>
+            </table>
+
+            <p style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; color: #1e293b;">Please carry/submit the following documents on your joining date:</p>
+            <ul style="font-size: 14px; padding-left: 20px; color: #334155; margin-bottom: 25px;">
+              <li style="margin-bottom: 6px;">Government ID Proof (Aadhaar / Passport / Driving License)</li>
+              <li style="margin-bottom: 6px;">PAN Card</li>
+              <li style="margin-bottom: 6px;">Passport-size Photographs</li>
+              <li style="margin-bottom: 6px;">Educational Certificates</li>
+              <li style="margin-bottom: 6px;">Previous Employment Documents (if applicable)</li>
+              <li style="margin-bottom: 6px;">Address Proof</li>
+              <li style="margin-bottom: 6px;">Bank Account Details</li>
+              <li style="margin-bottom: 6px;">Signed Offer Letter (if required)</li>
+            </ul>
+
+            <p style="font-size: 14px; color: #dc2626; font-weight: 500;">Kindly ensure all documents are available to avoid delays in completing onboarding formalities.</p>
+            <p style="font-size: 14px;">If you have any questions, please contact the HR team.</p>
+            <p style="font-size: 14px;">We look forward to welcoming you and wish you success in your new role.</p>
+            
+            <p style="font-size: 14px; margin-top: 30px; margin-bottom: 0;">Best Regards,<br/><strong>HR Team</strong><br/>{company_name}</p>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+    
+    # Text fallback
+    text_content = f"""
+Dear {full_name},
+
+Welcome to {company_name}!
+
+We are pleased to inform you that your onboarding process has been initiated successfully by the HR team. We are excited to have you join us.
+
+Please find your joining details below:
+
+* Employee ID: {emp_id}
+* Department: {dept_name}
+* Reporting Manager: {manager_name}
+* Joining Date: {joining_date}
+* Reporting Time: {reporting_time}
+* Work Location: {location}
+
+Please carry/submit the following documents on your joining date:
+
+* Government ID Proof (Aadhaar / Passport / Driving License)
+* PAN Card
+* Passport-size Photographs
+* Educational Certificates
+* Previous Employment Documents (if applicable)
+* Address Proof
+* Bank Account Details
+* Signed Offer Letter (if required)
+
+Kindly ensure all documents are available to avoid delays in completing onboarding formalities.
+
+If you have any questions, please contact the HR team.
+
+We look forward to welcoming you and wish you success in your new role.
+
+Best Regards,
+HR Team
+{company_name}
+    """.strip()
+    
+    try:
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL or 'hr@mtlv.com',
+            to=[recipient_email]
+        )
+        msg.attach_alternative(html_content, "text/html")
+        
+        # Attach the welcome banner image as inline
+        banner_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'welcome_onboarding.png')
+        if os.path.exists(banner_path):
+            with open(banner_path, 'rb') as f:
+                img_data = f.read()
+            mime_img = MIMEImage(img_data)
+            mime_img.add_header('Content-ID', '<welcome_banner>')
+            mime_img.add_header('Content-Disposition', 'inline', filename='welcome_onboarding.png')
+            msg.attach(mime_img)
+        else:
+            logger.warning(f"Welcome banner image not found at {banner_path}, sending without image.")
+            
+        msg.send(fail_silently=False)
+        return f"Welcome email sent successfully to {recipient_email}."
+    except Exception as e:
+        logger.error(f"Error sending onboarding welcome email to {recipient_email}: {e}")
+        return f"Failed to send email: {e}"
+
+
+@shared_task
+def send_offer_letter_email(employee_id, doc_id):
+    """
+    Sends the generated Offer Letter PDF via email to the employee.
+    """
+    from django.core.mail import EmailMessage
+    from django.conf import settings
+    from .models import EmployeeDocument
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+
+    try:
+        user_detail = BitrixClient.get_user_detail(employee_id)
+        if not user_detail:
+            return "Employee not found."
+        emp = BitrixEmployeeMock(user_detail)
+        doc = EmployeeDocument.objects.get(id=doc_id)
+    except Exception as err:
+        return f"Error loading data: {err}"
+
+    recipient_email = emp.personal_email or emp.work_email or emp.email
+    if not recipient_email:
+        return "No email for employee."
+
+    subject = "Your Offer Letter – Devex Hub Pvt Ltd."
+    body = f"""Dear {emp.first_name},
+
+Please find attached your official Offer Letter from Devex Hub Pvt Ltd.
+
+If you have any questions or need further details, feel free to contact the HR team.
+
+Best Regards,
+HR Team
+Devex Hub Pvt Ltd.
+"""
+    try:
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL or 'hr@mtlv.com',
+            to=[recipient_email]
+        )
+        if doc.file:
+            email.attach(doc.original_filename or "Offer_Letter.pdf", doc.file.read(), 'application/pdf')
+        email.send(fail_silently=False)
+        return "Offer letter sent successfully."
+    except Exception as e:
+        logger.error(f"Failed to send offer letter email to {recipient_email}: {e}")
+        return f"Failed: {e}"

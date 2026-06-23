@@ -118,8 +118,12 @@
                             <input type="text" id="editEmpLastName" required style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='var(--border-accent)'">
                         </div>
                         <div>
-                            <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Email Address (Immutable)</label>
-                            <input type="email" id="editEmpEmail" disabled style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-main); color:var(--text-light); font-size:14px; cursor:not-allowed;">
+                            <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Work Email *</label>
+                            <input type="email" id="editEmpWorkEmail" required style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='var(--border-accent)'">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Personal Email</label>
+                            <input type="email" id="editEmpPersonalEmail" style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='var(--border-accent)'">
                         </div>
                         <div>
                             <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Phone Number *</label>
@@ -214,6 +218,14 @@
                         <div>
                             <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">PAN Number</label>
                             <input type="text" id="editEmpPan" placeholder="XXXXXX1234" style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='var(--border-accent)'">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Bank Account Number</label>
+                            <input type="text" id="editEmpBankAccount" placeholder="Bank Account Number" style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='var(--border-accent)'">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Bank Name</label>
+                            <input type="text" id="editEmpBankName" placeholder="Bank Name" style="width:100%; padding:10px 12px; border: 1.5px solid var(--border-accent); border-radius:10px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary-color)'" onblur="this.style.borderColor='var(--border-accent)'">
                         </div>
                     </div>
 
@@ -525,9 +537,15 @@
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Designation</label>
-                                    <input type="text" id="custDesignation" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                <div style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Employee ID</label>
+                                        <input type="text" id="custEmpId" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Designation</label>
+                                        <input type="text" id="custDesignation" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                    </div>
                                 </div>
 
                                 <div>

@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 
-from employee_onboarding.models import Employee
+from common.bitrix_client import BitrixClient, BitrixEmployeeMock
 from .models import SalaryStructure, SalarySlip, SalaryImportBatch, SalaryIncrementReminder, SalaryIncrementApproval
 from .serializers import (
     SalaryStructureSerializer, SalarySlipSerializer, SalaryImportBatchSerializer,
@@ -87,8 +87,8 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         if reminder.status == 'Actioned':
             return Response({'error': 'This increment reminder has already been actioned.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        employee = reminder.employee
-        active_structure = SalaryStructure.objects.filter(employee=employee).order_by('-effective_from').first()
+        bitrix_user_id = reminder.bitrix_user_id
+        active_structure = SalaryStructure.objects.filter(bitrix_user_id=bitrix_user_id).order_by('-effective_from').first()
         if not active_structure:
             return Response({'error': 'Active salary structure not found.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -104,7 +104,7 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         old_net = active_structure.net_salary
 
         new_structure = SalaryStructure.objects.create(
-            employee=employee,
+            bitrix_user_id=bitrix_user_id,
             effective_from=effective_date,
             gross_salary=new_basic,
             pf_contribution=active_structure.pf_contribution,
@@ -119,7 +119,7 @@ class SalaryIncrementViewSet(viewsets.ModelViewSet):
         increment_pct = (increment_amount / old_net) * 100 if old_net > 0 else 0
 
         approval = serializer.save(
-            employee=employee,
+            bitrix_user_id=bitrix_user_id,
             reminder=reminder,
             old_net=old_net,
             new_net=new_net,
@@ -163,9 +163,10 @@ class SalaryExportView(APIView):
 
         # Columns
         headers = [
-            "Emp ID", "Emp Name", "Department", "Location", "Gross Salary", 
-            "PF Contribution", "ESI", "Labour Welfare Fund", "Professional Tax", 
-            "Other Deductions", "Leaves Available", "Working Days", "Leave Encashment / Extra Days"
+            "Sr. No.", "Name", "Designation", "Month days", "Worked days", 
+            "Weekend", "CL", "Extra", "Payable Days", "Month Salary", 
+            "Payable Salary", "Extra days working", "Fine/Advance", "Net Payable", 
+            "Bank A/c No.", "Bank"
         ]
 
         wb = openpyxl.Workbook()
@@ -182,30 +183,54 @@ class SalaryExportView(APIView):
         unlocked_style = Protection(locked=False)
 
         # Check if salary slips already exist
-        slips = SalarySlip.objects.filter(month=month, year=year).select_related('employee', 'employee__department')
+        slips = SalarySlip.objects.filter(month=month, year=year)
         
+        # Resolve employees for all slips
+        user_map = {}
+        for u in BitrixClient.get_all_users():
+            user_map[str(u['id'])] = BitrixEmployeeMock(u)
+            
         row_idx = 2
+        from salary.models import EmployeeBankDetail
+
         if slips.exists():
             for slip in slips:
+                emp = user_map.get(str(slip.bitrix_user_id))
+                emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
+                designation = emp.designation if emp else ""
+                
+                bank_acc = slip.bank_account_no or ""
+                bank_nm = slip.bank_name or ""
+                if not bank_acc or not bank_nm:
+                    detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+                    if detail:
+                        if not bank_acc:
+                            bank_acc = detail.bank_account_no or ""
+                        if not bank_nm:
+                            bank_nm = detail.bank_name or ""
+
                 row_data = [
-                    slip.employee.emp_id,
-                    slip.employee.name,
-                    slip.employee.department.name if slip.employee.department else "",
-                    slip.location,
-                    float(slip.gross_salary),
-                    float(slip.pf_contribution),
-                    float(slip.esi),
-                    float(slip.labour_welfare_fund),
-                    float(slip.professional_tax),
-                    float(slip.other_deductions),
-                    float(slip.leaves_available),
-                    float(slip.working_days),
-                    float(slip.extra_days)
+                    row_idx - 1,
+                    emp_name,
+                    designation,
+                    float(slip.month_days),
+                    float(slip.worked_days),
+                    float(slip.weekend),
+                    float(slip.cl),
+                    float(slip.extra),
+                    float(slip.payable_days),
+                    float(slip.month_salary),
+                    float(slip.payable_salary),
+                    float(slip.extra_days_working),
+                    float(slip.fine_advance),
+                    float(slip.net_payable),
+                    bank_acc,
+                    bank_nm
                 ]
                 ws.append(row_data)
                 
-                # Lock A, B, C (1, 2, 3), unlock others
-                for col_idx in range(1, 14):
+                # Lock columns 1, 2, 3, unlock others
+                for col_idx in range(1, 17):
                     cell = ws.cell(row=row_idx, column=col_idx)
                     if col_idx in [1, 2, 3]:
                         cell.protection = locked_style
@@ -214,37 +239,52 @@ class SalaryExportView(APIView):
                 row_idx += 1
         else:
             # Export empty template using active employees & structures
-            employees = Employee.objects.filter(status='Active', is_deleted=False).select_related('department')
+            import calendar
+            month_days_val = calendar.monthrange(year, month)[1]
+            users = BitrixClient.get_all_users()
+            employees = [BitrixEmployeeMock(u) for u in users if BitrixEmployeeMock(u).status != 'Exited']
             for emp in employees:
-                struct = SalaryStructure.objects.filter(employee=emp, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
+                struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
                 if not struct:
                     # Fallback to absolute latest if none effective yet
-                    struct = SalaryStructure.objects.filter(employee=emp).order_by('-effective_from').first()
+                    struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id).order_by('-effective_from').first()
+
+                bank_acc = ""
+                bank_nm = ""
+                detail = EmployeeBankDetail.objects.filter(bitrix_user_id=emp.bitrix_id).first()
+                if detail:
+                    bank_acc = detail.bank_account_no or ""
+                    bank_nm = detail.bank_name or ""
+                if not bank_acc:
+                    bank_acc = emp.bank_account or ""
 
                 row_data = [
-                    emp.emp_id,
+                    row_idx - 1,
                     emp.name,
-                    emp.department.name if emp.department else "",
-                    "Mohali",
+                    emp.designation,
+                    float(month_days_val),
+                    0.0,  # Worked days
+                    0.0,  # Weekend
+                    0.0,  # CL
+                    0.0,  # Extra
+                    0.0,  # Payable Days
                     float(struct.gross_salary) if struct else 0.0,
-                    float(struct.pf_contribution) if struct else 0.0,
-                    float(struct.esi) if struct else 0.0,
-                    float(struct.labour_welfare_fund) if struct else 0.0,
-                    float(struct.professional_tax) if struct else 0.0,
-                    float(struct.other_deductions) if struct else 0.0,
-                    "",  # Leaves Available (blank)
-                    "",  # Working Days (blank)
-                    ""   # Extra Days (blank)
+                    0.0,  # Payable Salary
+                    0.0,  # Extra days working
+                    0.0,  # Fine/Advance
+                    0.0,  # Net Payable
+                    bank_acc,
+                    bank_nm
                 ]
                 ws.append(row_data)
 
-                for col_idx in range(1, 14):
+                for col_idx in range(1, 17):
                     cell = ws.cell(row=row_idx, column=col_idx)
                     if col_idx in [1, 2, 3]:
                         cell.protection = locked_style
                     else:
                         cell.protection = unlocked_style
-                row_idx += 1
+                    row_idx += 1
 
         response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response['Content-Disposition'] = f'attachment; filename="salary_sheet_{month}_{year}.xlsx"'
@@ -305,9 +345,10 @@ class SalaryImportView(APIView):
                 raise ValueError(f"Invalid value in column {col_name}")
 
         headers = [
-            "Emp ID", "Emp Name", "Department", "Location", "Gross Salary", 
-            "PF Contribution", "ESI", "Labour Welfare Fund", "Professional Tax", 
-            "Other Deductions", "Leaves Available", "Working Days", "Leave Encashment / Extra Days"
+            "Sr. No.", "Name", "Designation", "Month days", "Worked days", 
+            "Weekend", "CL", "Extra", "Payable Days", "Month Salary", 
+            "Payable Salary", "Extra days working", "Fine/Advance", "Net Payable", 
+            "Bank A/c No.", "Bank"
         ]
 
         total_records = 0
@@ -318,66 +359,108 @@ class SalaryImportView(APIView):
         try:
             with transaction.atomic():
                 for r_idx in range(2, ws.max_row + 1):
-                    emp_id_val = ws.cell(row=r_idx, column=1).value
-                    if emp_id_val is None or str(emp_id_val).strip() == "":
+                    name_val = ws.cell(row=r_idx, column=2).value
+                    if name_val is None or str(name_val).strip() == "":
                         continue
 
                     total_records += 1
-                    row_vals = [ws.cell(row=r_idx, column=c).value for c in range(1, 14)]
-                    emp_id = str(emp_id_val).strip()
+                    row_vals = [ws.cell(row=r_idx, column=c).value for c in range(1, 17)]
+                    name_str = str(name_val).strip()
 
                     sid = transaction.savepoint()
                     try:
                         # Validate Employee
-                        employee = Employee.objects.filter(emp_id=emp_id, is_deleted=False).first()
-                        if not employee:
-                            raise ValueError("Employee ID not found")
-                        if employee.status != 'Active':
-                            raise ValueError("Employee is inactive")
+                        bitrix_users = BitrixClient.get_all_users()
+                        employee = None
+                        for u in bitrix_users:
+                            mock_emp = BitrixEmployeeMock(u)
+                            if mock_emp.name.lower().strip() == name_str.lower():
+                                employee = mock_emp
+                                break
+                        if not employee or employee.status == 'Exited':
+                            raise ValueError("Employee is exited or not found in Bitrix24")
 
                         # Parse data
-                        location = str(ws.cell(row=r_idx, column=4).value or "Mohali").strip()
-                        gross_salary = parse_decimal(ws.cell(row=r_idx, column=5).value, "Gross Salary")
-                        pf_contribution = parse_decimal(ws.cell(row=r_idx, column=6).value, "PF Contribution")
-                        esi = parse_decimal(ws.cell(row=r_idx, column=7).value, "ESI")
-                        labour_welfare_fund = parse_decimal(ws.cell(row=r_idx, column=8).value, "Labour Welfare Fund")
-                        professional_tax = parse_decimal(ws.cell(row=r_idx, column=9).value, "Professional Tax")
-                        other_deductions = parse_decimal(ws.cell(row=r_idx, column=10).value, "Other Deductions")
-                        leaves_available = parse_decimal(ws.cell(row=r_idx, column=11).value, "Leaves Available")
-                        working_days = parse_decimal(ws.cell(row=r_idx, column=12).value, "Working Days")
-                        extra_days = parse_decimal(ws.cell(row=r_idx, column=13).value, "Leave Encashment / Extra Days")
+                        month_days = parse_decimal(ws.cell(row=r_idx, column=4).value, "Month days")
+                        worked_days = parse_decimal(ws.cell(row=r_idx, column=5).value, "Worked days")
+                        weekend = parse_decimal(ws.cell(row=r_idx, column=6).value, "Weekend")
+                        cl = parse_decimal(ws.cell(row=r_idx, column=7).value, "CL")
+                        extra = parse_decimal(ws.cell(row=r_idx, column=8).value, "Extra")
+                        payable_days = parse_decimal(ws.cell(row=r_idx, column=9).value, "Payable Days")
+                        month_salary = parse_decimal(ws.cell(row=r_idx, column=10).value, "Month Salary")
+                        payable_salary = parse_decimal(ws.cell(row=r_idx, column=11).value, "Payable Salary")
+                        extra_days_working = parse_decimal(ws.cell(row=r_idx, column=12).value, "Extra days working")
+                        fine_advance = parse_decimal(ws.cell(row=r_idx, column=13).value, "Fine/Advance")
+                        net_payable = parse_decimal(ws.cell(row=r_idx, column=14).value, "Net Payable")
+                        
+                        bank_account_val = ws.cell(row=r_idx, column=15).value
+                        if bank_account_val is not None:
+                            if isinstance(bank_account_val, float):
+                                bank_account_no = str(int(bank_account_val)).strip()
+                            else:
+                                bank_account_no = str(bank_account_val).strip()
+                        else:
+                            bank_account_no = ""
+                            
+                        bank_name = str(ws.cell(row=r_idx, column=16).value or "").strip()
+
+                        from salary.models import EmployeeBankDetail
+                        # Prefill from EmployeeBankDetail if not provided in the excel row
+                        if not bank_account_no or not bank_name:
+                            detail = EmployeeBankDetail.objects.filter(bitrix_user_id=employee.bitrix_id).first()
+                            if detail:
+                                if not bank_account_no:
+                                    bank_account_no = detail.bank_account_no or ""
+                                if not bank_name:
+                                    bank_name = detail.bank_name or ""
+
+                        # If both are provided, save or update EmployeeBankDetail
+                        if bank_account_no and bank_name:
+                            EmployeeBankDetail.objects.update_or_create(
+                                bitrix_user_id=employee.bitrix_id,
+                                defaults={
+                                    'bank_account_no': bank_account_no,
+                                    'bank_name': bank_name
+                                }
+                            )
 
                         # Save SalarySlip
-                        slip = SalarySlip.objects.filter(employee=employee, month=month, year=year).first()
+                        slip = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, month=month, year=year).first()
                         if slip:
-                            slip.location = location
-                            slip.gross_salary = gross_salary
-                            slip.pf_contribution = pf_contribution
-                            slip.esi = esi
-                            slip.labour_welfare_fund = labour_welfare_fund
-                            slip.professional_tax = professional_tax
-                            slip.other_deductions = other_deductions
-                            slip.leaves_available = leaves_available
-                            slip.working_days = working_days
-                            slip.extra_days = extra_days
+                            slip.month_days = month_days
+                            slip.worked_days = worked_days
+                            slip.weekend = weekend
+                            slip.cl = cl
+                            slip.extra = extra
+                            slip.payable_days = payable_days
+                            slip.month_salary = month_salary
+                            slip.payable_salary = payable_salary
+                            slip.extra_days_working = extra_days_working
+                            slip.fine_advance = fine_advance
+                            slip.net_payable = net_payable
+                            slip.bank_account_no = bank_account_no
+                            slip.bank_name = bank_name
                             slip.status = 'draft' # Re-review needed
                             slip.uploaded_batch = batch
                             slip.save()
                         else:
                             slip = SalarySlip.objects.create(
-                                employee=employee,
+                                bitrix_user_id=employee.bitrix_id,
                                 month=month,
                                 year=year,
-                                location=location,
-                                gross_salary=gross_salary,
-                                pf_contribution=pf_contribution,
-                                esi=esi,
-                                labour_welfare_fund=labour_welfare_fund,
-                                professional_tax=professional_tax,
-                                other_deductions=other_deductions,
-                                leaves_available=leaves_available,
-                                working_days=working_days,
-                                extra_days=extra_days,
+                                month_days=month_days,
+                                worked_days=worked_days,
+                                weekend=weekend,
+                                cl=cl,
+                                extra=extra,
+                                payable_days=payable_days,
+                                month_salary=month_salary,
+                                payable_salary=payable_salary,
+                                extra_days_working=extra_days_working,
+                                fine_advance=fine_advance,
+                                net_payable=net_payable,
+                                bank_account_no=bank_account_no,
+                                bank_name=bank_name,
                                 status='draft',
                                 uploaded_batch=batch
                             )
@@ -415,6 +498,44 @@ class SalaryImportView(APIView):
             batch.status = 'partial'
             error_report_url = self.generate_error_xlsx(batch.id, headers, failed_rows_data)
             batch.error_report_path = error_report_url
+            
+            # Trigger 21: Salary Import Completed with Errors
+            try:
+                from notifications.models import Notification
+                from django.contrib.auth import get_user_model
+                from django.core.mail import send_mail
+                
+                User = get_user_model()
+                admins = User.objects.filter(role__code='ADMIN')
+                hrs = User.objects.filter(role__code='HR')
+                
+                msg = f"Salary import completed. {success_count} rows imported successfully. {failed_count} rows failed. Download error report to review."
+                
+                for hr in hrs:
+                    Notification.objects.create(
+                        recipient=hr,
+                        notif_type='WARNING',
+                        message=msg,
+                        link="/salary/import/result/"
+                    )
+                    if hr.email:
+                        error_full_url = f"{settings.FRONTEND_URL}{error_report_url}" if hasattr(settings, 'FRONTEND_URL') else f"http://localhost:8000{error_report_url}"
+                        send_mail(
+                            subject="Salary Import Completed with Errors",
+                            message=f"{msg}\n\nDownload the error report here: {error_full_url}",
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[hr.email],
+                            fail_silently=True
+                        )
+                for admin in admins:
+                    Notification.objects.create(
+                        recipient=admin,
+                        notif_type='WARNING',
+                        message=msg,
+                        link="/salary/import/result/"
+                    )
+            except Exception:
+                pass
         else:
             batch.status = 'success'
             error_report_url = None
@@ -475,6 +596,28 @@ class SalaryPublishView(APIView):
             slip.save()
             generate_payslip_pdf(slip)
 
+        # Trigger 20 notification
+        import calendar
+        try:
+            month_name = calendar.month_name[month]
+            month_year = f"{month_name} {year}"
+            month_year_slug = f"{month_name.lower()}-{year}"
+            
+            from notifications.models import Notification
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            admins_and_hrs = User.objects.filter(role__code__in=['ADMIN', 'HR'])
+            msg = f"Salary slips generated for {month_year}. {count} slips ready for download."
+            for user in admins_and_hrs:
+                Notification.objects.create(
+                    recipient=user,
+                    notif_type='SUCCESS',
+                    message=msg,
+                    link=f"/salary/slips/{month_year_slug}/"
+                )
+        except Exception:
+            pass
+
         return Response({'message': f'Successfully published {count} salary slips.'}, status=status.HTTP_200_OK)
 
 
@@ -489,7 +632,10 @@ class SalaryEditView(APIView):
 
         # Exclude read-only calculations from direct parsing
         mutable_fields = [
-            'location', 'leaves_available', 'working_days', 'extra_days',
+            'location', 'month_days', 'worked_days', 'weekend', 'cl', 'extra',
+            'month_salary', 'extra_days_working', 'fine_advance',
+            'bank_account_no', 'bank_name',
+            'leaves_available', 'working_days', 'extra_days',
             'gross_salary', 'pf_contribution', 'esi', 'labour_welfare_fund',
             'professional_tax', 'other_deductions', 'net_credited_amount',
             'payment_status', 'payment_date', 'transaction_ref'
@@ -498,7 +644,7 @@ class SalaryEditView(APIView):
         for field in mutable_fields:
             if field in request.data:
                 val = request.data[field]
-                if field in ['payment_status', 'transaction_ref', 'location']:
+                if field in ['payment_status', 'transaction_ref', 'location', 'bank_account_no', 'bank_name']:
                     setattr(slip, field, val)
                 elif field == 'payment_date':
                     setattr(slip, field, val if val else None)
@@ -507,6 +653,18 @@ class SalaryEditView(APIView):
 
         slip.status = 'draft' # Re-review needed after edit
         slip.save()
+
+        # Update or create persistent employee bank details if both are present in the slip
+        if slip.bank_account_no and slip.bank_name:
+            from salary.models import EmployeeBankDetail
+            EmployeeBankDetail.objects.update_or_create(
+                bitrix_user_id=slip.bitrix_user_id,
+                defaults={
+                    'bank_account_no': slip.bank_account_no,
+                    'bank_name': slip.bank_name
+                }
+            )
+
         generate_payslip_pdf(slip)
 
         serializer = SalarySlipSerializer(slip)
@@ -522,15 +680,16 @@ class SalaryHistoryView(APIView):
         # Scoped logic
         if role == 'employee':
             # Force self
-            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
-            if not employee:
-                return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-            slips = SalarySlip.objects.filter(employee=employee, status='published').order_by('-year', '-month')
+            user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
+            if not user_data:
+                return Response({'error': 'Employee profile not found in Bitrix24.'}, status=status.HTTP_404_NOT_FOUND)
+            employee = BitrixEmployeeMock(user_data)
+            slips = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, status='published').order_by('-year', '-month')
         else:
             # Admin / HR
-            employee_id = request.query_params.get('employee_id') or kwargs.get('employee_id')
+            employee_id = request.query_params.get('employee_id') or kwargs.get('employee_id') or request.query_params.get('bitrix_user_id')
             if employee_id:
-                slips = SalarySlip.objects.filter(employee_id=employee_id).order_by('-year', '-month')
+                slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id)).order_by('-year', '-month')
             else:
                 # Paginate all employees slips
                 slips = SalarySlip.objects.all().order_by('-year', '-month')
@@ -566,13 +725,17 @@ class SalaryHistoryView(APIView):
         paginator = StandardResultsSetPagination()
         page = paginator.paginate_queryset(slips, request, view=self)
         
+        bitrix_users = {str(u['id']): BitrixEmployeeMock(u) for u in BitrixClient.get_all_users()}
         data = []
         target_list = page if page is not None else slips
         for s in target_list:
+            emp = bitrix_users.get(str(s.bitrix_user_id))
+            emp_id = emp.id if emp else 0
+            emp_name = emp.name if emp else f"User {s.bitrix_user_id}"
             data.append({
                 'id': s.id,
-                'employee_id': s.employee.id,
-                'employee_name': s.employee.name,
+                'employee_id': emp_id,
+                'employee_name': emp_name,
                 'month': s.month,
                 'year': s.year,
                 'location': s.location,
@@ -588,6 +751,19 @@ class SalaryHistoryView(APIView):
                 'total_deductions': str(s.total_deductions),
                 'net_salary': str(s.net_salary),
                 'net_credited_amount': str(s.net_credited_amount),
+                'month_days': str(s.month_days),
+                'worked_days': str(s.worked_days),
+                'weekend': str(s.weekend),
+                'cl': str(s.cl),
+                'extra': str(s.extra),
+                'payable_days': str(s.payable_days),
+                'month_salary': str(s.month_salary),
+                'payable_salary': str(s.payable_salary),
+                'extra_days_working': str(s.extra_days_working),
+                'fine_advance': str(s.fine_advance),
+                'net_payable': str(s.net_payable),
+                'bank_account_no': s.bank_account_no or "",
+                'bank_name': s.bank_name or "",
                 'payment_status': s.payment_status,
                 'payment_date': str(s.payment_date) if s.payment_date else '',
                 'transaction_ref': s.transaction_ref or '',
@@ -609,12 +785,13 @@ class SalarySlipDownloadView(APIView):
         download_type = request.query_params.get('type') # single | last3 | last4 | range | bulk_month | selected
 
         if role == 'employee':
-            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
-            if not employee:
+            user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
+            if not user_data:
                 return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-            employee_id = employee.id
+            employee = BitrixEmployeeMock(user_data)
+            employee_id = employee.bitrix_id
             # Employees can only download published slips
-            slips_qs = SalarySlip.objects.filter(employee_id=employee_id, status='published')
+            slips_qs = SalarySlip.objects.filter(bitrix_user_id=employee_id, status='published')
         else:
             # Admin/HR
             if download_type in ['bulk_month', 'selected'] and not employee_id:
@@ -622,7 +799,7 @@ class SalarySlipDownloadView(APIView):
             else:
                 if not employee_id:
                     return Response({'error': 'employee_id parameter is required for Admin/HR.'}, status=status.HTTP_400_BAD_REQUEST)
-                slips_qs = SalarySlip.objects.filter(employee_id=employee_id)
+                slips_qs = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
 
         # Filters
         slips = []
@@ -715,14 +892,14 @@ class SalaryEmployeeSummaryView(APIView):
         role = check_role(request.user)
         if role == 'employee':
             # Employees can only view their own summary
-            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
-            if not employee or employee.id != employee_id:
+            user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
+            if not user_data or str(user_data.get('id')) != str(employee_id):
                 raise PermissionDenied("You can only view your own salary summary.")
 
-        slips = SalarySlip.objects.filter(employee_id=employee_id)
+        slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
         
-        total_credited = slips.aggregate(models.Sum('net_credited_amount'))['net_credited_amount__sum'] or Decimal('0.00')
-        total_deductions = slips.aggregate(models.Sum('total_deductions'))['total_deductions__sum'] or Decimal('0.00')
+        total_credited = slips.aggregate(models.Sum('net_payable'))['net_payable__sum'] or Decimal('0.00')
+        total_deductions = slips.aggregate(models.Sum('fine_advance'))['fine_advance__sum'] or Decimal('0.00')
         total_payslips = slips.count()
         last_paid_slip = slips.filter(payment_status='paid', payment_date__isnull=False).order_by('-payment_date').first()
         last_payment_date = last_paid_slip.payment_date.strftime('%Y-%m-%d') if last_paid_slip else '-'
@@ -741,13 +918,17 @@ class SalaryEmployeeHistoryExportView(APIView):
     def get(self, request, employee_id):
         role = check_role(request.user)
         if role == 'employee':
-            employee = Employee.objects.filter(email=request.user.email, is_deleted=False).first()
-            if not employee or employee.id != employee_id:
+            user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
+            if not user_data or str(user_data.get('id')) != str(employee_id):
                 raise PermissionDenied("You can only export your own salary history.")
         else:
-            employee = get_object_or_404(Employee, id=employee_id, is_deleted=False)
+            user_data = BitrixClient.get_user_detail(employee_id)
 
-        slips = SalarySlip.objects.filter(employee=employee).order_by('-year', '-month')
+        if not user_data:
+            return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        employee = BitrixEmployeeMock(user_data)
+        slips = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id).order_by('-year', '-month')
 
         from_param = request.query_params.get('from')
         to_param = request.query_params.get('to')
@@ -769,10 +950,10 @@ class SalaryEmployeeHistoryExportView(APIView):
             slips = slips.filter(payment_status=payment_status)
 
         headers = [
-            "Month/Year", "Location", "Gross Salary", "PF Contribution", "ESI", 
-            "Labour Welfare Fund", "Professional Tax", "Other Deductions", "Leaves Available", 
-            "Working Days", "Leave Encashment / Extra Days", "Total Deductions", "Net Salary", 
-            "Net Credited Amount", "Payment Status", "Payment Date", "Transaction Ref"
+            "Month/Year", "Location", "Month days", "Worked days", "Weekend", 
+            "CL", "Extra", "Payable Days", "Month Salary", "Payable Salary", 
+            "Extra days working", "Fine/Advance", "Net Payable", "Bank A/c No.", "Bank",
+            "Payment Status", "Payment Date", "Transaction Ref"
         ]
 
         wb = openpyxl.Workbook()
@@ -786,18 +967,19 @@ class SalaryEmployeeHistoryExportView(APIView):
             ws.append([
                 f"{month_names[s.month]} {s.year}",
                 s.location,
-                float(s.gross_salary),
-                float(s.pf_contribution),
-                float(s.esi),
-                float(s.labour_welfare_fund),
-                float(s.professional_tax),
-                float(s.other_deductions),
-                float(s.leaves_available),
-                float(s.working_days),
-                float(s.extra_days),
-                float(s.total_deductions),
-                float(s.net_salary),
-                float(s.net_credited_amount),
+                float(s.month_days),
+                float(s.worked_days),
+                float(s.weekend),
+                float(s.cl),
+                float(s.extra),
+                float(s.payable_days),
+                float(s.month_salary),
+                float(s.payable_salary),
+                float(s.extra_days_working),
+                float(s.fine_advance),
+                float(s.net_payable),
+                s.bank_account_no or "",
+                s.bank_name or "",
                 s.payment_status.capitalize(),
                 s.payment_date.strftime('%Y-%m-%d') if s.payment_date else '',
                 s.transaction_ref or ''

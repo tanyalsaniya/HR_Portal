@@ -103,6 +103,16 @@
                 </tbody>
             </table>
         </div>
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent); background: #fafafa;">
+            <div style="font-size: 9pt; color: var(--text-secondary);">
+                Showing <span id="onboardingPageStart">0</span> to <span id="onboardingPageEnd">0</span> of <span id="onboardingTotalCount">0</span> entries
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="onboardingPrevBtn" onclick="changeOnboardingPage('onboarding', -1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="onboardingNextBtn" onclick="changeOnboardingPage('onboarding', 1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Next</button>
+            </div>
+        </div>
     </div>
 
     <!-- SUB-TAB 2: ACTIVE DIRECTORY -->
@@ -126,6 +136,16 @@
                     <!-- Dynamic rendering -->
                 </tbody>
             </table>
+        </div>
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent); background: #fafafa;">
+            <div style="font-size: 9pt; color: var(--text-secondary);">
+                Showing <span id="directoryPageStart">0</span> to <span id="directoryPageEnd">0</span> of <span id="directoryTotalCount">0</span> entries
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="directoryPrevBtn" onclick="changeOnboardingPage('all', -1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="directoryNextBtn" onclick="changeOnboardingPage('all', 1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Next</button>
+            </div>
         </div>
     </div>
 </div>

@@ -95,14 +95,89 @@
             margin-bottom: 20px;
             display: none;
         }
+
+        /* Premium Global Loading Bar */
+        .loading-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            background: linear-gradient(90deg, #0056b3, #3b82f6, #60a5fa);
+            z-index: 99999;
+            transition: width 0.4s ease, opacity 0.4s ease;
+            box-shadow: 0 0 10px rgba(0, 86, 179, 0.5);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-bar.loading {
+            opacity: 1;
+            width: 85%;
+            animation: pulse-loading 2s infinite ease-in-out;
+        }
+
+        .loading-bar.finished {
+            width: 100%;
+            opacity: 0;
+            transition: width 0.3s ease, opacity 0.5s ease 0.3s;
+        }
+
+        @keyframes pulse-loading {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
+            100% { filter: brightness(1); }
+        }
+
+        /* Premium Global Spinner Overlay */
+        .global-loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(241, 245, 249, 0.8); /* translucent light */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .global-loader-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .premium-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #0056b3;
+            border-radius: 50%;
+            animation: spin-premium 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes spin-premium {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
 
+    <!-- GLOBAL LOADING SYSTEM ELEMENTS -->
+    <div id="globalLoadingBar" class="loading-bar"></div>
+    <div id="globalLoaderOverlay" class="global-loader-overlay">
+        <div class="premium-spinner"></div>
+    </div>
+
     <div class="form-card" id="formWrapper">
         <div class="header">
             <div class="title">Exit Clearance & Questionnaire</div>
-            <div style="font-size: 9.5pt; color: #64748b; margin-top: 5px;">MTLV Solutions Private Limited</div>
+            <div style="font-size: 9.5pt; color: #64748b; margin-top: 5px;">Devex Hub Pvt Ltd.</div>
         </div>
 
         <div class="error-message" id="errorAlert"></div>
@@ -230,12 +305,41 @@
             token = '{{ token }}';
         }
 
+        function showLoader(isBlocking = false) {
+            const bar = document.getElementById('globalLoadingBar');
+            const overlay = document.getElementById('globalLoaderOverlay');
+            if (bar) {
+                bar.classList.remove('finished');
+                bar.classList.add('loading');
+                bar.style.width = '15%';
+                setTimeout(() => {
+                    if (bar.classList.contains('loading')) bar.style.width = '75%';
+                }, 50);
+            }
+            if (isBlocking && overlay) {
+                overlay.classList.add('show');
+            }
+        }
+
+        function hideLoader() {
+            const bar = document.getElementById('globalLoadingBar');
+            const overlay = document.getElementById('globalLoaderOverlay');
+            if (bar) {
+                bar.classList.remove('loading');
+                bar.classList.add('finished');
+            }
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             if (!token || token === 'None' || token === '') {
                 showError('Error: Access token is missing. Please contact HR.');
                 return;
             }
 
+            showLoader(false);
             // Validate token and fetch employee details
             try {
                 const res = await fetch(`/api/exit/public-questionnaire/?token=${token}`);
@@ -250,6 +354,8 @@
                 }
             } catch (e) {
                 showError('Server is currently unreachable.');
+            } finally {
+                hideLoader();
             }
         });
 
@@ -262,6 +368,7 @@
         document.getElementById('questionnaireForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            showLoader(true);
             const data = {
                 token: token,
                 asset_laptop_returned: document.getElementById('assetLaptop').checked,
@@ -302,6 +409,7 @@
                 });
 
                 if (res.ok) {
+                    hideLoader();
                     document.getElementById('formWrapper').innerHTML = `
                         <div class="header">
                             <div class="title" style="color: #22c55e;">Form Submitted Successfully</div>
@@ -309,10 +417,12 @@
                         <p style="text-align:center; font-size:11pt; line-height:1.6;">Thank you for completing your offboarding clearance form. The HR department has been notified, and your relieving certificates will be issued shortly.</p>
                     `;
                 } else {
+                    hideLoader();
                     const err = await res.json();
                     displayFieldErrors(err);
                 }
             } catch (ex) {
+                hideLoader();
                 alert('Failed to submit form.');
             }
         });

@@ -4,9 +4,61 @@
 const API_BASE = '/api';
 let currentUser = null;
 
+// ---------- GLOBAL LOADER SYSTEM ----------
+let activeRequestsCount = 0;
+let loaderTimeout = null;
+
+function showGlobalLoader(isBlocking = false) {
+    const bar = document.getElementById('globalLoadingBar');
+    const overlay = document.getElementById('globalLoaderOverlay');
+    
+    if (bar) {
+        bar.classList.remove('finished');
+        bar.classList.add('loading');
+        bar.style.width = '15%';
+        setTimeout(() => {
+            if (bar.classList.contains('loading')) {
+                bar.style.width = '80%';
+            }
+        }, 50);
+    }
+    
+    if (isBlocking && overlay) {
+        if (loaderTimeout) clearTimeout(loaderTimeout);
+        loaderTimeout = setTimeout(() => {
+            overlay.classList.add('show');
+        }, 150);
+    }
+}
+
+function hideGlobalLoader() {
+    const bar = document.getElementById('globalLoadingBar');
+    const overlay = document.getElementById('globalLoaderOverlay');
+    
+    if (loaderTimeout) clearTimeout(loaderTimeout);
+    
+    if (bar) {
+        bar.classList.remove('loading');
+        bar.classList.add('finished');
+    }
+    
+    if (overlay) {
+        overlay.classList.remove('show');
+    }
+}
+
 // ---------- JWT & API HELPER ----------
 async function apiFetch(endpoint, options = {}) {
     let accessToken = localStorage.getItem('accessToken');
+    
+    // Determine if request is silent (notifications check)
+    const isSilent = endpoint.includes('/notifications/feed/');
+    if (!isSilent) {
+        activeRequestsCount++;
+        // If it's a write action, make it blocking
+        const isWrite = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
+        showGlobalLoader(isWrite);
+    }
     
     // Set default headers
     options.headers = options.headers || {};
@@ -43,30 +95,41 @@ async function apiFetch(endpoint, options = {}) {
     } else {
         url = `${API_BASE}${endpoint}`;
     }
-    let response = await fetch(url, options);
 
-    // Handle token expiration (401 Unauthorized)
-    if (response.status === 401) {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-            console.log('Access token expired. Attempting token refresh...');
-            const refreshSuccess = await attemptTokenRefresh(refreshToken);
-            if (refreshSuccess) {
-                // Retry request with new token
-                accessToken = localStorage.getItem('accessToken');
-                options.headers['Authorization'] = `Bearer ${accessToken}`;
-                response = await fetch(url, options);
+    try {
+        let response = await fetch(url, options);
+
+        // Handle token expiration (401 Unauthorized)
+        if (response.status === 401) {
+            const refreshToken = localStorage.getItem('refreshToken');
+            if (refreshToken) {
+                console.log('Access token expired. Attempting token refresh...');
+                const refreshSuccess = await attemptTokenRefresh(refreshToken);
+                if (refreshSuccess) {
+                    // Retry request with new token
+                    accessToken = localStorage.getItem('accessToken');
+                    options.headers['Authorization'] = `Bearer ${accessToken}`;
+                    response = await fetch(url, options);
+                } else {
+                    logout();
+                    return response;
+                }
             } else {
                 logout();
                 return response;
             }
-        } else {
-            logout();
-            return response;
+        }
+
+        return response;
+    } finally {
+        if (!isSilent) {
+            activeRequestsCount--;
+            if (activeRequestsCount <= 0) {
+                activeRequestsCount = 0;
+                hideGlobalLoader();
+            }
         }
     }
-
-    return response;
 }
 
 async function attemptTokenRefresh(refreshToken) {
@@ -140,6 +203,7 @@ const viewToPath = {
     'salaryHistoryView': '/salaries/employee/',
     'exitView': '/exits/',
     'studentView': '/students/',
+    'studentDetailView': '/students/detail/',
     'logsView': '/logs/',
     'rolesView': '/roles/'
 };
@@ -154,6 +218,7 @@ const pathToView = {
     '/exits/': 'exitView',
     '/exits/detail/': 'exitDetailView',
     '/students/': 'studentView',
+    '/students/detail/': 'studentDetailView',
     '/logs/': 'logsView',
     '/roles/': 'rolesView'
 };
@@ -168,6 +233,7 @@ const views = [
     'exitView',
     'exitDetailView',
     'studentView',
+    'studentDetailView',
     'logsView',
     'rolesView',
     'exitLetterWorkspace',
@@ -179,7 +245,27 @@ function getEmployeeIdFromUrl() {
     return match ? parseInt(match[1]) : null;
 }
 
+function getEmployeeDetailIdFromUrl() {
+    const match = window.location.pathname.match(/^\/employees\/(\d+)\/?$/);
+    return match ? parseInt(match[1]) : null;
+}
+
+function getStudentIdFromUrl() {
+    const match = window.location.pathname.match(/^\/students\/(\d+)\/?$/);
+    return match ? parseInt(match[1]) : null;
+}
+
 function switchView(viewId, pushState = true, extraParams = {}) {
+    showGlobalLoader(false);
+
+    const targetView = document.getElementById(viewId);
+    if (!targetView) {
+        console.warn(`View "${viewId}" was not found in the page.`);
+        showToast('This page section is not loaded. Please refresh the page.', 'error');
+        hideGlobalLoader();
+        return;
+    }
+
     views.forEach(v => {
         const el = document.getElementById(v);
         if (el) el.style.display = v === viewId ? 'block' : 'none';
@@ -195,43 +281,85 @@ function switchView(viewId, pushState = true, extraParams = {}) {
     });
 
     // Load dynamic data based on view
-    if (viewId === 'dashboardView') loadDashboardData();
-    else if (viewId === 'onboardingView') loadOnboardingData();
-    else if (viewId === 'onboardingFormView') loadOnboardingFormPage();
-    else if (viewId === 'salaryView') loadSalaryData();
-    else if (viewId === 'salaryHistoryView') {
-        const empId = extraParams.employeeId || getEmployeeIdFromUrl();
-        if (empId) {
-            loadDedicatedEmployeeSalaryHistory(empId);
+    try {
+        if (viewId === 'dashboardView') loadDashboardData();
+        else if (viewId === 'onboardingView') loadOnboardingData();
+        else if (viewId === 'onboardingFormView') loadOnboardingFormPage();
+        else if (viewId === 'employeeDetailView' && typeof openEmployeeProfileDetail === 'function') {
+            const empId = extraParams.employeeId || getEmployeeDetailIdFromUrl();
+            if (empId) {
+                openEmployeeProfileDetail(empId, extraParams.employeeTab || 'personal', false);
+            }
         }
+        else if (viewId === 'salaryView') loadSalaryData();
+        else if (viewId === 'salaryHistoryView') {
+            const empId = extraParams.employeeId || getEmployeeIdFromUrl();
+            if (empId) {
+                loadDedicatedEmployeeSalaryHistory(empId);
+            }
+        }
+        else if (viewId === 'exitView') loadExitData();
+        else if (viewId === 'studentView') loadStudentData();
+        else if (viewId === 'studentDetailView' && extraParams.studentId && !extraParams.skipStudentDetailLoad && typeof openStudentProfileDetail === 'function') {
+            openStudentProfileDetail(extraParams.studentId, extraParams.studentTab || 'personal', false);
+        }
+        else if (viewId === 'logsView') loadLogsData();
+        else if (viewId === 'rolesView') loadRolesData();
+    } catch (e) {
+        console.error(`Error loading view "${viewId}":`, e);
+        showToast('Unable to load this page section. Please refresh and try again.', 'error');
     }
-    else if (viewId === 'exitView') loadExitData();
-    else if (viewId === 'studentView') loadStudentData();
-    else if (viewId === 'logsView') loadLogsData();
-    else if (viewId === 'rolesView') loadRolesData();
 
     // Update URL without page reload
     if (pushState) {
         let path = viewToPath[viewId] || '/';
         if (viewId === 'salaryHistoryView' && extraParams.employeeId) {
             path = `/salaries/employee/${extraParams.employeeId}/`;
+        } else if (viewId === 'employeeDetailView' && extraParams.employeeId) {
+            path = `/employees/${extraParams.employeeId}/`;
+        } else if (viewId === 'studentDetailView' && extraParams.studentId) {
+            path = `/students/${extraParams.studentId}/`;
         }
-        history.pushState({ viewId: viewId, employeeId: extraParams.employeeId || null }, '', path);
+        history.pushState({
+            viewId: viewId,
+            employeeId: extraParams.employeeId || null,
+            employeeTab: extraParams.employeeTab || null,
+            studentId: extraParams.studentId || null,
+            studentTab: extraParams.studentTab || null
+        }, '', path);
     }
+
+    setTimeout(() => {
+        if (activeRequestsCount === 0) {
+            hideGlobalLoader();
+        }
+    }, 300);
 }
 
 // Handle browser Back/Forward navigation
 window.addEventListener('popstate', (event) => {
     if (event.state && event.state.viewId) {
-        switchView(event.state.viewId, false, { employeeId: event.state.employeeId });
+        switchView(event.state.viewId, false, {
+            employeeId: event.state.employeeId,
+            employeeTab: event.state.employeeTab,
+            studentId: event.state.studentId,
+            studentTab: event.state.studentTab
+        });
     } else {
         let viewId = 'dashboardView';
         if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
             viewId = 'salaryHistoryView';
+        } else if (getEmployeeDetailIdFromUrl()) {
+            viewId = 'employeeDetailView';
+        } else if (getStudentIdFromUrl()) {
+            viewId = 'studentDetailView';
         } else {
             viewId = pathToView[window.location.pathname] || 'dashboardView';
         }
-        switchView(viewId, false);
+        switchView(viewId, false, {
+            employeeId: getEmployeeDetailIdFromUrl(),
+            studentId: getStudentIdFromUrl()
+        });
     }
 });
 
@@ -265,12 +393,16 @@ async function checkNotifications() {
                     return;
                 }
 
-                listContainer.innerHTML = notifications.map(n => `
-                    <div class="notif-item ${n.is_read ? '' : 'unread'}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
-                        <div class="notif-text">${n.message}</div>
-                        <div class="notif-time">${formatDate(n.created_at)}</div>
-                    </div>
-                `).join('');
+                listContainer.innerHTML = notifications.map(n => {
+                    const typeClass = 'notif-' + (n.notif_type || 'info').toLowerCase();
+                    const unreadClass = n.is_read ? '' : 'unread';
+                    return `
+                        <div class="notif-item ${unreadClass} ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
+                            <div class="notif-text">${n.message}</div>
+                            <div class="notif-time">${formatDate(n.created_at)}</div>
+                        </div>
+                    `;
+                }).join('');
             }
         }
     } catch (e) {

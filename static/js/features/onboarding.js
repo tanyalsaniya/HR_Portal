@@ -103,34 +103,82 @@ async function loadOnboardingData() {
     switchOnboardingSubTab(activeOnboardingSubTab);
 }
 
+// Pagination state variables
+let onboardingCurrentPage = 1;
+let directoryCurrentPage = 1;
+let onboardingTotalCount = 0;
+let directoryTotalCount = 0;
+
 // Load filtered employee datasets based on selected active tab
 async function loadFilteredEmployeeData() {
-    let endpoint = '/employees/';
+    const page = activeOnboardingSubTab === 'onboarding' ? onboardingCurrentPage : directoryCurrentPage;
     
+    let params = new URLSearchParams();
+    params.append('page', page);
+    params.append('page_size', 10);
+    
+    // Pass sub-tab type
     if (activeOnboardingSubTab === 'onboarding') {
-        endpoint = '/employees/?type=onboarding';
+        params.append('type', 'onboarding');
     } else if (activeOnboardingSubTab === 'all') {
-        endpoint = '/employees/?type=all';
+        params.append('type', 'all');
+    } else if (activeOnboardingSubTab === 'offboarding') {
+        params.append('type', 'offboarding');
+    } else if (activeOnboardingSubTab === 'dismissed') {
+        params.append('type', 'dismissed');
     }
+
+    // Search query
+    const searchVal = document.getElementById('onboardingSearchInput').value;
+    if (searchVal) {
+        params.append('search', searchVal);
+    }
+
+    // Dropdown filters
+    const dept = document.getElementById('onboardingDeptFilter').value;
+    const type = document.getElementById('onboardingTypeFilter').value;
+    const fromDate = document.getElementById('onboardingFromDateFilter').value;
+    const toDate = document.getElementById('onboardingToDateFilter').value;
+    
+    if (dept) {
+        params.append('department', dept);
+    }
+    if (type) {
+        params.append('employment_type', type);
+    }
+    if (fromDate) {
+        params.append('from_date', fromDate);
+    }
+    if (toDate) {
+        params.append('to_date', toDate);
+    }
+
+    // Sort order
+    const sortBy = document.getElementById('onboardingSortSelect').value;
+    if (sortBy) {
+        params.append('sort', sortBy);
+    }
+    
+    let endpoint = `/employees/?${params.toString()}`;
     
     try {
         const res = await apiFetch(endpoint);
         if (res.ok) {
             const data = await res.json();
+            
+            // Server returns {count: X, results: [...]} under pagination, or raw array if pagination is bypassed
             let rawList = data.results || data;
+            let total = data.count || rawList.length;
             
-            // Local filters for other mock states (offboarding, dismissed)
-            if (activeOnboardingSubTab === 'offboarding') {
-                rawList = rawList.filter(e => e.status === 'Exited' || e.exit_request_id !== undefined);
-            } else if (activeOnboardingSubTab === 'dismissed') {
-                rawList = rawList.filter(e => e.is_deleted === true || e.status === 'Exited');
-            } else if (activeOnboardingSubTab === 'all') {
-                // Active directory filters out exited employees by default
-                rawList = rawList.filter(e => e.status !== 'Exited');
+            if (activeOnboardingSubTab === 'onboarding') {
+                onboardingTotalCount = total;
+                updatePaginationControls('onboarding', onboardingCurrentPage, onboardingTotalCount);
+                renderOnboardingTrackerTable(rawList);
+            } else {
+                directoryTotalCount = total;
+                updatePaginationControls('all', directoryCurrentPage, directoryTotalCount);
+                renderActiveDirectoryTable(rawList);
             }
-            
-            currentOnboardingData = rawList;
-            applySearchSortAndFilter();
         }
     } catch (e) {
         console.error(e);
@@ -140,61 +188,58 @@ async function loadFilteredEmployeeData() {
 
 // Apply client-side search query, dropdown filters and sort orders
 function filterOnboardingTables() {
-    applySearchSortAndFilter();
+    onboardingCurrentPage = 1;
+    directoryCurrentPage = 1;
+    loadFilteredEmployeeData();
 }
 
 function sortOnboardingTables() {
-    applySearchSortAndFilter();
+    onboardingCurrentPage = 1;
+    directoryCurrentPage = 1;
+    loadFilteredEmployeeData();
 }
 
-function applySearchSortAndFilter() {
-    let list = [...currentOnboardingData];
-    
-    // 1. Search filter
-    const query = document.getElementById('onboardingSearchInput').value.toLowerCase();
-    if (query) {
-        list = list.filter(e => 
-            e.first_name.toLowerCase().includes(query) ||
-            e.last_name.toLowerCase().includes(query) ||
-            e.email.toLowerCase().includes(query) ||
-            e.emp_id.toLowerCase().includes(query)
-        );
-    }
-    
-    // 2. Dropdown filters
-    const dept = document.getElementById('onboardingDeptFilter').value;
-    const type = document.getElementById('onboardingTypeFilter').value;
-    const fromDate = document.getElementById('onboardingFromDateFilter').value;
-    const toDate = document.getElementById('onboardingToDateFilter').value;
-    
-    if (dept) {
-        list = list.filter(e => String(e.department) === String(dept));
-    }
-    if (type) {
-        list = list.filter(e => e.employment_type === type);
-    }
-    if (fromDate) {
-        list = list.filter(e => e.joining_date >= fromDate);
-    }
-    if (toDate) {
-        list = list.filter(e => e.joining_date <= toDate);
-    }
-    
-    // 3. Sort ordering
-    const sortBy = document.getElementById('onboardingSortSelect').value;
-    if (sortBy === 'name') {
-        list.sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
-    } else if (sortBy === 'date') {
-        list.sort((a, b) => new Date(a.joining_date) - new Date(b.joining_date));
-    } else if (sortBy === 'id') {
-        list.sort((a, b) => a.emp_id.localeCompare(b.emp_id));
-    }
-    
-    // Render to correct tab tbody
-    if (activeOnboardingSubTab === 'onboarding') {
-        renderOnboardingTrackerTable(list);
+function changeOnboardingPage(tab, direction) {
+    if (tab === 'onboarding') {
+        const maxPage = Math.ceil(onboardingTotalCount / 10) || 1;
+        onboardingCurrentPage = Math.max(1, Math.min(maxPage, onboardingCurrentPage + direction));
     } else {
-        renderActiveDirectoryTable(list);
+        const maxPage = Math.ceil(directoryTotalCount / 10) || 1;
+        directoryCurrentPage = Math.max(1, Math.min(maxPage, directoryCurrentPage + direction));
+    }
+    loadFilteredEmployeeData();
+}
+
+function updatePaginationControls(tab, currentPage, totalCount) {
+    const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * 10 + 1;
+    const pageEnd = Math.min(currentPage * 10, totalCount);
+    
+    if (tab === 'onboarding') {
+        const startEl = document.getElementById('onboardingPageStart');
+        const endEl = document.getElementById('onboardingPageEnd');
+        const totalEl = document.getElementById('onboardingTotalCount');
+        const prevBtn = document.getElementById('onboardingPrevBtn');
+        const nextBtn = document.getElementById('onboardingNextBtn');
+        
+        if (startEl) startEl.textContent = pageStart;
+        if (endEl) endEl.textContent = pageEnd;
+        if (totalEl) totalEl.textContent = totalCount;
+        
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
+    } else {
+        const startEl = document.getElementById('directoryPageStart');
+        const endEl = document.getElementById('directoryPageEnd');
+        const totalEl = document.getElementById('directoryTotalCount');
+        const prevBtn = document.getElementById('directoryPrevBtn');
+        const nextBtn = document.getElementById('directoryNextBtn');
+        
+        if (startEl) startEl.textContent = pageStart;
+        if (endEl) endEl.textContent = pageEnd;
+        if (totalEl) totalEl.textContent = totalCount;
+        
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = pageEnd >= totalCount;
     }
 }
 
@@ -267,7 +312,7 @@ function renderOnboardingTrackerTable(list) {
                     </div>
                 </td>
                 <td style="padding: 12px 20px; font-weight: 600; color: #1e293b; font-family: 'Inter', sans-serif;">${e.emp_id}</td>
-                <td style="padding: 12px 20px; color: #475569;">${e.department_details ? e.department_details.name : e.department}</td>
+                <td style="padding: 12px 20px; color: #475569;">${e.department}</td>
                 <td style="padding: 12px 20px; color: #475569;">${e.designation}</td>
                 <td style="padding: 12px 20px; font-weight: 500; color: #1e293b;">${formatSimpleDate(e.joining_date)}</td>
                 <td style="padding: 12px 20px;">
@@ -343,7 +388,7 @@ function renderActiveDirectoryTable(list) {
                     </div>
                 </td>
                 <td style="padding: 12px 20px; font-weight: 600; color: #1e293b; font-family: 'Inter', sans-serif;">${e.emp_id}</td>
-                <td style="padding: 12px 20px; color: #475569;">${e.department_details ? e.department_details.name : e.department}</td>
+                <td style="padding: 12px 20px; color: #475569;">${e.department}</td>
                 <td style="padding: 12px 20px; color: #475569;">${e.designation}</td>
                 <td style="padding: 12px 20px; color: #475569;">${e.employment_type}</td>
                 <td style="padding: 12px 20px; font-weight: 500; color: #1e293b;">${formatSimpleDate(e.joining_date)}</td>
@@ -442,7 +487,7 @@ async function loadDepartmentsSelect(selectId) {
             if (select) {
                 const hasAll = select.firstElementChild && select.firstElementChild.value === '';
                 select.innerHTML = (hasAll ? `<option value="">All Departments</option>` : '') + 
-                    deptList.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                    deptList.map(d => `<option value="${d.id}">${d.id}</option>`).join('');
             }
         }
     } catch (e) {
@@ -541,9 +586,11 @@ function renderDocumentsChecklist(docList, bondPeriod) {
     }).join('');
 }
 
-async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
+async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldSwitchView = true) {
     currentDetailEmployeeId = empId;
-    switchView('employeeDetailView');
+    if (shouldSwitchView) {
+        switchView('employeeDetailView', true, { employeeId: empId, employeeTab: tabToFocus });
+    }
     
     try {
         const res = await apiFetch(`/employees/${empId}/`);
@@ -553,7 +600,7 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
             document.getElementById('detailProfileName').textContent = `${emp.first_name} ${emp.last_name}`;
             document.getElementById('detailProfileDesignation').textContent = emp.designation;
             document.getElementById('detailProfileEmpId').textContent = emp.emp_id;
-            document.getElementById('detailProfileDept').textContent = emp.department_details ? emp.department_details.name : emp.department;
+            document.getElementById('detailProfileDept').textContent = emp.department;
             
             const statusBadge = document.getElementById('detailProfileStatusBadge');
             statusBadge.textContent = emp.status;
@@ -578,34 +625,106 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal') {
                 fallback.style.display = 'block';
             }
 
-            document.getElementById('editEmpFirstName').value = emp.first_name;
-            document.getElementById('editEmpLastName').value = emp.last_name;
-            document.getElementById('editEmpEmail').value = emp.email;
-            document.getElementById('editEmpPhone').value = emp.phone;
-            document.getElementById('editEmpAltPhone').value = emp.alternate_phone || '';
-            document.getElementById('editEmpDob').value = emp.dob;
-            document.getElementById('editEmpGender').value = emp.gender;
+            document.getElementById('editEmpFirstName').value = emp.first_name || '';
+            document.getElementById('editEmpLastName').value = emp.last_name || '';
             
-            document.getElementById('editEmpAddr1').value = emp.address_line1;
+            const workEmailInput = document.getElementById('editEmpWorkEmail');
+            const personalEmailInput = document.getElementById('editEmpPersonalEmail');
+            if (workEmailInput) {
+                workEmailInput.value = emp.work_email || emp.email || '';
+            }
+            if (personalEmailInput) {
+                personalEmailInput.value = emp.personal_email || '';
+            }
+            
+            // Enable/disable based on role
+            const canEditEmail = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR');
+            if (workEmailInput) {
+                if (canEditEmail) {
+                    workEmailInput.removeAttribute('disabled');
+                    workEmailInput.style.backgroundColor = 'var(--bg-card)';
+                    workEmailInput.style.cursor = 'text';
+                } else {
+                    workEmailInput.setAttribute('disabled', 'true');
+                    workEmailInput.style.backgroundColor = 'var(--bg-main)';
+                    workEmailInput.style.cursor = 'not-allowed';
+                }
+            }
+            if (personalEmailInput) {
+                if (canEditEmail) {
+                    personalEmailInput.removeAttribute('disabled');
+                    personalEmailInput.style.backgroundColor = 'var(--bg-card)';
+                    personalEmailInput.style.cursor = 'text';
+                } else {
+                    personalEmailInput.setAttribute('disabled', 'true');
+                    personalEmailInput.style.backgroundColor = 'var(--bg-main)';
+                    personalEmailInput.style.cursor = 'not-allowed';
+                }
+            }
+            document.getElementById('editEmpPhone').value = emp.phone || '';
+            document.getElementById('editEmpAltPhone').value = emp.alternate_phone || '';
+            document.getElementById('editEmpDob').value = emp.dob || '';
+            
+            // Normalize Gender Select
+            let genderVal = (emp.gender || '').toUpperCase();
+            document.getElementById('editEmpGender').value = ['MALE', 'FEMALE', 'OTHER'].includes(genderVal) ? genderVal : 'MALE';
+            
+            document.getElementById('editEmpAddr1').value = emp.address_line1 || '';
             document.getElementById('editEmpAddr2').value = emp.address_line2 || '';
-            document.getElementById('editEmpCity').value = emp.city;
+            document.getElementById('editEmpCity').value = emp.city || '';
             
             populateStatesDropdown('editEmpState');
-            document.getElementById('editEmpState').value = emp.state;
-            document.getElementById('editEmpPin').value = emp.pin_code;
+            // Normalize State select (check name or code)
+            let stateVal = emp.state || '';
+            if (stateVal) {
+                const selectState = document.getElementById('editEmpState');
+                let optFound = Array.from(selectState.options).some(o => o.value === stateVal);
+                if (!optFound) {
+                    let optTextMatch = Array.from(selectState.options).find(o => o.text.toLowerCase() === stateVal.toLowerCase());
+                    if (optTextMatch) {
+                        stateVal = optTextMatch.value;
+                    }
+                }
+            }
+            document.getElementById('editEmpState').value = stateVal;
+            document.getElementById('editEmpPin').value = emp.pin_code || '';
             
-            document.getElementById('editEmpDept').value = emp.department;
-            document.getElementById('editEmpDesignation').value = emp.designation;
-            document.getElementById('editEmpType').value = emp.employment_type;
-            document.getElementById('editEmpNotice').value = emp.notice_period_days;
-            document.getElementById('editEmpBond').value = emp.bond_period_months;
+            // Normalize Department Select (append if missing)
+            const selectDept = document.getElementById('editEmpDept');
+            if (selectDept && emp.department) {
+                let deptFound = Array.from(selectDept.options).some(o => o.value === String(emp.department));
+                if (!deptFound) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = emp.department;
+                    newOpt.text = emp.department;
+                    selectDept.appendChild(newOpt);
+                }
+            }
+            if (selectDept) {
+                selectDept.value = emp.department || '';
+            }
+
+            document.getElementById('editEmpDesignation').value = emp.designation || '';
+            
+            // Normalize Employment Type Select
+            let empTypeVal = (emp.employment_type || '').toUpperCase().replace(' ', '_');
+            document.getElementById('editEmpType').value = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN'].includes(empTypeVal) ? empTypeVal : 'FULL_TIME';
+            
+            document.getElementById('editEmpNotice').value = emp.notice_period_days !== undefined ? emp.notice_period_days : 30;
+            document.getElementById('editEmpBond').value = emp.bond_period_months !== undefined ? emp.bond_period_months : 0;
             
             document.getElementById('editEmpAadhaar').value = emp.aadhaar_masked || '';
             document.getElementById('editEmpPan').value = emp.pan_masked || '';
+            document.getElementById('editEmpBankAccount').value = emp.bank_account || '';
+            document.getElementById('editEmpBankName').value = emp.bank_name || '';
             
-            document.getElementById('editEmpEmergencyName').value = emp.emergency_contact_name;
-            document.getElementById('editEmpEmergencyRel').value = emp.emergency_relationship;
-            document.getElementById('editEmpEmergencyPhone').value = emp.emergency_phone;
+            document.getElementById('editEmpEmergencyName').value = emp.emergency_contact_name || '';
+            
+            // Normalize Emergency Relationship Select
+            let emergencyRelVal = (emp.emergency_relationship || '').toUpperCase();
+            document.getElementById('editEmpEmergencyRel').value = ['PARENT', 'SPOUSE', 'SIBLING', 'FRIEND', 'OTHER'].includes(emergencyRelVal) ? emergencyRelVal : 'OTHER';
+            
+            document.getElementById('editEmpEmergencyPhone').value = emp.emergency_phone || '';
 
             const joinInput = document.getElementById('editEmpJoining');
             joinInput.value = emp.joining_date;
@@ -695,6 +814,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('first_name', document.getElementById('editEmpFirstName').value);
             formData.append('last_name', document.getElementById('editEmpLastName').value);
+            
+            const workEmailEl = document.getElementById('editEmpWorkEmail');
+            if (workEmailEl) formData.append('work_email', workEmailEl.value);
+            const personalEmailEl = document.getElementById('editEmpPersonalEmail');
+            if (personalEmailEl) formData.append('personal_email', personalEmailEl.value);
+            
             formData.append('phone', document.getElementById('editEmpPhone').value);
             formData.append('alternate_phone', document.getElementById('editEmpAltPhone').value);
             formData.append('dob', document.getElementById('editEmpDob').value);
@@ -716,6 +841,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const panVal = document.getElementById('editEmpPan').value;
             if (aadhaarVal) formData.append('aadhaar', aadhaarVal);
             if (panVal) formData.append('pan', panVal);
+            
+            const bankAccountVal = document.getElementById('editEmpBankAccount').value;
+            const bankNameVal = document.getElementById('editEmpBankName').value;
+            formData.append('bank_account', bankAccountVal);
+            formData.append('bank_name', bankNameVal);
             
             formData.append('emergency_contact_name', document.getElementById('editEmpEmergencyName').value);
             formData.append('emergency_relationship', document.getElementById('editEmpEmergencyRel').value);
@@ -762,7 +892,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('first_name', document.getElementById('empFirstName').value);
             formData.append('last_name', document.getElementById('empLastName').value);
-            formData.append('email', document.getElementById('empEmail').value);
+            formData.append('work_email', document.getElementById('empWorkEmail').value);
+            formData.append('personal_email', document.getElementById('empPersonalEmail').value);
             formData.append('phone', document.getElementById('empPhone').value);
             formData.append('dob', document.getElementById('empDob').value);
             formData.append('gender', document.getElementById('empGender').value);
@@ -1225,6 +1356,7 @@ async function openLetterWorkspace(type) {
             document.getElementById('custJoiningDate').value = emp.joining_date || '';
             document.getElementById('custFirstName').value = emp.first_name || '';
             document.getElementById('custLastName').value = emp.last_name || '';
+            document.getElementById('custEmpId').value = emp.emp_id || '';
             document.getElementById('custDesignation').value = emp.designation || '';
             document.getElementById('custAddress1').value = emp.address_line1 || '';
             document.getElementById('custCity').value = emp.city || '';
@@ -1295,6 +1427,7 @@ async function updateLetterPreview() {
         date: document.getElementById('custLetterDate').value,
         first_name: document.getElementById('custFirstName').value,
         last_name: document.getElementById('custLastName').value,
+        emp_id: document.getElementById('custEmpId').value,
         designation: document.getElementById('custDesignation').value,
         joining_date: document.getElementById('custJoiningDate').value,
         notice_period_days: document.getElementById('custNoticePeriod').value,
@@ -1466,89 +1599,31 @@ async function updateLetterPreview() {
                 return pages[num - 1];
             }
             
-            function getMirrorParent(originalParent, activePage) {
-                if (!originalParent || originalParent === originalBody) {
-                    return activePage;
-                }
-                
-                const path = [];
-                let curr = originalParent;
-                while (curr && curr !== originalBody) {
-                    path.unshift(curr);
-                    curr = curr.parentNode;
-                }
-                
-                let currentTarget = activePage;
-                path.forEach(origNode => {
-                    let mirror = null;
-                    for (let child of currentTarget.children) {
-                        if (child.tagName === origNode.tagName && 
-                            child.className === origNode.className && 
-                            !child.dataset.finalized) {
-                            mirror = child;
-                            break;
+            const children = Array.from(originalBody.childNodes);
+            children.forEach(child => {
+                if (child.nodeType === Node.ELEMENT_NODE) {
+                    if (child.tagName === 'SCRIPT' || child.tagName === 'STYLE' || child.id === 'a4-preview-styles') {
+                        return;
+                    }
+                    
+                    const styleAttr = child.getAttribute('style') || '';
+                    const hasPageBreak = styleAttr.includes('page-break-before: always') || 
+                                         styleAttr.includes('page-break-before:always') ||
+                                         child.style.pageBreakBefore === 'always';
+                                         
+                    if (hasPageBreak) {
+                        currentPageNum++;
+                        const isEmptyPageBreak = !child.textContent.trim() && child.children.length === 0;
+                        if (!isEmptyPageBreak) {
+                            const page = getOrCreatePage(currentPageNum);
+                            page.appendChild(child.cloneNode(true));
                         }
-                    }
-                    if (!mirror) {
-                        mirror = origNode.cloneNode(false);
-                        currentTarget.appendChild(mirror);
-                    }
-                    currentTarget = mirror;
-                });
-                
-                return currentTarget;
-            }
-            
-            function processNode(node, parentInPage) {
-                if (!node) return;
-                
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || node.id === 'a4-preview-styles') {
                         return;
                     }
                 }
                 
-                let hasPageBreak = false;
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const styleAttr = node.getAttribute('style') || '';
-                    hasPageBreak = styleAttr.includes('page-break-before: always') || 
-                                   styleAttr.includes('page-break-before:always') ||
-                                   node.style.pageBreakBefore === 'always';
-                }
-                
-                if (hasPageBreak) {
-                    currentPageNum++;
-                }
-                
-                if (node.nodeType === Node.TEXT_NODE) {
-                    const activePage = getOrCreatePage(currentPageNum);
-                    const targetParent = getMirrorParent(parentInPage, activePage);
-                    targetParent.appendChild(node.cloneNode(true));
-                    return;
-                }
-                
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const isTableOrRow = ['TABLE', 'TR', 'THEAD', 'TBODY', 'TH', 'TD', 'UL', 'OL', 'LI'].includes(node.tagName);
-                    const isSpecialBlock = node.classList.contains('header') || 
-                                           node.classList.contains('signature-section') ||
-                                           node.classList.contains('details-table');
-                    const isLeaf = node.childNodes.length === 0;
-                    
-                    if (isLeaf || isTableOrRow || isSpecialBlock) {
-                        const activePage = getOrCreatePage(currentPageNum);
-                        const targetParent = getMirrorParent(parentInPage, activePage);
-                        targetParent.appendChild(node.cloneNode(true));
-                        return;
-                    }
-                    
-                    Array.from(node.childNodes).forEach(child => {
-                        processNode(child, node);
-                    });
-                }
-            }
-            
-            Array.from(originalBody.childNodes).forEach(child => {
-                processNode(child, originalBody);
+                const page = getOrCreatePage(currentPageNum);
+                page.appendChild(child.cloneNode(true));
             });
             
             pages.forEach((page, index) => {
@@ -2039,4 +2114,45 @@ function previewProfilePhoto(input) {
             placeholder.style.display = 'block';
         }
     }
+}
+
+// -----------------------------------------------------------------------
+// triggerExitFormality(empId)
+// Called from the employee row "Initiate Exit" dropdown button.
+// Opens the shared Initiate Exit modal (defined in exit.js / layout) and
+// pre-selects the correct employee in the dropdown.
+// -----------------------------------------------------------------------
+async function triggerExitFormality(empId) {
+    // Open the modal (function defined in exit.js, loaded globally)
+    if (typeof openInitiateExitModal === 'function') {
+        openInitiateExitModal();
+    } else {
+        showToast('Exit modal is not available. Please go to the Exit page.', 'error');
+        return;
+    }
+
+    // Wait for the employee select dropdown to be populated, then pre-select
+    const maxWait = 50; // 50 * 100ms = 5 seconds
+    let waited = 0;
+    const interval = setInterval(() => {
+        waited++;
+        const select = document.getElementById('exitEmployeeSelect');
+        if (!select) {
+            if (waited >= maxWait) clearInterval(interval);
+            return;
+        }
+        // Options loaded when more than the placeholder exist
+        if (select.options.length > 1) {
+            clearInterval(interval);
+            const strId = String(empId);
+            for (let i = 0; i < select.options.length; i++) {
+                if (String(select.options[i].value) === strId) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+        } else if (waited >= maxWait) {
+            clearInterval(interval);
+        }
+    }, 100);
 }

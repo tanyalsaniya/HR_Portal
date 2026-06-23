@@ -3,7 +3,7 @@ import datetime
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from rules import MAX_DOCUMENT_SIZE_BYTES, MAX_PROFILE_PHOTO_SIZE_BYTES
-from .models import Department, Employee, EmployeeDocument, LetterTemplate
+from .models import Department, EmployeeDocument, LetterTemplate
 
 User = get_user_model()
 
@@ -16,11 +16,20 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class EmployeeDocumentSerializer(serializers.ModelSerializer):
     uploaded_by_username = serializers.ReadOnlyField(source='uploaded_by.username')
     file_name = serializers.SerializerMethodField()
+    employee = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = EmployeeDocument
         fields = '__all__'
         read_only_fields = ('uploaded_by', 'upload_date')
+
+    def to_internal_value(self, data):
+        emp_id_val = data.get('employee') or data.get('employee_id')
+        if emp_id_val and 'bitrix_user_id' not in data:
+            if hasattr(data, 'copy'):
+                data = data.copy()
+            data['bitrix_user_id'] = emp_id_val
+        return super().to_internal_value(data)
 
     def get_file_name(self, obj):
         return obj.file.name.split('/')[-1] if obj.file else ""
@@ -39,6 +48,7 @@ class EmployeeDocumentSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        validated_data.pop('employee', None)
         request = self.context.get('request')
         if request and request.user:
             validated_data['uploaded_by'] = request.user
@@ -56,139 +66,96 @@ class EmployeeSalaryStructureSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class EmployeeSerializer(serializers.ModelSerializer):
-    name = serializers.ReadOnlyField()
-    department_name = serializers.ReadOnlyField(source='department.name')
-    aadhaar = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=12)
-    pan = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=10)
-    aadhaar_masked = serializers.SerializerMethodField(read_only=True)
-    pan_masked = serializers.SerializerMethodField(read_only=True)
-    created_by_username = serializers.ReadOnlyField(source='created_by.username')
-    documents = EmployeeDocumentSerializer(many=True, read_only=True)
-    salary_structures = EmployeeSalaryStructureSerializer(many=True, read_only=True)
+class EmployeeSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    emp_id = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    name = serializers.CharField()
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    work_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    personal_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone = serializers.CharField()
+    designation = serializers.CharField()
+    department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    department_name = serializers.SerializerMethodField()
+    department_details = serializers.SerializerMethodField()
+    joining_date = serializers.CharField()
+    dob = serializers.CharField()
+    gender = serializers.CharField()
+    profile_photo = serializers.CharField(allow_blank=True, required=False)
+    status = serializers.CharField()
+    onboarding_complete = serializers.BooleanField()
+    employment_type = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    address_line1 = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    state = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pin_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    emergency_contact_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    emergency_relationship = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    emergency_phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    bitrix_contact_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    exit_request_id = serializers.SerializerMethodField()
+    
+    # Relational documents and structures
+    documents = serializers.SerializerMethodField()
+    salary_structures = serializers.SerializerMethodField()
+    
+    # Masked placeholders for banking/pan compatibility
+    aadhaar_masked = serializers.CharField(default="XXXXXXXX1234", read_only=True)
+    pan_masked = serializers.CharField(default="XXXXXX1234", read_only=True)
+    bank_account = serializers.SerializerMethodField()
+    bank_name = serializers.SerializerMethodField()
+    pan_no = serializers.CharField(default="", required=False, allow_blank=True)
+    bond_period_months = serializers.IntegerField(default=0, required=False)
+    notice_period_days = serializers.IntegerField(default=30, required=False)
 
-    class Meta:
-        model = Employee
-        fields = '__all__'
-        read_only_fields = ('emp_id', 'created_by', 'created_at', 'status')
+    def get_bank_account(self, obj):
+        from salary.models import EmployeeBankDetail
+        detail = EmployeeBankDetail.objects.filter(bitrix_user_id=obj.get('id')).first()
+        return detail.bank_account_no if detail else ""
 
-    def validate_first_name(self, value):
-        if not re.match(r'^[a-zA-Z\s]+$', value):
-            raise serializers.ValidationError("First name must contain letters and spaces only.")
-        return value
+    def get_bank_name(self, obj):
+        from salary.models import EmployeeBankDetail
+        detail = EmployeeBankDetail.objects.filter(bitrix_user_id=obj.get('id')).first()
+        return detail.bank_name if detail else ""
 
-    def validate_phone(self, value):
-        if not re.match(r'^[6-9]\d{9}$', value):
-            raise serializers.ValidationError("Phone number must be a 10-digit Indian mobile number (e.g., 9XXXXXXXXX).")
-        return value
+    def get_documents(self, obj):
+        docs = EmployeeDocument.objects.filter(bitrix_user_id=obj.get('id'))
+        return EmployeeDocumentSerializer(docs, many=True, context=self.context).data
 
-    def validate_alternate_phone(self, value):
-        if value and not re.match(r'^[6-9]\d{9}$', value):
-            raise serializers.ValidationError("Alternate phone number must be a 10-digit Indian mobile number.")
-        return value
+    def get_salary_structures(self, obj):
+        from salary.models import SalaryStructure
+        structures = SalaryStructure.objects.filter(bitrix_user_id=obj.get('id'))
+        return EmployeeSalaryStructureSerializer(structures, many=True, context=self.context).data
 
-    def validate_emergency_phone(self, value):
-        if not re.match(r'^[6-9]\d{9}$', value):
-            raise serializers.ValidationError("Emergency phone number must be a 10-digit Indian mobile number.")
-        return value
+    def get_department_name(self, obj):
+        dept_id = obj.get('department')
+        if dept_id:
+            try:
+                dept = Department.objects.filter(id=dept_id).first()
+                if dept:
+                    return dept.name
+            except Exception:
+                pass
+        return "Engineering"
 
-    def validate_dob(self, value):
-        today = datetime.date.today()
-        age = today.year - value.year - ((today.month, today.day) < (value.month, value.day))
-        if age < 18:
-            raise serializers.ValidationError("Employee must be 18 years or older.")
-        return value
+    def get_department_details(self, obj):
+        dept_id = obj.get('department')
+        if dept_id:
+            try:
+                dept = Department.objects.filter(id=dept_id).first()
+                if dept:
+                    return {
+                        'id': dept.id,
+                        'name': dept.name
+                    }
+            except Exception:
+                pass
+        return None
 
-    def validate_pin_code(self, value):
-        if not re.match(r'^\d{6}$', value):
-            raise serializers.ValidationError("PIN code must be a 6-digit numeric value.")
-        return value
-
-    def validate_email(self, value):
-        if self.instance and self.instance.email != value:
-            raise serializers.ValidationError("Email address cannot be changed after creation.")
-        return value
-
-    def validate_joining_date(self, value):
-        today = datetime.date.today()
-        future_limit = today + datetime.timedelta(days=30)
-        if value > future_limit:
-            raise serializers.ValidationError("Joining date cannot be more than 30 days in the future.")
-        
-        # Check if updating joining_date and user role is not ADMIN
-        if self.instance and self.instance.joining_date != value:
-            request = self.context.get('request')
-            if request and request.user:
-                is_admin = request.user.is_superuser or (request.user.role and request.user.role.code == 'ADMIN')
-                if not is_admin:
-                    raise serializers.ValidationError("Only an Administrator can change the joining date.")
-        return value
-
-    def validate_aadhaar(self, value):
-        # If masked, skip validation
-        if value and 'X' in value:
-            return value
-        if value and not re.match(r'^\d{12}$', value):
-            raise serializers.ValidationError("Aadhaar number must be a 12-digit numeric value.")
-        return value
-
-    def validate_pan(self, value):
-        # If masked, skip validation
-        if value and 'X' in value:
-            return value
-        if value and not re.match(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$', value):
-            raise serializers.ValidationError("PAN number must be a 10-character alphanumeric code in the format ABCDE1234F.")
-        return value
-
-    def validate_profile_photo(self, value):
-        if value:
-            if value.size > MAX_PROFILE_PHOTO_SIZE_BYTES:
-                raise serializers.ValidationError("Profile photo size must be less than 2 MB.")
-            import os
-            ext = os.path.splitext(value.name)[1].lower()
-            if ext not in ['.jpg', '.jpeg', '.png']:
-                raise serializers.ValidationError("Profile photo must be a JPEG or PNG file.")
-        return value
-
-    def get_aadhaar_masked(self, obj):
-        val = obj.aadhaar_encrypted
-        if val and len(val) >= 4:
-            return f"XXXXXXXX{val[-4:]}"
-        return val
-
-    def get_pan_masked(self, obj):
-        val = obj.pan_encrypted
-        if val and len(val) >= 4:
-            return f"XXXXXX{val[-4:]}"
-        return val
-
-    def create(self, validated_data):
-        # Map raw fields to encrypted fields
-        aadhaar = validated_data.pop('aadhaar', None)
-        pan = validated_data.pop('pan', None)
-        
-        if aadhaar and 'X' not in aadhaar:
-            validated_data['aadhaar_encrypted'] = aadhaar
-        if pan and 'X' not in pan:
-            validated_data['pan_encrypted'] = pan
-            
-        request = self.context.get('request')
-        if request and request.user:
-            validated_data['created_by'] = request.user
-            
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        # Update encrypted fields if passed
-        aadhaar = validated_data.pop('aadhaar', None)
-        pan = validated_data.pop('pan', None)
-        
-        if aadhaar is not None and 'X' not in aadhaar and aadhaar != '':
-            instance.aadhaar_encrypted = aadhaar
-        if pan is not None and 'X' not in pan and pan != '':
-            instance.pan_encrypted = pan
-            
-        return super().update(instance, validated_data)
+    def get_exit_request_id(self, obj):
+        return obj.get('exit_request_id')
 
 
 class LetterTemplateSerializer(serializers.ModelSerializer):

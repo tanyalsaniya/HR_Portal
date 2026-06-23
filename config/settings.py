@@ -217,11 +217,15 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'notifications.tasks.run_daily_onboarding_pipeline',
         'schedule': crontab(hour=8, minute=0),  # Daily at 08:00 IST
     },
+    'daily-bitrix-sync-retry': {
+        'task': 'notifications.tasks.retry_failed_bitrix_syncs',
+        'schedule': crontab(hour=9, minute=0),  # Daily at 09:00 IST
+    },
 }
 
 # ---------- COMPANY & SIGNATORY DEFAULTS FOR LETTERS ----------
-COMPANY_NAME = "MTLV Solutions Private Limited"
-COMPANY_ADDRESS = "HR Division, Secure Enterprise Operations, India"
+COMPANY_NAME = "Devex Hub Pvt Ltd."
+COMPANY_ADDRESS = "Plot No D-254, Fourth Floor, Phase 8A, Industrial Area, Mohali"
 LETTER_SIGNATORY_NAME = os.getenv('LETTER_SIGNATORY_NAME', 'Head of HR Operations')
 LETTER_SIGNATORY_DESIGNATION = os.getenv('LETTER_SIGNATORY_DESIGNATION', 'Authorized Signatory')
 

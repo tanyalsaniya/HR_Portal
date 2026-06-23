@@ -13,7 +13,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
 from roles.permissions import HasModelPermission
-from employee_onboarding.models import Employee, Department
+from employee_onboarding.models import Department
+from common.bitrix_client import BitrixClient, BitrixEmployeeMock
 from employee_onboarding.serializers import EmployeeSerializer, EmployeeDocumentSerializer
 from .models import ExitRequest, ExitSecureLink, ExitFormResponse, ExitFFSettlement
 from .serializers import ExitRequestSerializer, ExitFormResponseSerializer, ExitFFSettlementSerializer
@@ -38,8 +39,25 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return ExitRequest.objects.all().order_by('-initiated_at')
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        no_pagination = request.query_params.get('no_pagination') == 'true'
+        if not no_pagination:
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
-        employee = serializer.validated_data['employee']
+        bitrix_user_id = serializer.validated_data.get('bitrix_user_id')
+        if not bitrix_user_id:
+            raise ValidationError("bitrix_user_id is required.")
+        user_data = BitrixClient.get_user_detail(bitrix_user_id)
+        if not user_data:
+            raise ValidationError("Employee not found in Bitrix24.")
+        employee = BitrixEmployeeMock(user_data)
         
         # Check if employee is already exited
         if employee.status == 'Exited':
@@ -161,11 +179,20 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
         exit_req.cancelled_reason = cancelled_reason
         exit_req.save(update_fields=['status', 'cancelled_reason'])
         
-        # Reset employee to Active
-        employee = exit_req.employee
-        employee.status = 'Active'
-        employee.exit_date = None
-        employee.save(update_fields=['status', 'exit_date'])
+        # Reset employee to Active in Bitrix24
+        webhook = BitrixClient.get_webhook_url()
+        update_url = f"{webhook}/crm.contact.update"
+        try:
+            import requests
+            requests.post(update_url, json={
+                'id': exit_req.bitrix_user_id,
+                'fields': {
+                    'UF_ONBOARDING_STATUS': 'Completed',
+                }
+            }, timeout=10)
+            BitrixClient.get_all_users(force_refresh=True)
+        except Exception:
+            pass
         
         return Response({'message': 'Exit request cancelled successfully.'})
 
@@ -190,11 +217,20 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
         exit_req.status = 'REOPENED'
         exit_req.save(update_fields=['status'])
         
-        # Reset employee to Active
-        employee = exit_req.employee
-        employee.status = 'Active'
-        employee.exit_date = None
-        employee.save(update_fields=['status', 'exit_date'])
+        # Reset employee to Active in Bitrix24
+        webhook = BitrixClient.get_webhook_url()
+        update_url = f"{webhook}/crm.contact.update"
+        try:
+            import requests
+            requests.post(update_url, json={
+                'id': exit_req.bitrix_user_id,
+                'fields': {
+                    'UF_ONBOARDING_STATUS': 'Completed',
+                }
+            }, timeout=10)
+            BitrixClient.get_all_users(force_refresh=True)
+        except Exception:
+            pass
         
         return Response({'message': 'Exit request reopened successfully.'})
 
@@ -516,6 +552,29 @@ class ExitPublicQuestionnaireView(APIView):
         if not link.ip_address:
             link.ip_address = ip
             link.save(update_fields=['ip_address'])
+            
+            # Trigger 13: Employee opens secure exit form link
+            try:
+                from notifications.models import Notification
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                
+                admins = User.objects.filter(role__code='ADMIN')
+                hrs = User.objects.filter(role__code='HR')
+                
+                exit_request = link.exit_request
+                employee = exit_request.employee
+                msg = f"{employee.name} has opened the exit form and started filling it"
+                
+                for user in list(admins) + list(hrs):
+                    Notification.objects.create(
+                        recipient=user,
+                        notif_type='INFO',
+                        message=msg,
+                        link=f"/exit/{exit_request.id}/"
+                    )
+            except Exception:
+                pass
 
         exit_request = link.exit_request
         employee = exit_request.employee
@@ -614,66 +673,55 @@ class RejoiningAPIView(APIView):
             return Response({'error': 'All details and salary structure are required.'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            ex_employee = Employee.objects.get(id=ex_employee_id, status='Exited')
-        except Employee.DoesNotExist:
-            return Response({'error': 'Ex-employee record not found.'}, status=status.HTTP_400_BAD_REQUEST)
+            ex_employee_data = BitrixClient.get_user_detail(ex_employee_id)
+            if not ex_employee_data:
+                raise Exception()
+            ex_employee = BitrixEmployeeMock(ex_employee_data)
+        except Exception:
+            return Response({'error': 'Ex-employee record not found in Bitrix24.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             dept = Department.objects.get(id=new_department_id)
         except Department.DoesNotExist:
             return Response({'error': 'Department not found.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        new_emp = Employee.objects.create(
-            first_name=ex_employee.first_name,
-            last_name=ex_employee.last_name,
-            email=ex_employee.email,
-            phone=ex_employee.phone,
-            alternate_phone=ex_employee.alternate_phone,
-            dob=ex_employee.dob,
-            gender=ex_employee.gender,
-            address_line1=ex_employee.address_line1,
-            address_line2=ex_employee.address_line2,
-            city=ex_employee.city,
-            state=ex_employee.state,
-            pin_code=ex_employee.pin_code,
-            department=dept,
-            designation=new_designation,
-            employment_type=new_employment_type,
-            joining_date=new_joining_date,
-            notice_period_days=new_notice_period_days,
-            bond_period_months=new_bond_period_months,
-            emergency_contact_name=ex_employee.emergency_contact_name,
-            emergency_relationship=ex_employee.emergency_relationship,
-            emergency_phone=ex_employee.emergency_phone,
-            aadhaar_encrypted=ex_employee.aadhaar_encrypted,
-            pan_encrypted=ex_employee.pan_encrypted,
-            status='Active',
-            rejoined_from=ex_employee,
-            created_by=request.user
-        )
-        
-        timestamp = int(datetime.datetime.now().timestamp())
-        ex_employee.email = f"{ex_employee.email}.exited.{timestamp}"
-        ex_employee.save()
-        
+        # Update designation and active status in Bitrix24
+        webhook = BitrixClient.get_webhook_url()
+        update_url = f"{webhook}/crm.contact.update"
+        payload = {
+            'id': ex_employee_id,
+            'fields': {
+                'POST': new_designation,
+                'UF_ONBOARDING_STATUS': 'Pending',
+                'UF_CRM_ONBOARDING_STATUS': 'Pending'
+            }
+        }
+        try:
+            import requests
+            requests.post(update_url, json=payload, timeout=10)
+        except Exception:
+            pass
+
+        # Refresh Bitrix cache
+        BitrixClient.get_all_users(force_refresh=True)
+        new_emp_data = BitrixClient.get_user_detail(ex_employee_id)
+        new_emp = BitrixEmployeeMock(new_emp_data)
+
         from salary.models import SalaryStructure
         from salary.serializers import SalaryStructureSerializer
         
         salary_structure_data = salary_data.copy()
-        salary_structure_data['employee'] = new_emp.id
+        salary_structure_data['bitrix_user_id'] = ex_employee_id
         
         salary_serializer = SalaryStructureSerializer(data=salary_structure_data, context={'request': request})
         if not salary_serializer.is_valid():
-            new_emp.delete()
-            ex_employee.email = ex_employee.email.split('.exited.')[0]
-            ex_employee.save()
             return Response(salary_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
         salary_serializer.save(created_by=request.user)
 
         return Response({
-            'message': 'Ex-employee rejoined successfully with a new tenure.',
-            'employee': EmployeeSerializer(new_emp).data
+            'message': 'Ex-employee rejoined successfully in Bitrix24 and new salary structure applied.',
+            'employee': EmployeeSerializer(new_emp._data).data
         }, status=status.HTTP_201_CREATED)
 
 def exit_form_view(request, token):

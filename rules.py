@@ -167,7 +167,7 @@ INDIAN_STATES = (
 STUDENT_FEES_WARNING_SUBJECT = "Action Required: Pending Fee Installment Payment"
 STUDENT_FEES_WARNING_BODY = """Dear {student_name},
 
-This is a reminder regarding your training program at MTLV. Our records indicate that your fee installment number {installment_number} of Rs. {amount:.2f} was due on {due_date}. 
+This is a reminder regarding your training program at Devex Hub Pvt Ltd. Our records indicate that your fee installment number {installment_number} of Rs. {amount:.2f} was due on {due_date}. 
 
 As of today, we have not received the payment. Please process this installment as soon as possible. If you have already paid, please contact the HR department with the receipt to update your status.
 
@@ -175,5 +175,5 @@ If you have any questions or require assistance, please contact the HR office.
 
 Sincerely,
 HR Department
-MTLV Development Team
+Devex Hub Pvt Ltd.
 """

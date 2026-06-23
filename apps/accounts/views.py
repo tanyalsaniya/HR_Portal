@@ -67,7 +67,6 @@ class PasswordResetConfirmView(APIView):
         return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
 
 
-from employee_onboarding.models import Employee
 from student_certificate.models import Student
 from exit_formality.models import ExitRequest
 from salary.models import SalaryIncrementReminder
@@ -92,9 +91,10 @@ class DashboardAPIView(APIView):
         user_perms = set(user.role.permissions.values_list('codename', flat=True)) if user.role else set()
 
         if is_admin or 'onboarding.read' in user_perms:
-            employees = Employee.objects.filter(is_deleted=False)
-            data['total_employees'] = employees.count()
-            data['active_employees'] = employees.filter(status='Active').count()
+            from common.bitrix_client import BitrixClient
+            users = BitrixClient.get_all_users()
+            data['total_employees'] = len(users)
+            data['active_employees'] = sum(1 for u in users if u.get('status') == 'Active')
 
         if is_admin or 'student.read' in user_perms:
             data['active_students'] = Student.objects.filter(status='ACTIVE').count()
@@ -141,3 +141,12 @@ def hybrid_view(view_class_or_func, actions=None, template_name='base/layout.htm
         else:
             return render(request, template_name)
     return wrapper
+
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def client_log_view(request):
+    if request.method == 'POST':
+        print("CLIENT LOG:", request.body.decode('utf-8'))
+    return HttpResponse("OK")
