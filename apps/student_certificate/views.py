@@ -4,6 +4,7 @@ import zipfile
 import datetime
 import urllib.request
 import urllib.parse
+import re
 from decimal import Decimal
 from django.db import transaction
 from django.http import HttpResponse
@@ -602,6 +603,13 @@ class StudentViewSet(viewsets.ModelViewSet):
                     formatted = format_bitrix_student_data(bitrix_student)
                     
                     # Check if student exists
+                    dob_val = None
+                    if formatted.get('dob'):
+                        try:
+                            dob_val = datetime.datetime.strptime(formatted.get('dob').split('T')[0], '%Y-%m-%d').date()
+                        except ValueError:
+                            pass
+
                     student, created = Student.objects.update_or_create(
                         email=email,
                         defaults={
@@ -620,11 +628,15 @@ class StudentViewSet(viewsets.ModelViewSet):
                             'mentor': formatted.get('mentor', ''),
                             'father_name': formatted.get('father_name', ''),
                             'status': 'ACTIVE',
-                            'student_type': 'TRAINEE',
+                            'student_type': formatted.get('student_type', 'TRAINEE'),
                             'program_name': formatted.get('course_name', 'General'),
-                            'cert_type': 'TRAINING_CERT',
+                            'cert_type': formatted.get('cert_type', 'TRAINING_CERT'),
                             'department_id': department_id,
                             'created_by_id': created_by_id if created else None,
+                            'gender': formatted.get('gender', 'MALE'),
+                            'address': formatted.get('address', ''),
+                            'dob': dob_val,
+                            'total_fees': Decimal(re.sub(r'[^\d.]', '', str(formatted.get('total_fees', '0'))) or '0') if formatted.get('total_fees') else Decimal('0.00'),
                         }
                     )
                     
@@ -828,6 +840,11 @@ class StudentViewSet(viewsets.ModelViewSet):
         completion_date_str = request.data.get('completion_date')
         father_name = request.data.get('father_name', '')
         total_fees = request.data.get('total_fees', '0')
+        dob_str = request.data.get('dob')
+        gender = request.data.get('gender', 'MALE')
+        address = request.data.get('address', '')
+        student_type = request.data.get('student_type', 'TRAINEE')
+        cert_type = request.data.get('cert_type', 'TRAINING_CERT')
         
         # Parse dates
         today = datetime.date.today()
@@ -843,6 +860,13 @@ class StudentViewSet(viewsets.ModelViewSet):
         if joining_date_str:
             try:
                 joining_date = datetime.datetime.strptime(joining_date_str.split('T')[0], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        dob = None
+        if dob_str:
+            try:
+                dob = datetime.datetime.strptime(dob_str.split('T')[0], '%Y-%m-%d').date()
             except ValueError:
                 pass
 
@@ -897,11 +921,14 @@ class StudentViewSet(viewsets.ModelViewSet):
                 'completion_date': completion_date,
                 'father_name': father_name,
                 'status': 'ACTIVE',
-                'student_type': 'TRAINEE',
+                'student_type': student_type or 'TRAINEE',
                 'program_name': course_name,
-                'cert_type': 'TRAINING_CERT',
+                'cert_type': cert_type or 'TRAINING_CERT',
                 'department': dept,
                 'total_fees': parsed_fees,
+                'dob': dob,
+                'gender': gender or 'MALE',
+                'address': address,
                 'created_by': request.user if request.user.is_authenticated else None
             }
         )
@@ -1066,18 +1093,24 @@ class BitrixActiveStudentsView(APIView):
             total = data.get('total', len(items))
             active_students = []
             for item in items:
+                formatted = format_bitrix_student_data(item)
                 active_students.append({
-                    'id': item.get('id'),
-                    'name': (item.get('title') or '').strip(),
-                    'email': item.get('ufCrm6_1761731565702') or '',
-                    'phone': item.get('ufCrm6_1761731546152') or '',
-                    'course_id': item.get('ufCrm6_1761731874888'),
-                    'start_date': (item.get('ufCrm6_1761735340146') or '')[:10],
-                    'completion_date': (item.get('ufCrm6_1761735481170') or '')[:10],
-                    'father_name': item.get('ufCrm6_1761731958409') or '',
-                    'institute': item.get('ufCrm6_1761732176981') or '',
-                    'total_fees': item.get('ufCrm6_1761732340679') or '0',
+                    'id': formatted.get('bitrix_id'),
+                    'name': formatted.get('name'),
+                    'email': formatted.get('email'),
+                    'phone': formatted.get('phone'),
+                    'course_id': formatted.get('course_name'),
+                    'start_date': formatted.get('joining_date'),
+                    'completion_date': formatted.get('completion_date'),
+                    'father_name': formatted.get('father_name'),
+                    'institute': formatted.get('institute'),
+                    'total_fees': formatted.get('total_fees'),
                     'stage': item.get('stageId', ''),
+                    'dob': formatted.get('dob'),
+                    'gender': formatted.get('gender'),
+                    'address': formatted.get('address'),
+                    'student_type': formatted.get('student_type'),
+                    'cert_type': formatted.get('cert_type'),
                 })
 
             active_students = active_students[relative_start : relative_start + limit]

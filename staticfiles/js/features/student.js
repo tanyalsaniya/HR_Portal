@@ -139,7 +139,14 @@ async function openCertTabWithBitrixStudent(index) {
             institute: s.institute || '',
             start_date: s.start_date || '',
             completion_date: s.completion_date || '',
-            total_fees: s.total_fees || '0'
+            total_fees: s.total_fees || '0',
+            father_name: s.father_name || '',
+            phone: s.phone || '',
+            dob: s.dob || '',
+            gender: s.gender || '',
+            address: s.address || '',
+            student_type: s.student_type || '',
+            cert_type: s.cert_type || ''
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
@@ -973,7 +980,14 @@ async function handleStudentRowClick(event, index) {
             institute: s.institute || '',
             start_date: s.start_date || '',
             completion_date: s.completion_date || '',
-            total_fees: s.total_fees || '0'
+            total_fees: s.total_fees || '0',
+            father_name: s.father_name || '',
+            phone: s.phone || '',
+            dob: s.dob || '',
+            gender: s.gender || '',
+            address: s.address || '',
+            student_type: s.student_type || '',
+            cert_type: s.cert_type || ''
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
