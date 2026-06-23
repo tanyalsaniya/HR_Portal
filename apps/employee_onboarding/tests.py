@@ -245,3 +245,103 @@ class OnboardingModuleTests(APITestCase):
         self.assertIn("SALARY BREAKUP", offer_template.html_content)
         self.assertIn("IN-HAND", offer_template.html_content)
         self.assertIn("Company Representative (Sign)", offer_template.html_content)
+
+    @patch('common.bitrix_client.BitrixClient.get_all_users')
+    def test_offboarding_list_filtering(self, mock_get_all_users):
+        from exit_formality.models import ExitRequest
+        
+        # Mock 3 employees: one with pending, one with cancelled, one with overridden
+        mock_get_all_users.return_value = [
+            {
+                'id': '10',
+                'emp_id': 'BITRIX-10',
+                'first_name': 'Pending',
+                'last_name': 'Emp',
+                'name': 'Pending Emp',
+                'email': 'pending@test.com',
+                'phone': '9876543210',
+                'designation': 'Software Engineer',
+                'department_name': 'Engineering',
+                'dob': '1995-05-10',
+                'gender': 'Male',
+                'joining_date': '2026-06-01',
+                'status': 'Active',
+                'onboarding_complete': True
+            },
+            {
+                'id': '11',
+                'emp_id': 'BITRIX-11',
+                'first_name': 'Cancelled',
+                'last_name': 'Emp',
+                'name': 'Cancelled Emp',
+                'email': 'cancelled@test.com',
+                'phone': '9876543211',
+                'designation': 'Software Engineer',
+                'department_name': 'Engineering',
+                'dob': '1995-05-10',
+                'gender': 'Male',
+                'joining_date': '2026-06-01',
+                'status': 'Active',
+                'onboarding_complete': True
+            },
+            {
+                'id': '12',
+                'emp_id': 'BITRIX-12',
+                'first_name': 'Overridden',
+                'last_name': 'Emp',
+                'name': 'Overridden Emp',
+                'email': 'overridden@test.com',
+                'phone': '9876543212',
+                'designation': 'Software Engineer',
+                'department_name': 'Engineering',
+                'dob': '1995-05-10',
+                'gender': 'Male',
+                'joining_date': '2026-06-01',
+                'status': 'Active',
+                'onboarding_complete': True
+            }
+        ]
+        
+        # Create exit requests
+        # BITRIX-10 is PENDING
+        ExitRequest.objects.create(
+            bitrix_user_id="10",
+            resignation_date=datetime.date.today(),
+            last_working_day=datetime.date.today(),
+            exit_type="RESIGNATION",
+            exit_reason="Reasons",
+            mode_of_resignation="Email",
+            status="PENDING"
+        )
+        # BITRIX-11 is CANCELLED
+        ExitRequest.objects.create(
+            bitrix_user_id="11",
+            resignation_date=datetime.date.today(),
+            last_working_day=datetime.date.today(),
+            exit_type="RESIGNATION",
+            exit_reason="Reasons",
+            mode_of_resignation="Email",
+            status="CANCELLED"
+        )
+        # BITRIX-12 is OVERRIDDEN
+        ExitRequest.objects.create(
+            bitrix_user_id="12",
+            resignation_date=datetime.date.today(),
+            last_working_day=datetime.date.today(),
+            exit_type="RESIGNATION",
+            exit_reason="Reasons",
+            mode_of_resignation="Email",
+            status="OVERRIDDEN"
+        )
+        
+        self.client.force_authenticate(user=self.hr_user)
+        url = reverse('employee-list') + '?type=offboarding'
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        
+        data = res.json()
+        results = data.get('results', data)
+        
+        # Only BITRIX-10 (Pending Emp) should be returned in the list
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['emp_id'], 'BITRIX-10')
