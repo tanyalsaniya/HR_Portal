@@ -251,7 +251,7 @@
         {% if certificate.show_dates %}
         <div class="dates-section">
             <div>Date of joining : {{ certificate.student.joining_date|date:"d-m-Y" }}</div>
-            <div>Date of completion : {{ certificate.student.completion_date|date:"d-m-Y" }}</div>
+            <div>Date of completion : {{ certificate.display_completion_date|date:"d-m-Y" }}</div>
         </div>
         {% endif %}
         

@@ -64,11 +64,17 @@ class Student(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Manually selected duration from the dropdown (e.g. '45 Days', '3 Months', '6 Months')
+    selected_duration = models.CharField(max_length=50, blank=True, null=True)
+
     @property
     def training_duration(self):
         """
-        Calculates training duration in days or weeks.
+        Returns the manually selected duration if set,
+        otherwise calculates from the joining/completion date delta.
         """
+        if self.selected_duration:
+            return self.selected_duration
         delta = self.completion_date - self.joining_date
         days = delta.days
         if days < 7:
@@ -131,6 +137,9 @@ class StudentCertificate(models.Model):
     # Validation & Approval Workflow Fields
     early_generation_reason = models.TextField(blank=True, null=True)
     calculated_completed_duration = models.CharField(max_length=100, blank=True, null=True)
+    # The date to show on the certificate as "Completion Date" (may differ from student.completion_date
+    # when generated early — it will be the generation date in that case)
+    display_completion_date = models.DateField(null=True, blank=True)
     generated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

@@ -123,7 +123,11 @@
                     </div>
                     <div>
                         <label>Duration</label>
-                        <input type="text" id="certDurationInput" oninput="onCertDurationChange()">
+                        <select id="certDurationInput" onchange="onCertDurationChange()" style="width: 100%;">
+                            <option value="6 Months">6 Months</option>
+                            <option value="3 Months">3 Months</option>
+                            <option value="45 Days">45 Days</option>
+                        </select>
                     </div>
                 </div>
 

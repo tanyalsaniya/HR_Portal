@@ -53,3 +53,38 @@ def calculate_completed_duration(start_date, end_date):
         if rem_days > 0:
             parts.append(f"{rem_days} Day{'s' if rem_days > 1 else ''}")
         return " and ".join(parts) + " Completed"
+
+
+DURATION_CHOICES = ["45 Days", "3 Months", "6 Months"]
+
+def parse_duration_days(duration_str):
+    """
+    Parses a duration string from the fixed dropdown options and returns
+    the corresponding number of days to add to the joining date.
+
+    Supported values:
+        '45 Days'  -> 45
+        '3 Months' -> 90
+        '6 Months' -> 180 (default)
+    """
+    if not duration_str:
+        return 180
+    d = duration_str.strip().lower()
+    if '45' in d and 'day' in d:
+        return 45
+    elif '3' in d and 'month' in d:
+        return 90
+    elif '6' in d and 'month' in d:
+        return 180
+    # Fallback: try generic parsing
+    import re
+    m = re.search(r'(\d+)\s*month', d)
+    w = re.search(r'(\d+)\s*week', d)
+    dd = re.search(r'(\d+)\s*day', d)
+    if m:
+        return int(m.group(1)) * 30
+    elif w:
+        return int(w.group(1)) * 7
+    elif dd:
+        return int(dd.group(1))
+    return 180
