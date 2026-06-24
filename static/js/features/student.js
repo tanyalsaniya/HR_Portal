@@ -736,7 +736,17 @@ async function generateAndSaveCertificate() {
             const err = await res.json();
             if (err.requires_override) {
                 if (confirm(err.warning)) {
+                    let reason = prompt("Please provide the reason for generating this certificate before the course completion date.");
+                    if (reason === null) {
+                        return; // user cancelled
+                    }
+                    reason = reason.trim();
+                    if (!reason) {
+                        showToast("A valid reason is required to generate the certificate early.", "error");
+                        return;
+                    }
                     data.confirm_override = true;
+                    data.early_generation_reason = reason;
                     showToast('Generating and saving certificate (with override)...');
                     const retryRes = await apiFetch('/api/student/certificates/', {
                         method: 'POST',
@@ -1360,7 +1370,7 @@ async function loadStudentCertificatesList() {
             const tbody = document.getElementById('studentCertificatesTableBody');
             if (tbody) {
                 if (certs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
                     return;
                 }
 
@@ -1369,6 +1379,10 @@ async function loadStudentCertificatesList() {
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${c.serial_no}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.course_name || '-'}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${formatSimpleDate(c.issue_date)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.generated_by_username || 'System'}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">
+                            ${c.early_generation_reason ? `<span style="color:#ef4444; font-weight:600;">Early Gen:</span> ${c.early_generation_reason} (${c.calculated_completed_duration || '-'})` : 'No'}
+                        </td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.place || 'Mohali'}</td>
                         <td style="padding: 10px 20px; text-align: center;">
                             ${c.pdf_file ? `

@@ -127,6 +127,18 @@ class StudentCertificate(models.Model):
     pdf_file = models.FileField(upload_to='certificates/', blank=True, null=True)
     cert_content = models.TextField(blank=True, null=True, help_text="Customized content text")
     place = models.CharField(max_length=100, default="Mohali")
+    
+    # Validation & Approval Workflow Fields
+    early_generation_reason = models.TextField(blank=True, null=True)
+    calculated_completed_duration = models.CharField(max_length=100, blank=True, null=True)
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='generated_certificates'
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

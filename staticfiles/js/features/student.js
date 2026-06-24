@@ -79,6 +79,21 @@ function updateStudentDirectoryPagination(count) {
     if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
 }
 
+function updateStudentDirectoryPagination(count) {
+    const pageStart = count === 0 ? 0 : studentDirectoryStart + 1;
+    const pageEnd = count === 0 ? 0 : studentDirectoryStart + count;
+
+    const startEl = document.getElementById('studentPageStart');
+    const endEl = document.getElementById('studentPageEnd');
+    const prevBtn = document.getElementById('studentPrevBtn');
+    const nextBtn = document.getElementById('studentNextBtn');
+
+    if (startEl) startEl.textContent = pageStart;
+    if (endEl) endEl.textContent = pageEnd;
+    if (prevBtn) prevBtn.disabled = (studentDirectoryStart === 0);
+    if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
+}
+
 function openStudentModal() {
     const modal = document.getElementById('studentModal');
     if (modal) {
@@ -120,15 +135,7 @@ function addInstallmentRow() {
 
 // Open Certificate tab and automatically select a student
 function openCertTabWithStudent(studentId) {
-    switchStudentTab('certgen');
-    // We wait a tiny bit to make sure select option elements are loaded
-    setTimeout(() => {
-        const select = document.getElementById('certStudentSelect');
-        if (select) {
-            select.value = studentId;
-            loadStudentCertPrefills();
-        }
-    }, 400);
+    switchStudentTab('certgen', studentId);
 }
 
 // Open Certificate tab with Bitrix student data (from API, not database)
@@ -300,13 +307,16 @@ function switchStudentTab(tab, selectedStudentId = null) {
         loadBitrixStudents();
     } else {
         if (certTab) certTab.style.display = 'block';
-        if (certBtn) certBtn.classList.add('active');
-        loadStudentsSelect();
+        if (certBtn) {
+            certBtn.classList.add('active');
+            certBtn.style.display = 'inline-block'; // Ensure the tab button is shown
+        }
+        loadStudentsSelect(selectedStudentId);
         loadCoursesSelect('certCourseSelect');
     }
 }
 
-async function loadBitrixStudents() {
+async function loadBitrixStudents(forceRefresh = false) {
     const tbody = document.getElementById('bitrixStudentTableBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
@@ -726,7 +736,17 @@ async function generateAndSaveCertificate() {
             const err = await res.json();
             if (err.requires_override) {
                 if (confirm(err.warning)) {
+                    let reason = prompt("Please provide the reason for generating this certificate before the course completion date.");
+                    if (reason === null) {
+                        return; // user cancelled
+                    }
+                    reason = reason.trim();
+                    if (!reason) {
+                        showToast("A valid reason is required to generate the certificate early.", "error");
+                        return;
+                    }
                     data.confirm_override = true;
+                    data.early_generation_reason = reason;
                     showToast('Generating and saving certificate (with override)...');
                     const retryRes = await apiFetch('/api/student/certificates/', {
                         method: 'POST',
@@ -1350,7 +1370,7 @@ async function loadStudentCertificatesList() {
             const tbody = document.getElementById('studentCertificatesTableBody');
             if (tbody) {
                 if (certs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
                     return;
                 }
 
@@ -1359,6 +1379,10 @@ async function loadStudentCertificatesList() {
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${c.serial_no}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.course_name || '-'}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${formatSimpleDate(c.issue_date)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.generated_by_username || 'System'}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">
+                            ${c.early_generation_reason ? `<span style="color:#ef4444; font-weight:600;">Early Gen:</span> ${c.early_generation_reason} (${c.calculated_completed_duration || '-'})` : 'No'}
+                        </td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.place || 'Mohali'}</td>
                         <td style="padding: 10px 20px; text-align: center;">
                             ${c.pdf_file ? `

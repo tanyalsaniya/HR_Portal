@@ -96,6 +96,7 @@ class StudentSerializer(serializers.ModelSerializer):
 class StudentCertificateSerializer(serializers.ModelSerializer):
     student_name = serializers.ReadOnlyField(source='student.name')
     course_name = serializers.ReadOnlyField(source='course.course_name')
+    generated_by_username = serializers.ReadOnlyField(source='generated_by.username')
 
     class Meta:
         model = StudentCertificate
