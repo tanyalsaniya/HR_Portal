@@ -914,6 +914,33 @@ class SalaryEmployeeSummaryView(APIView):
                 raise PermissionDenied("You can only view your own salary summary.")
 
         slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
+
+        # Payment status filtering
+        payment_status = request.query_params.get('payment_status')
+        if payment_status:
+            slips = slips.filter(payment_status=payment_status)
+
+        # Date range filtering
+        from_param = request.query_params.get('from') # format: YYYY-MM
+        to_param = request.query_params.get('to')     # format: YYYY-MM
+
+        if from_param:
+            try:
+                fY, fM = map(int, from_param.split('-'))
+                slips = slips.filter(
+                    models.Q(year__gt=fY) | models.Q(year=fY, month__gte=fM)
+                )
+            except ValueError:
+                pass
+
+        if to_param:
+            try:
+                tY, tM = map(int, to_param.split('-'))
+                slips = slips.filter(
+                    models.Q(year__lt=tY) | models.Q(year=tY, month__lte=tM)
+                )
+            except ValueError:
+                pass
         
         total_credited = sum((slip.net_payable or Decimal('0.00') for slip in slips), Decimal('0.00'))
         total_deductions = sum((slip.fine_advance or Decimal('0.00') for slip in slips), Decimal('0.00'))

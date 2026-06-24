@@ -278,9 +278,12 @@ function switchView(viewId, pushState = true, extraParams = {}) {
 
     // Update sidebar active classes
     const links = document.querySelectorAll('.sidebar-link');
+    // Salary sub-views should highlight the parent salaryView sidebar item
+    const salarySubViews = ['salaryHistoryView'];
+    const effectiveSidebarView = salarySubViews.includes(viewId) ? 'salaryView' : viewId;
     links.forEach(l => {
         l.classList.remove('active');
-        if (l.getAttribute('data-view') === viewId) {
+        if (l.getAttribute('data-view') === effectiveSidebarView) {
             l.classList.add('active');
         }
     });

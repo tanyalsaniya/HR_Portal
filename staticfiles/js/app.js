@@ -11,7 +11,7 @@ let loaderTimeout = null;
 function showGlobalLoader(isBlocking = false) {
     const bar = document.getElementById('globalLoadingBar');
     const overlay = document.getElementById('globalLoaderOverlay');
-
+    
     if (bar) {
         bar.classList.remove('finished');
         bar.classList.add('loading');
@@ -22,7 +22,7 @@ function showGlobalLoader(isBlocking = false) {
             }
         }, 50);
     }
-
+    
     if (isBlocking && overlay) {
         if (loaderTimeout) clearTimeout(loaderTimeout);
         loaderTimeout = setTimeout(() => {
@@ -34,14 +34,14 @@ function showGlobalLoader(isBlocking = false) {
 function hideGlobalLoader() {
     const bar = document.getElementById('globalLoadingBar');
     const overlay = document.getElementById('globalLoaderOverlay');
-
+    
     if (loaderTimeout) clearTimeout(loaderTimeout);
-
+    
     if (bar) {
         bar.classList.remove('loading');
         bar.classList.add('finished');
     }
-
+    
     if (overlay) {
         overlay.classList.remove('show');
     }
@@ -50,7 +50,7 @@ function hideGlobalLoader() {
 // ---------- JWT & API HELPER ----------
 async function apiFetch(endpoint, options = {}) {
     let accessToken = localStorage.getItem('accessToken');
-
+    
     // Determine if request is silent (notifications check)
     const isSilent = endpoint.includes('/notifications/feed/');
     if (!isSilent) {
@@ -59,7 +59,7 @@ async function apiFetch(endpoint, options = {}) {
         const isWrite = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
         showGlobalLoader(isWrite);
     }
-
+    
     // Set default headers
     options.headers = options.headers || {};
     options.headers['Accept'] = 'application/json';
@@ -67,7 +67,7 @@ async function apiFetch(endpoint, options = {}) {
     if (accessToken) {
         options.headers['Authorization'] = `Bearer ${accessToken}`;
     }
-
+    
     // Add CSRF Token if post/put/delete
     const csrfToken = getCookie('csrftoken');
     if (csrfToken && options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())) {
@@ -278,9 +278,12 @@ function switchView(viewId, pushState = true, extraParams = {}) {
 
     // Update sidebar active classes
     const links = document.querySelectorAll('.sidebar-link');
+    // Salary sub-views should highlight the parent salaryView sidebar item
+    const salarySubViews = ['salaryHistoryView'];
+    const effectiveSidebarView = salarySubViews.includes(viewId) ? 'salaryView' : viewId;
     links.forEach(l => {
         l.classList.remove('active');
-        if (l.getAttribute('data-view') === viewId) {
+        if (l.getAttribute('data-view') === effectiveSidebarView) {
             l.classList.add('active');
         }
     });
@@ -376,33 +379,38 @@ async function checkNotifications() {
         const res = await apiFetch('/notifications/feed/');
         if (res.ok) {
             const data = await res.json();
-            const notifications = data.results || data;
-            const unread = notifications.filter(n => !n.is_read);
+            // Backend now always returns { unread_count, results }
+            const notifications = Array.isArray(data) ? data : (data.results || []);
+            const unreadCount = data.unread_count !== undefined ? data.unread_count : notifications.filter(n => !n.is_read).length;
 
             // Update Bell Badge
             const badge = document.getElementById('notifBadge');
             if (badge) {
-                if (unread.length > 0) {
-                    badge.textContent = unread.length;
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
                     badge.style.display = 'block';
                 } else {
                     badge.style.display = 'none';
                 }
             }
 
-            // Populate Panel
+            // Populate Panel — shows only unread (returned by backend, max 5)
             const listContainer = document.getElementById('notifList');
             if (listContainer) {
                 if (notifications.length === 0) {
-                    listContainer.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+                    listContainer.innerHTML = `
+                        <div class="notif-empty">
+                            <span style="font-size:1.5rem;">&#10003;</span>
+                            <div>You're all caught up!</div>
+                            <div style="font-size:0.75rem;opacity:0.6;margin-top:4px;">No new notifications</div>
+                        </div>`;
                     return;
                 }
 
                 listContainer.innerHTML = notifications.map(n => {
                     const typeClass = 'notif-' + (n.notif_type || 'info').toLowerCase();
-                    const unreadClass = n.is_read ? '' : 'unread';
                     return `
-                        <div class="notif-item ${unreadClass} ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
+                        <div class="notif-item unread ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
                             <div class="notif-text">${n.message}</div>
                             <div class="notif-time">${formatDate(n.created_at)}</div>
                         </div>
