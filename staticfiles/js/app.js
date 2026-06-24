@@ -11,7 +11,7 @@ let loaderTimeout = null;
 function showGlobalLoader(isBlocking = false) {
     const bar = document.getElementById('globalLoadingBar');
     const overlay = document.getElementById('globalLoaderOverlay');
-
+    
     if (bar) {
         bar.classList.remove('finished');
         bar.classList.add('loading');
@@ -22,7 +22,7 @@ function showGlobalLoader(isBlocking = false) {
             }
         }, 50);
     }
-
+    
     if (isBlocking && overlay) {
         if (loaderTimeout) clearTimeout(loaderTimeout);
         loaderTimeout = setTimeout(() => {
@@ -34,14 +34,14 @@ function showGlobalLoader(isBlocking = false) {
 function hideGlobalLoader() {
     const bar = document.getElementById('globalLoadingBar');
     const overlay = document.getElementById('globalLoaderOverlay');
-
+    
     if (loaderTimeout) clearTimeout(loaderTimeout);
-
+    
     if (bar) {
         bar.classList.remove('loading');
         bar.classList.add('finished');
     }
-
+    
     if (overlay) {
         overlay.classList.remove('show');
     }
@@ -50,7 +50,7 @@ function hideGlobalLoader() {
 // ---------- JWT & API HELPER ----------
 async function apiFetch(endpoint, options = {}) {
     let accessToken = localStorage.getItem('accessToken');
-
+    
     // Determine if request is silent (notifications check)
     const isSilent = endpoint.includes('/notifications/feed/');
     if (!isSilent) {
@@ -59,7 +59,7 @@ async function apiFetch(endpoint, options = {}) {
         const isWrite = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
         showGlobalLoader(isWrite);
     }
-
+    
     // Set default headers
     options.headers = options.headers || {};
     options.headers['Accept'] = 'application/json';
@@ -67,7 +67,7 @@ async function apiFetch(endpoint, options = {}) {
     if (accessToken) {
         options.headers['Authorization'] = `Bearer ${accessToken}`;
     }
-
+    
     // Add CSRF Token if post/put/delete
     const csrfToken = getCookie('csrftoken');
     if (csrfToken && options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase())) {
@@ -153,7 +153,12 @@ async function attemptTokenRefresh(refreshToken) {
     return false;
 }
 
-function logout() {
+async function logout() {
+    try {
+        await apiFetch('/auth/logout/', { method: 'POST' });
+    } catch (e) {
+        console.error('Logout error:', e);
+    }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     window.location.href = '/login/';
@@ -346,15 +351,19 @@ window.addEventListener('popstate', (event) => {
             studentTab: event.state.studentTab
         });
     } else {
+        let currentPath = window.location.pathname;
+        if (!currentPath.endsWith('/')) {
+            currentPath += '/';
+        }
         let viewId = 'dashboardView';
-        if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
+        if (currentPath.match(/\/salaries\/employee\/(\d+)\//)) {
             viewId = 'salaryHistoryView';
         } else if (getEmployeeDetailIdFromUrl()) {
             viewId = 'employeeDetailView';
         } else if (getStudentIdFromUrl()) {
             viewId = 'studentDetailView';
         } else {
-            viewId = pathToView[window.location.pathname] || 'dashboardView';
+            viewId = pathToView[currentPath] || 'dashboardView';
         }
         switchView(viewId, false, {
             employeeId: getEmployeeDetailIdFromUrl(),
@@ -373,7 +382,7 @@ async function checkNotifications() {
             const data = await res.json();
             const notifications = data.results || data;
             const unread = notifications.filter(n => !n.is_read);
-
+            
             // Update Bell Badge
             const badge = document.getElementById('notifBadge');
             if (badge) {

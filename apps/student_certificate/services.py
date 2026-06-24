@@ -187,7 +187,7 @@ def format_bitrix_student_data(bitrix_student_dict):
     """
     # Map gender
     gender_map = {970: 'MALE', 982: 'FEMALE', 984: 'OTHER', '970': 'MALE', '982': 'FEMALE', '984': 'OTHER'}
-    raw_gender = bitrix_student_dict.get('ufCrm6_1761732025847') or bitrix_student_dict.get('GENDER') or bitrix_student_dict.get('UF_GENDER')
+    raw_gender = bitrix_student_dict.get('GENDER') or bitrix_student_dict.get('UF_GENDER')
     gender = gender_map.get(raw_gender, 'MALE')
 
     # Map student type
@@ -208,6 +208,24 @@ def format_bitrix_student_data(bitrix_student_dict):
     raw_dob = bitrix_student_dict.get('ufCrm6_1761732075408') or bitrix_student_dict.get('DOB') or bitrix_student_dict.get('UF_DOB') or ''
     dob = raw_dob[:10] if raw_dob else ''
 
+    # Map Course Name
+    raw_course = bitrix_student_dict.get('COURSE') or bitrix_student_dict.get('UF_COURSE_NAME') or bitrix_student_dict.get('ufCrm6_1761731874888') or ''
+    course_map = {
+        954: "MEAN",
+        956: "MERN",
+        958: "Web Designing",
+        960: "Web Development",
+        962: "Digital Marketing",
+        964: "AI Development",
+        '954': "MEAN",
+        '956': "MERN",
+        '958': "Web Designing",
+        '960': "Web Development",
+        '962': "Digital Marketing",
+        '964': "AI Development"
+    }
+    course_name = course_map.get(raw_course, str(raw_course))
+
     return {
         'bitrix_id': bitrix_student_dict.get('ID') or bitrix_student_dict.get('id'),
         'name': (bitrix_student_dict.get('NAME') or bitrix_student_dict.get('title') or '').strip(),
@@ -217,7 +235,7 @@ def format_bitrix_student_data(bitrix_student_dict):
         'joining_date': (bitrix_student_dict.get('UF_JOINING_DATE') or bitrix_student_dict.get('UF_START_DATE') or bitrix_student_dict.get('ufCrm6_1761735340146') or '')[:10],
         'completion_date': (bitrix_student_dict.get('UF_COMPLETION_DATE') or bitrix_student_dict.get('UF_END_DATE') or bitrix_student_dict.get('ufCrm6_1761735481170') or '')[:10],
         'institute': bitrix_student_dict.get('INSTITUTE') or bitrix_student_dict.get('UF_INSTITUTE') or bitrix_student_dict.get('ufCrm6_1761732176981') or '',
-        'course_name': bitrix_student_dict.get('COURSE') or bitrix_student_dict.get('UF_COURSE_NAME') or bitrix_student_dict.get('ufCrm6_1761731874888') or '',
+        'course_name': course_name,
         'mentor': bitrix_student_dict.get('MENTOR') or bitrix_student_dict.get('UF_MENTOR') or bitrix_student_dict.get('ufCrm6_1761815392532') or '',
         'father_name': bitrix_student_dict.get('FATHER_NAME') or bitrix_student_dict.get('UF_FATHER_NAME') or bitrix_student_dict.get('ufCrm6_1761731958409') or '',
         'total_fees': bitrix_student_dict.get('ufCrm6_1761732340679') or bitrix_student_dict.get('TOTAL_FEES') or bitrix_student_dict.get('total_fees') or '0',

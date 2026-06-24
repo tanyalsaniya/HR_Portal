@@ -345,3 +345,250 @@ class OnboardingModuleTests(APITestCase):
         # Only BITRIX-10 (Pending Emp) should be returned in the list
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['emp_id'], 'BITRIX-10')
+
+    @patch('employee_onboarding.tasks.send_onboarding_welcome_email.delay')
+    @patch('common.bitrix_client.BitrixClient.get_user_detail')
+    def test_bitrix_webhook_by_id_success(self, mock_get_user_detail, mock_email_delay):
+        recent_date = (datetime.date.today() - datetime.timedelta(days=2)).strftime('%Y-%m-%d')
+        mock_user = {
+            'id': '10',
+            'emp_id': 'BITRIX-10',
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'name': 'John Doe',
+            'email': 'john.doe@test.com',
+            'phone': '9876543210',
+            'designation': 'Software Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': recent_date,
+            'status': 'Active',
+            'onboarding_complete': True
+        }
+        mock_get_user_detail.return_value = mock_user
+
+        url = reverse('employee-bitrix-webhook')
+        
+        # Test direct id in POST
+        payload = {'id': '10'}
+        res = self.client.post(url, payload, format='json')
+        
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['employee']['id'], '10')
+        
+        # Check BitrixSyncLog entry
+        from notifications.models import BitrixSyncLog
+        log_entry = BitrixSyncLog.objects.filter(employee_id='10').first()
+        self.assertIsNotNone(log_entry)
+        self.assertEqual(log_entry.status, 'SUCCESS')
+        self.assertEqual(log_entry.action_type, 'Webhook Sync')
+        
+        # Check Celery task called
+        mock_email_delay.assert_called_once_with(mock_user)
+        
+        # Also check nested payload data[FIELDS][ID]
+        mock_email_delay.reset_mock()
+        payload_nested = {
+            'data': {
+                'FIELDS': {
+                    'ID': '10'
+                }
+            }
+        }
+        res_nested = self.client.post(url, payload_nested, format='json')
+        self.assertEqual(res_nested.status_code, status.HTTP_200_OK)
+        mock_email_delay.assert_called_once_with(mock_user)
+
+    @patch('employee_onboarding.tasks.send_onboarding_welcome_email.delay')
+    @patch('common.bitrix_client.BitrixClient.get_user_detail')
+    @patch('requests.post')
+    def test_bitrix_webhook_by_fields_success(self, mock_post, mock_get_user_detail, mock_email_delay):
+        class MockResponse:
+            def __init__(self, json_data, status_code, ok=True):
+                self.json_data = json_data
+                self.status_code = status_code
+                self.ok = ok
+                self.text = "Success mock text"
+            def json(self):
+                return self.json_data
+
+        # Mock requests.post response
+        mock_post.return_value = MockResponse({'result': '20'}, 200, ok=True)
+        
+        recent_date = (datetime.date.today() - datetime.timedelta(days=2)).strftime('%Y-%m-%d')
+        mock_user = {
+            'id': '20',
+            'emp_id': 'BITRIX-20',
+            'first_name': 'Jane',
+            'last_name': 'Smith',
+            'name': 'Jane Smith',
+            'email': 'jane.smith@test.com',
+            'phone': '9876543212',
+            'designation': 'Software Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Female',
+            'joining_date': recent_date,
+            'status': 'Active',
+            'onboarding_complete': True
+        }
+        mock_get_user_detail.return_value = mock_user
+
+        url = reverse('employee-bitrix-webhook')
+        payload = {
+            'first_name': 'Jane',
+            'last_name': 'Smith',
+            'email': 'jane.smith@test.com',
+            'phone': '9876543212',
+            'designation': 'Software Engineer',
+            'gender': 'Female'
+        }
+        res = self.client.post(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.json()['id'], '20')
+        
+        # Check BitrixSyncLog
+        from notifications.models import BitrixSyncLog
+        log_entry = BitrixSyncLog.objects.filter(employee_id='20').first()
+        self.assertIsNotNone(log_entry)
+        self.assertEqual(log_entry.status, 'SUCCESS')
+        self.assertEqual(log_entry.action_type, 'Contact Create')
+        
+        # Check Celery task
+        mock_email_delay.assert_called_once_with(mock_user)
+
+    def test_bitrix_webhook_invalid_payload(self):
+        url = reverse('employee-bitrix-webhook')
+        payload = {'some_random_field': 'value'}
+        res = self.client.post(url, payload, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', res.json())
+
+    @patch('employee_onboarding.tasks.send_onboarding_welcome_email.delay')
+    @patch('common.bitrix_client.BitrixClient.get_user_detail')
+    def test_employees_endpoint_webhook_routing_success(self, mock_get_user_detail, mock_email_delay):
+        recent_date = (datetime.date.today() - datetime.timedelta(days=2)).strftime('%Y-%m-%d')
+        mock_user = {
+            'id': '30',
+            'emp_id': 'BITRIX-30',
+            'first_name': 'Alice',
+            'last_name': 'Web',
+            'name': 'Alice Web',
+            'email': 'alice@test.com',
+            'phone': '9876543210',
+            'designation': 'QA Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Female',
+            'joining_date': recent_date,
+            'status': 'Active',
+            'onboarding_complete': False
+        }
+        mock_get_user_detail.return_value = mock_user
+
+        # Make POST request directly to the page URL "/employees/" without AJAX headers
+        url = reverse('employees_view')
+        payload = {'id': '30'}
+        res = self.client.post(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['employee']['id'], '30')
+        mock_email_delay.assert_called_once_with(mock_user)
+
+    @patch('employee_onboarding.tasks.send_onboarding_welcome_email.delay')
+    @patch('common.bitrix_client.BitrixClient.get_user_detail')
+    def test_employees_endpoint_webhook_routing_ignored_non_onboarding(self, mock_get_user_detail, mock_email_delay):
+        old_date = (datetime.date.today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+        mock_user = {
+            'id': '31',
+            'emp_id': 'BITRIX-31',
+            'first_name': 'Bob',
+            'last_name': 'Old',
+            'name': 'Bob Old',
+            'email': 'bob@test.com',
+            'phone': '9876543210',
+            'designation': 'QA Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': old_date,
+            'status': 'Active',
+            'onboarding_complete': True
+        }
+        mock_get_user_detail.return_value = mock_user
+
+        url = reverse('employees_view')
+        payload = {'id': '31'}
+        res = self.client.post(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['status'], 'ignored')
+        self.assertIn('not in the onboarding period', res.json()['message'])
+        mock_email_delay.assert_not_called()
+
+    @patch('employee_onboarding.tasks.send_onboarding_welcome_email.delay')
+    @patch('common.bitrix_client.BitrixClient.get_user_detail')
+    def test_employees_endpoint_webhook_routing_ignored_exited(self, mock_get_user_detail, mock_email_delay):
+        recent_date = (datetime.date.today() - datetime.timedelta(days=2)).strftime('%Y-%m-%d')
+        mock_user = {
+            'id': '32',
+            'emp_id': 'BITRIX-32',
+            'first_name': 'Charlie',
+            'last_name': 'Left',
+            'name': 'Charlie Left',
+            'email': 'charlie@test.com',
+            'phone': '9876543210',
+            'designation': 'QA Engineer',
+            'department_name': 'Engineering',
+            'dob': '1995-05-10',
+            'gender': 'Male',
+            'joining_date': recent_date,
+            'status': 'Exited',
+            'onboarding_complete': True
+        }
+        mock_get_user_detail.return_value = mock_user
+
+        url = reverse('employees_view')
+        payload = {'id': '32'}
+        res = self.client.post(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['status'], 'ignored')
+        self.assertIn('not in the onboarding period', res.json()['message'])
+        mock_email_delay.assert_not_called()
+
+
+class LetterCustomizationSanitizationTests(TestCase):
+
+    def test_sanitize_html_context_recursive(self):
+        from employee_onboarding.services import sanitize_html_context
+        from django.utils.safestring import SafeData
+        
+        ctx = {
+            'str_field': "Line 1\nLine 2 with <b>bold</b> text on 22nd June 2026",
+            'list_field': ["Item 1\nNext Line", "Item 2"],
+            'dict_field': {
+                'nested_str': "Nested\nLine",
+            },
+            'int_field': 123,
+            'bool_field': True,
+        }
+        
+        sanitized = sanitize_html_context(ctx)
+        
+        # Verify formatting changes
+        self.assertEqual(sanitized['str_field'], "Line 1<br>Line 2 with <b>bold</b> text on 22<sup>nd</sup> June 2026")
+        self.assertEqual(sanitized['list_field'][0], "Item 1<br>Next Line")
+        self.assertEqual(sanitized['list_field'][1], "Item 2")
+        self.assertEqual(sanitized['dict_field']['nested_str'], "Nested<br>Line")
+        self.assertEqual(sanitized['int_field'], 123)
+        self.assertEqual(sanitized['bool_field'], True)
+        
+        # Verify safe strings
+        self.assertTrue(isinstance(sanitized['str_field'], SafeData))
+        self.assertTrue(isinstance(sanitized['list_field'][0], SafeData))
+        self.assertTrue(isinstance(sanitized['list_field'][1], SafeData))
+        self.assertTrue(isinstance(sanitized['dict_field']['nested_str'], SafeData))
+
+

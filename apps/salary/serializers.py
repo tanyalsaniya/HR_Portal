@@ -20,6 +20,12 @@ class SalaryStructureSerializer(serializers.ModelSerializer):
         model = SalaryStructure
         fields = '__all__'
 
+    def to_internal_value(self, data):
+        if 'employee' in data and not data.get('bitrix_user_id'):
+            data = data.copy()
+            data['bitrix_user_id'] = data['employee']
+        return super().to_internal_value(data)
+
     def get_employee_details(self, obj):
         from common.bitrix_client import BitrixClient
         user = BitrixClient.get_user_detail(obj.bitrix_user_id)

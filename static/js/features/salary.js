@@ -593,7 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
         structureForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const data = {
-                employee: document.getElementById('structEmployeeSelect').value,
+                bitrix_user_id: document.getElementById('structEmployeeSelect').value,
                 effective_from: document.getElementById('structEffectiveFrom').value,
                 gross_salary: document.getElementById('structGrossSalary').value,
                 pf_contribution: document.getElementById('structPfContribution').value,

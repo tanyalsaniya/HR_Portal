@@ -148,6 +148,28 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['GET'], url_path='enrollment-details')
     def enrollment_details(self, request, pk=None):
         student = self.get_object()
+        
+        # Self-healing: try to fetch missing father's name or address from Bitrix24
+        if not student.father_name or not student.address:
+            try:
+                bitrix_students = fetch_active_students_from_bitrix()
+                for bs in bitrix_students:
+                    formatted = format_bitrix_student_data(bs)
+                    if formatted.get('email') == student.email:
+                        updated = False
+                        if not student.father_name and formatted.get('father_name'):
+                            student.father_name = formatted.get('father_name')
+                            updated = True
+                        if not student.address and formatted.get('address'):
+                            student.address = formatted.get('address')
+                            updated = True
+                        if updated:
+                            student.save()
+                        break
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Self-healing father_name fetch failed in enrollment_details: {e}")
+                
         course = student.enrolled_course
         
         # Gender pronoun resolution
@@ -214,6 +236,28 @@ class StudentViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def generate_certificate(self, request, pk=None):
         student = self.get_object()
+        
+        # Self-healing: try to fetch missing father's name or address from Bitrix24
+        if not student.father_name or not student.address:
+            try:
+                bitrix_students = fetch_active_students_from_bitrix()
+                for bs in bitrix_students:
+                    formatted = format_bitrix_student_data(bs)
+                    if formatted.get('email') == student.email:
+                        updated = False
+                        if not student.father_name and formatted.get('father_name'):
+                            student.father_name = formatted.get('father_name')
+                            updated = True
+                        if not student.address and formatted.get('address'):
+                            student.address = formatted.get('address')
+                            updated = True
+                        if updated:
+                            student.save()
+                        break
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Self-healing father_name fetch failed in generate_certificate: {e}")
+
         confirm_override = request.data.get('confirm_override', False)
         
         # Check completion date warning rule

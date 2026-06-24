@@ -390,19 +390,47 @@ async function loadStudentsSelect(selectedStudentId = null) {
     const el = document.getElementById('certStudentSelect');
     if (!el) return;
     try {
-        const res = await apiFetch('/api/student/students/?status=ACTIVE');
-        if (res.ok) {
-            const data = await res.json();
-            const list = data.results || data;
-            let html = '<option value="">-- Select Student --</option>';
-            list.forEach(s => {
-                html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
-            });
-            el.innerHTML = html;
-            if (selectedStudentId) {
-                el.value = selectedStudentId;
-                loadStudentCertPrefills();
+        // 1. Fetch database students
+        const resDb = await apiFetch('/api/student/students/');
+        let dbStudents = [];
+        if (resDb.ok) {
+            const dataDb = await resDb.json();
+            dbStudents = dataDb.results || dataDb;
+        }
+
+        // 2. Fetch active students from Bitrix24
+        const resBitrix = await apiFetch('/api/student/bitrix-active/?limit=200');
+        let bitrixStudents = [];
+        if (resBitrix.ok) {
+            const dataBitrix = await resBitrix.json();
+            bitrixStudents = dataBitrix.results || [];
+        }
+
+        // Combine. Match by email to avoid duplicates.
+        const dbEmails = new Set(dbStudents.map(s => (s.email || '').toLowerCase()));
+        
+        let html = '<option value="">-- Select Student --</option>';
+        
+        // Add database students first
+        dbStudents.forEach(s => {
+            html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
+        });
+
+        // Add Bitrix students who aren't in the database yet
+        bitrixStudents.forEach(s => {
+            const email = (s.email || '').toLowerCase();
+            if (email && !dbEmails.has(email)) {
+                const certNo = `BITRIX-${s.id}`;
+                const detailJson = JSON.stringify(s).replace(/"/g, '&quot;');
+                html += `<option value="bitrix_${s.id}" data-student="${detailJson}">${s.name} (${certNo}) [Bitrix24]</option>`;
             }
+        });
+
+        el.innerHTML = html;
+
+        if (selectedStudentId) {
+            el.value = selectedStudentId;
+            await loadStudentCertPrefills();
         }
     } catch (e) {
         console.error(e);
@@ -423,7 +451,64 @@ async function loadStudentCertPrefills() {
     const select = document.getElementById('certStudentSelect');
     if (!select || !select.value) return;
 
-    const studentId = select.value;
+    let studentId = select.value;
+    
+    // If it's a Bitrix-only student, dynamically sync them first
+    if (String(studentId).startsWith('bitrix_')) {
+        const option = select.options[select.selectedIndex];
+        const studentDataStr = option.getAttribute('data-student');
+        if (studentDataStr) {
+            showGlobalLoader(true);
+            try {
+                const s = JSON.parse(studentDataStr);
+                const payload = {
+                    id: s.id,
+                    name: s.name,
+                    email: s.email,
+                    course_name: s.course_id ? String(s.course_id) : '',
+                    institute: s.institute || '',
+                    start_date: s.start_date || s.joining_date || '',
+                    completion_date: s.completion_date || '',
+                    total_fees: s.total_fees || '0',
+                    father_name: s.father_name || '',
+                    phone: s.phone || '',
+                    dob: s.dob || '',
+                    gender: s.gender || '',
+                    address: s.address || '',
+                    student_type: s.student_type || '',
+                    cert_type: s.cert_type || ''
+                };
+                const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    const student = await res.json();
+                    option.value = student.id;
+                    option.textContent = `${student.name} (${student.cert_no})`;
+                    select.value = student.id;
+                    studentId = student.id;
+                    showToast(`Synced student from Bitrix24: ${student.name}`);
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                    select.value = "";
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Error syncing student data.', 'error');
+                select.value = "";
+                return;
+            } finally {
+                showGlobalLoader(false);
+            }
+        } else {
+            select.value = "";
+            return;
+        }
+    }
+
     currentSelectedStudentName = select.options[select.selectedIndex].text.split(' (')[0];
 
     try {

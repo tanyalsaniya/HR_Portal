@@ -724,7 +724,7 @@
 
     <!-- GLOBAL LOADING SYSTEM ELEMENTS -->
     <div id="globalLoadingBar" class="loading-bar"></div>
-    <div id="globalLoaderOverlay" class="global-loader-overlay">
+    <div id="globalLoaderOverlay" class="global-loader-overlay show">
         <div class="premium-spinner"></div>
     </div>
 
@@ -993,13 +993,17 @@
                     const pathMap = typeof pathToView !== 'undefined' ? pathToView : {};
                     let initialView = 'dashboardView';
                     const initialParams = {};
-                    if (window.location.pathname.match(/\/salaries\/employee\/\d+\/?/)) {
+                    let currentPath = window.location.pathname;
+                    if (!currentPath.endsWith('/')) {
+                        currentPath += '/';
+                    }
+                    if (currentPath.match(/\/salaries\/employee\/\d+\//)) {
                         initialView = 'salaryHistoryView';
                     } else if (typeof getStudentIdFromUrl === 'function' && getStudentIdFromUrl()) {
                         initialView = 'studentDetailView';
                         initialParams.studentId = getStudentIdFromUrl();
                     } else {
-                        initialView = pathMap[window.location.pathname] || 'dashboardView';
+                        initialView = pathMap[currentPath] || 'dashboardView';
                     }
                     if (typeof switchView === 'function') {
                         switchView(initialView, false, initialParams);

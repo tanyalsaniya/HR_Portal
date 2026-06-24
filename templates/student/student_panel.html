@@ -60,7 +60,6 @@
     <!-- Student Navigation Tabs -->
     <div class="student-tabs-container">
         <button class="student-tab-btn active" id="tabStudentDirectoryBtn" onclick="switchStudentTab('directory')">Directory</button>
-        <button class="student-tab-btn" id="tabBitrixStudentsBtn" onclick="switchStudentTab('bitrix')">Active Students (Bitrix24)</button>
         <button class="student-tab-btn" id="tabCertGenBtn" onclick="switchStudentTab('certgen')" style="display: none;">Certificate Generator</button>
     </div>
 
@@ -98,44 +97,7 @@
         </div>
     </div>
 
-    <!-- TAB: BITRIX24 ACTIVE STUDENTS -->
-    <div id="studentTabBitrix" style="display: none;">
-        <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <p style="margin: 0; color: #64748b; font-size: 9.5pt;">Live data from Bitrix24 CRM — showing ONLY currently enrolled (ongoing) students. Excludes completed and failed students.</p>
-            <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadBitrixStudents(true)">↻ Refresh</button>
-        </div>
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Institute</th>
-                        <th>Father's Name</th>
-                        <th>Start Date</th>
-                        <th>Completion Date</th>
-                        <th>Total Fees</th>
-                        <th>Stage</th>
-                    </tr>
-                </thead>
-                <tbody id="bitrixStudentTableBody">
-                    <!-- Populated dynamically -->
-                </tbody>
-            </table>
-        </div>
-        <!-- Pagination Controls -->
-        <div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent); background: #fafafa;">
-            <div style="font-size: 9pt; color: var(--text-secondary);">
-                Showing <span id="bitrixStudentPageStart">0</span> to <span id="bitrixStudentPageEnd">0</span> of <span id="bitrixStudentTotalCount">0</span> entries
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button id="bitrixStudentPrevBtn" onclick="changeBitrixStudentPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
-                <button id="bitrixStudentNextBtn" onclick="changeBitrixStudentPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Next</button>
-            </div>
-        </div>
-    </div>
+    <!-- TAB: BITRIX24 ACTIVE STUDENTS REMOVED -->
 
     <!-- TAB 2: CERTIFICATE GENERATOR CONTENT -->
     <div id="studentTabCertGen" style="display: none;">
