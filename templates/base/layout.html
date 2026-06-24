@@ -746,7 +746,7 @@
             <ul class="sidebar-menu"
                 style="list-style: none; padding: 10px 0; margin: 0; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
                 <li class="sidebar-item" id="dashboardLink">
-                    <a class="sidebar-link active" data-view="dashboardView" onclick="switchView('dashboardView')">
+                    <a class="sidebar-link" data-view="dashboardView" onclick="switchView('dashboardView')">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="3" y="3" width="7" height="9"></rect>
@@ -946,16 +946,16 @@
 
 
     <!-- LOAD CENTRAL APP JS -->
-    <script src="{% static 'js/app.js' %}?v=4.0"></script>
+    <script src="{% static 'js/app.js' %}?v=4.2"></script>
 
     <!-- LOAD FEATURES JS SCRIPTS -->
     <script src="{% static 'js/features/common_utils.js' %}?v=4.0"></script>
     <script src="{% static 'js/features/dashboard.js' %}?v=4.1"></script>
     <script src="{% static 'js/features/onboarding.js' %}?v=4.0"></script>
-    <script src="{% static 'js/features/salary.js' %}?v=3.6"></script>
+    <script src="{% static 'js/features/salary.js' %}?v=3.8"></script>
     <script src="{% static 'js/features/exit.js' %}?v=3.2"></script>
     <script src="{% static 'js/features/student.js' %}?v=4.0"></script>
-    <script src="{% static 'js/features/audit.js' %}?v=4.0"></script>
+    <script src="{% static 'js/features/audit.js' %}?v=3.1"></script>
     <script src="{% static 'js/features/roles.js' %}?v=3.1"></script>
     <script src="{% static 'js/features/users.js' %}?v=3.1"></script>
 
@@ -993,17 +993,16 @@
                     const pathMap = typeof pathToView !== 'undefined' ? pathToView : {};
                     let initialView = 'dashboardView';
                     const initialParams = {};
-                    let currentPath = window.location.pathname;
-                    if (!currentPath.endsWith('/')) {
-                        currentPath += '/';
-                    }
-                    if (currentPath.match(/\/salaries\/employee\/\d+\//)) {
+                    if (window.location.pathname.match(/\/salaries\/employee\/\d+\/?/)) {
                         initialView = 'salaryHistoryView';
+                    } else if (typeof getEmployeeDetailIdFromUrl === 'function' && getEmployeeDetailIdFromUrl()) {
+                        initialView = 'employeeDetailView';
+                        initialParams.employeeId = getEmployeeDetailIdFromUrl();
                     } else if (typeof getStudentIdFromUrl === 'function' && getStudentIdFromUrl()) {
                         initialView = 'studentDetailView';
                         initialParams.studentId = getStudentIdFromUrl();
                     } else {
-                        initialView = pathMap[currentPath] || 'dashboardView';
+                        initialView = pathMap[window.location.pathname] || 'dashboardView';
                     }
                     if (typeof switchView === 'function') {
                         switchView(initialView, false, initialParams);

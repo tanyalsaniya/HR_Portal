@@ -2,7 +2,7 @@
 // Central controller for Admin Audit Logs & Activity Trails (Simplified V2)
 
 let logsCurrentPage = 1;
-let logsPageSize = 15;
+let logsPageSize = 12;
 let currentLogsList = [];
 
 // ---------- INITIAL LOAD ----------
@@ -87,6 +87,11 @@ function prevLogsPage() {
         logsCurrentPage--;
         fetchLogsWithParams();
     }
+}
+
+function nextLogsPage() {
+    logsCurrentPage++;
+    fetchLogsWithParams();
 }
 
 // ---------- EXPORT LOGS ----------

@@ -48,7 +48,7 @@ class SalaryStructureViewSet(viewsets.ModelViewSet):
         queryset = SalaryStructure.objects.all().order_by('-effective_from')
         employee_id = self.request.query_params.get('employee_id')
         if employee_id:
-            queryset = queryset.filter(employee_id=employee_id)
+            queryset = queryset.filter(bitrix_user_id=employee_id)
         return queryset
 
     def perform_create(self, serializer):
@@ -199,15 +199,9 @@ class SalaryExportView(APIView):
                 emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
                 designation = emp.designation if emp else ""
                 
-                bank_acc = slip.bank_account_no or ""
-                bank_nm = slip.bank_name or ""
-                if not bank_acc or not bank_nm:
-                    detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
-                    if detail:
-                        if not bank_acc:
-                            bank_acc = detail.bank_account_no or ""
-                        if not bank_nm:
-                            bank_nm = detail.bank_name or ""
+                detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+                bank_acc = detail.bank_account_no if (detail and detail.bank_account_no) else (slip.bank_account_no or "")
+                bank_nm = detail.bank_name if (detail and detail.bank_name) else (slip.bank_name or "")
 
                 row_data = [
                     row_idx - 1,
@@ -920,6 +914,33 @@ class SalaryEmployeeSummaryView(APIView):
                 raise PermissionDenied("You can only view your own salary summary.")
 
         slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
+
+        # Payment status filtering
+        payment_status = request.query_params.get('payment_status')
+        if payment_status:
+            slips = slips.filter(payment_status=payment_status)
+
+        # Date range filtering
+        from_param = request.query_params.get('from') # format: YYYY-MM
+        to_param = request.query_params.get('to')     # format: YYYY-MM
+
+        if from_param:
+            try:
+                fY, fM = map(int, from_param.split('-'))
+                slips = slips.filter(
+                    models.Q(year__gt=fY) | models.Q(year=fY, month__gte=fM)
+                )
+            except ValueError:
+                pass
+
+        if to_param:
+            try:
+                tY, tM = map(int, to_param.split('-'))
+                slips = slips.filter(
+                    models.Q(year__lt=tY) | models.Q(year=tY, month__lte=tM)
+                )
+            except ValueError:
+                pass
         
         total_credited = sum((slip.net_payable or Decimal('0.00') for slip in slips), Decimal('0.00'))
         total_deductions = sum((slip.fine_advance or Decimal('0.00') for slip in slips), Decimal('0.00'))

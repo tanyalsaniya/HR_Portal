@@ -1,4 +1,5 @@
 from rest_framework import viewsets, serializers, permissions, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.http import HttpResponse, Http404
@@ -51,10 +52,16 @@ class AuditLogSerializer(serializers.ModelSerializer):
             'old_values', 'new_values', 'ip_address', 'user_agent', 'status', 'timestamp'
         ]
 
+class AuditLogPagination(PageNumberPagination):
+    page_size = 12
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
     permission_classes = [IsAdminUserOnly]
     authentication_classes = [QueryParamJWTAuthentication]
+    pagination_class = AuditLogPagination
 
     def get_queryset(self):
         return AuditLog.objects.filter(timestamp__date=timezone.localdate()).order_by('-timestamp')
