@@ -42,6 +42,8 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
  
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        from .utils import parse_duration_days, calculate_completed_duration
+        
         student_id = request.data.get('student')
         if not student_id:
             return Response({'error': 'student is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -50,6 +52,18 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
             student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
             return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # ----- Duration & Completion Date Calculation -----
+        # Use duration from the payload (from the fixed dropdown)
+        selected_duration = request.data.get('duration', '').strip()
+        if selected_duration:
+            days_to_add = parse_duration_days(selected_duration)
+            new_completion_date = student.joining_date + datetime.timedelta(days=days_to_add)
+            # Persist updated selected duration and completion_date on the student
+            student.selected_duration = selected_duration
+            student.completion_date = new_completion_date
+            student.save(update_fields=['selected_duration', 'completion_date'])
+        # ---------------------------------------------------
             
         confirm_override = request.data.get('confirm_override', False)
         early_generation_reason = request.data.get('early_generation_reason', '').strip()
@@ -71,14 +85,17 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Calculate completed duration if early
+        is_early = student.completion_date > today
+        
+        # Calculate completed duration & display date if early
         completed_duration = None
-        if student.completion_date > today:
-            from .utils import calculate_completed_duration
+        display_completion_date = student.completion_date
+        if is_early:
             completed_duration = calculate_completed_duration(student.joining_date, today)
+            display_completion_date = today  # Show today as completion date on the certificate
 
-        extra_args = {}
-        if student.completion_date > today:
+        extra_args = {'display_completion_date': display_completion_date}
+        if is_early:
             extra_args['early_generation_reason'] = early_generation_reason
             extra_args['calculated_completed_duration'] = completed_duration
         if request.user and request.user.is_authenticated:
@@ -105,6 +122,7 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
             
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
  
     @transaction.atomic
     def perform_create(self, serializer, **kwargs):
@@ -187,15 +205,11 @@ class StudentViewSet(viewsets.ModelViewSet):
             
         course_name = course.course_name if course else student.course_at_institute
         
-        today = datetime.date.today()
-        is_early = student.completion_date > today
-        if is_early:
-            from .utils import calculate_completed_duration
-            duration = calculate_completed_duration(student.joining_date, today)
-        else:
-            duration = course.default_duration if course else student.training_duration
+        # Always return the FULL assigned duration (not shortened).
+        # The frontend dropdown will handle display + early calculation.
+        duration = student.training_duration or (course.default_duration if course else '6 Months')
         
-        # Format completion month
+        # Format completion month based on stored completion_date
         try:
             completion_month = student.completion_date.strftime("%B %Y")
         except:
@@ -204,7 +218,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         address_str = student.address or ""
         father_name_str = student.father_name or ""
         
-        # Default paragraph layouts
+        # Default paragraph layouts (frontend recalculates when duration changes)
         default_paragraph = (
             f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
             f"Has successfully Completed {duration} \"**{course_name}**\" course ."
@@ -240,10 +254,21 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='generate-certificate')
     @transaction.atomic
     def generate_certificate(self, request, pk=None):
+        from .utils import parse_duration_days, calculate_completed_duration
         student = self.get_object()
         confirm_override = request.data.get('confirm_override', False)
         early_generation_reason = request.data.get('early_generation_reason', '').strip()
         today = datetime.date.today()
+        
+        # ----- Duration & Completion Date Calculation -----
+        selected_duration = request.data.get('duration', '').strip()
+        if selected_duration:
+            days_to_add = parse_duration_days(selected_duration)
+            new_completion_date = student.joining_date + datetime.timedelta(days=days_to_add)
+            student.selected_duration = selected_duration
+            student.completion_date = new_completion_date
+            student.save(update_fields=['selected_duration', 'completion_date'])
+        # ---------------------------------------------------
         
         # Check completion date warning rule
         if student.completion_date > today:
@@ -276,12 +301,15 @@ class StudentViewSet(viewsets.ModelViewSet):
             address_str = student.address or ""
             
             completed_duration = None
-            if student.completion_date > today:
-                from .utils import calculate_completed_duration
+            is_early = student.completion_date > today
+            if is_early:
                 completed_duration = calculate_completed_duration(student.joining_date, today)
+                # Display shortened duration AND use today as the display completion date
                 duration = completed_duration
+                display_completion_date = today
             else:
-                duration = course.default_duration
+                duration = student.training_duration or course.default_duration
+                display_completion_date = student.completion_date
                 
             course_name = course.course_name
             
@@ -324,8 +352,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                 serial_no=serial_no,
                 cert_content=default_content,
                 place="Mohali",
-                early_generation_reason=early_generation_reason if student.completion_date > today else None,
-                calculated_completed_duration=completed_duration if student.completion_date > today else None,
+                display_completion_date=display_completion_date,
+                early_generation_reason=early_generation_reason if is_early else None,
+                calculated_completed_duration=completed_duration if is_early else None,
                 generated_by=request.user if request.user and request.user.is_authenticated else None
             )
             
@@ -906,15 +935,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
 
-        # Handle missing dates logically
-        if not joining_date and not completion_date:
-            joining_date = today
-            completion_date = today + datetime.timedelta(days=180)
-        elif not joining_date:
-            joining_date = completion_date - datetime.timedelta(days=180)
-        elif not completion_date:
-            completion_date = joining_date + datetime.timedelta(days=180)
-
         # Find or create department
         from employee_onboarding.models import Department
         dept = Department.objects.filter(name__iexact="Training").first()
@@ -933,6 +953,39 @@ class StudentViewSet(viewsets.ModelViewSet):
                 default_duration="6 months",
                 skills_list=["Java", "Python", "Web Development"]
             )
+
+        # Determine days to add based on course duration
+        duration_str = course.default_duration.lower()
+        days_to_add = 180
+        if 'month' in duration_str:
+            try:
+                months = int(''.join(filter(str.isdigit, duration_str)) or '6')
+                days_to_add = months * 30
+            except ValueError:
+                pass
+        elif 'week' in duration_str:
+            try:
+                weeks = int(''.join(filter(str.isdigit, duration_str)) or '4')
+                days_to_add = weeks * 7
+            except ValueError:
+                pass
+        elif 'day' in duration_str:
+            try:
+                days_to_add = int(''.join(filter(str.isdigit, duration_str)) or '180')
+            except ValueError:
+                pass
+
+        # Handle missing dates logically
+        if joining_date and completion_date and joining_date >= completion_date:
+            completion_date = None
+
+        if not joining_date and not completion_date:
+            joining_date = today
+            completion_date = today + datetime.timedelta(days=days_to_add)
+        elif not joining_date:
+            joining_date = completion_date - datetime.timedelta(days=days_to_add)
+        elif not completion_date:
+            completion_date = joining_date + datetime.timedelta(days=days_to_add)
 
         # Parse total fees robustly (removing currency formatting like "Rs. 20,000", commas, etc.)
         parsed_fees = Decimal('0.00')

@@ -453,7 +453,11 @@ async function loadStudentCertPrefills() {
             // Set Duration input
             const durationInput = document.getElementById('certDurationInput');
             if (durationInput) {
-                durationInput.value = data.duration || '';
+                let dur = data.duration || '6 Months';
+                dur = dur.toLowerCase();
+                if (dur.includes('45')) durationInput.value = '45 Days';
+                else if (dur.includes('3')) durationInput.value = '3 Months';
+                else durationInput.value = '6 Months';
             }
 
             // Set Place and Issue Date (today)
@@ -469,8 +473,8 @@ async function loadStudentCertPrefills() {
             const showDates = document.getElementById('certShowDatesToggle').checked;
             document.getElementById('certParagraphTextarea').value = showDates ? data.default_paragraph_with_dates : data.default_paragraph;
 
-            // Update preview
-            updateLivePreview();
+            // Update preview and recalculate dates
+            onCertDurationChange();
         }
     } catch (e) {
         console.error(e);
@@ -549,48 +553,55 @@ function onCertCourseChange() {
 
     if (select.selectedIndex > 0) {
         const option = select.options[select.selectedIndex];
-        // If currentStudentDetails already has a duration and it's early (contains "Completed"), keep it.
-        // Otherwise use the option's default duration.
-        let duration = option.getAttribute('data-duration') || '6 months';
-        if (currentStudentDetails && currentStudentDetails.duration && currentStudentDetails.duration.includes('Completed')) {
-            duration = currentStudentDetails.duration;
-        }
         const skills = JSON.parse(option.getAttribute('data-skills') || '[]');
 
-        document.getElementById('certDurationInput').value = duration;
         certEditorSkills = skills.map(s => ({ name: s, rating: 'Excellent' }));
         renderEditorSkills();
 
         if (currentStudentDetails) {
             currentStudentDetails.course_name = option.text;
-            currentStudentDetails.duration = duration;
             currentStudentDetails.skills = skills;
-
-            const s_o_d_o = currentStudentDetails.s_o_d_o;
-            const father_name = currentStudentDetails.father_name;
-            const address = currentStudentDetails.address;
-            const student_name = currentStudentDetails.student_name;
-            const completion_month = currentStudentDetails.completion_month;
-
-            currentStudentDetails.default_paragraph = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed ${duration} \"**${option.text}**\" course .`;
-            currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed \"**${option.text}**\" course in the month of **${completion_month}**.`;
-
-            const showDates = document.getElementById('certShowDatesToggle').checked;
-            document.getElementById('certParagraphTextarea').value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
+            onCertDurationChange(); // This will recalculate the text and dates
         }
     }
     updateLivePreview();
 }
 
 function onCertDurationChange() {
-    const duration = document.getElementById('certDurationInput').value;
+    const durationSelect = document.getElementById('certDurationInput');
+    if (!durationSelect) return;
+    
+    const duration = durationSelect.value;
     const textarea = document.getElementById('certParagraphTextarea');
-    if (textarea && currentStudentDetails) {
-        let text = textarea.value;
-        const oldDuration = currentStudentDetails.duration;
-        if (text.includes(oldDuration)) {
-            textarea.value = text.replace(oldDuration, duration);
-            currentStudentDetails.duration = duration;
+    
+    if (currentStudentDetails && currentStudentDetails.joining_date) {
+        let joiningDate = new Date(currentStudentDetails.joining_date);
+        let daysToAdd = 180; // default 6 Months
+        if (duration.includes("3 Month")) daysToAdd = 90;
+        if (duration.includes("45 Day")) daysToAdd = 45;
+        
+        let newComp = new Date(joiningDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+        currentStudentDetails.completion_date = newComp.toISOString().split('T')[0];
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        currentStudentDetails.completion_month = monthNames[newComp.getMonth()] + " " + newComp.getFullYear();
+        
+        currentStudentDetails.duration = duration;
+        
+        // Update paragraphs
+        const s_name = currentStudentDetails.student_name;
+        const sodo = currentStudentDetails.s_o_d_o;
+        const fname = currentStudentDetails.father_name;
+        const addr = currentStudentDetails.address;
+        const cname = currentStudentDetails.course_name;
+        const cmonth = currentStudentDetails.completion_month;
+        
+        currentStudentDetails.default_paragraph = `This is to certify that **${s_name}** **${sodo} ${fname}**, ${addr}. Has successfully Completed ${duration} \"**${cname}**\" course .`;
+        currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${s_name}** **${sodo} ${fname}**, ${addr}. Has successfully Completed \"**${cname}**\" course in the month of **${cmonth}**.`;
+        
+        if (textarea) {
+            const showDates = document.getElementById('certShowDatesToggle').checked;
+            textarea.value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
         }
     }
     updateLivePreview();
@@ -713,6 +724,7 @@ async function generateAndSaveCertificate() {
     const data = {
         student: parseInt(select.value),
         course: parseInt(courseSelect.value),
+        duration: document.getElementById('certDurationInput').value,
         skill_ratings: skillRatings,
         show_dates: document.getElementById('certShowDatesToggle').checked,
         issue_date: document.getElementById('certIssueDate').value,
