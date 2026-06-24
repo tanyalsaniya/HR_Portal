@@ -598,9 +598,268 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['POST'], url_path='import-excel')
     def excel_import(self, request):
+        user = request.user
+        is_admin = user.is_superuser or (user.role and user.role.code == 'ADMIN')
+        if not is_admin:
+            raise PermissionDenied("Only Admin can import employee details.")
+
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(file_obj, data_only=True)
+            ws = wb.active
+        except Exception as e:
+            return Response({'error': f'Failed to parse Excel file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        headers = [str(ws.cell(row=1, column=col).value).strip() for col in range(1, ws.max_column + 1)]
+        header_map = {}
+        for idx, h in enumerate(headers):
+            header_map[h.lower()] = idx + 1
+
+        def get_val(row, header_name, default=""):
+            idx = header_map.get(header_name.lower())
+            if idx is None:
+                return default
+            val = ws.cell(row=row, column=idx).value
+            return val if val is not None else default
+
+        import datetime
+        def parse_date(val):
+            if not val:
+                return None
+            if isinstance(val, (datetime.date, datetime.datetime)):
+                return val.date() if isinstance(val, datetime.datetime) else val
+            try:
+                for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y'):
+                    try:
+                        return datetime.datetime.strptime(str(val).strip(), fmt).date()
+                    except ValueError:
+                        continue
+            except Exception:
+                pass
+            return None
+
+        from decimal import Decimal
+        def parse_decimal(val):
+            if val is None or str(val).strip() == "":
+                return Decimal("0.00")
+            try:
+                cleaned = str(val).strip().replace("$", "").replace(",", "")
+                return Decimal(cleaned)
+            except Exception:
+                return Decimal("0.00")
+
+        total_records = 0
+        success_count = 0
+        failed_count = 0
+        failed_rows_data = []
+
+        from django.db import transaction
+        from salary.models import EmployeeBankDetail, SalaryStructure
+
+        # Fetch all active users from Bitrix
+        bitrix_users = BitrixClient.get_all_users()
+
+        with transaction.atomic():
+            for row_idx in range(2, ws.max_row + 1):
+                first_name = str(get_val(row_idx, 'First Name')).strip()
+                last_name = str(get_val(row_idx, 'Last Name')).strip()
+                if not first_name and not last_name:
+                    continue
+
+                total_records += 1
+                row_vals = [ws.cell(row=row_idx, column=c).value for c in range(1, ws.max_column + 1)]
+                sid = transaction.savepoint()
+
+                try:
+                    parsed_emp_id = str(get_val(row_idx, 'Employee ID')).strip()
+                    parsed_email = str(get_val(row_idx, 'Email')).strip()
+                    parsed_phone = str(get_val(row_idx, 'Phone')).strip()
+
+                    if not parsed_email:
+                        raise ValueError("Email is required")
+
+                    # Find matching employee in bitrix_users
+                    employee = None
+                    for u in bitrix_users:
+                        mock_emp = BitrixEmployeeMock(u)
+                        if parsed_emp_id and mock_emp.emp_id.lower() == parsed_emp_id.lower():
+                            employee = mock_emp
+                            break
+                        if parsed_email and mock_emp.email.lower() == parsed_email.lower():
+                            employee = mock_emp
+                            break
+                        if parsed_phone and mock_emp.phone == parsed_phone:
+                            employee = mock_emp
+                            break
+                        if mock_emp.name.lower() == f"{first_name} {last_name}".lower().strip():
+                            employee = mock_emp
+                            break
+
+                    gender_val = str(get_val(row_idx, 'Gender')).strip().upper()
+                    gender_code = 'M'
+                    if gender_val in ('FEMALE', 'F'):
+                        gender_code = 'F'
+                    elif gender_val in ('OTHER', 'O'):
+                        gender_code = 'O'
+
+                    dept_val = get_val(row_idx, 'Department')
+                    dept_list = [1]
+                    if dept_val:
+                        try:
+                            dept_list = [int(float(str(dept_val)))]
+                        except ValueError:
+                            dept_obj = Department.objects.filter(name__iexact=str(dept_val).strip()).first()
+                            if dept_obj:
+                                dept_list = [dept_obj.id]
+
+                    webhook = BitrixClient.get_webhook_url()
+                    contact_id = None
+
+                    if employee:
+                        contact_id = employee.bitrix_id
+                        # Update employee details in Bitrix24
+                        payload = {
+                            'ID': contact_id,
+                            'NAME': first_name,
+                            'LAST_NAME': last_name,
+                            'EMAIL': parsed_email,
+                            'PERSONAL_MOBILE': parsed_phone,
+                            'WORK_POSITION': str(get_val(row_idx, 'Designation')).strip(),
+                            'PERSONAL_BIRTHDAY': str(get_val(row_idx, 'DOB')).strip(),
+                            'PERSONAL_CITY': str(get_val(row_idx, 'Address Line 1')).strip(),
+                            'PERSONAL_STATE': str(get_val(row_idx, 'State')).strip(),
+                            'PERSONAL_ZIP': str(get_val(row_idx, 'PIN Code')).strip(),
+                            'PERSONAL_GENDER': gender_code,
+                        }
+                        
+                        import requests
+                        res = requests.post(f"{webhook}/user.update.json", json=payload, timeout=10)
+                        if not res.ok:
+                            payload_crm = {
+                                'id': contact_id,
+                                'fields': {
+                                    'NAME': first_name,
+                                    'LAST_NAME': last_name,
+                                    'EMAIL': [{'VALUE': parsed_email, 'VALUE_TYPE': 'WORK'}],
+                                    'PHONE': [{'VALUE': parsed_phone, 'VALUE_TYPE': 'WORK'}],
+                                    'POST': str(get_val(row_idx, 'Designation')).strip(),
+                                }
+                            }
+                            requests.post(f"{webhook}/crm.contact.update", json=payload_crm, timeout=10)
+                    else:
+                        # Create new contact in Bitrix24
+                        user_payload = {
+                            'EMAIL': parsed_email,
+                            'NAME': first_name,
+                            'LAST_NAME': last_name,
+                            'PERSONAL_MOBILE': parsed_phone,
+                            'WORK_POSITION': str(get_val(row_idx, 'Designation')).strip(),
+                            'UF_DEPARTMENT': dept_list,
+                            'PERSONAL_BIRTHDAY': str(get_val(row_idx, 'DOB')).strip(),
+                            'PERSONAL_GENDER': gender_code,
+                        }
+                        
+                        import requests
+                        res = requests.post(f"{webhook}/user.add.json", json=user_payload, timeout=10)
+                        if res.ok:
+                            contact_id = str(res.json().get('result'))
+                        else:
+                            crm_payload = {
+                                'fields': {
+                                    'NAME': first_name,
+                                    'LAST_NAME': last_name,
+                                    'EMAIL': [{'VALUE': parsed_email, 'VALUE_TYPE': 'WORK'}],
+                                    'PHONE': [{'VALUE': parsed_phone, 'VALUE_TYPE': 'WORK'}],
+                                    'POST': str(get_val(row_idx, 'Designation')).strip(),
+                                    'UF_ONBOARDING_STATUS': 'Pending',
+                                    'UF_CRM_ONBOARDING_STATUS': 'Pending',
+                                }
+                            }
+                            res_crm = requests.post(f"{webhook}/crm.contact.add", json=crm_payload, timeout=10)
+                            if res_crm.ok:
+                                contact_id = str(res_crm.json().get('result'))
+
+                        if not contact_id:
+                            # Fallback mock ID
+                            import uuid
+                            contact_id = f"MOCK-{uuid.uuid4().hex[:8]}"
+
+                    # Save or update Bank details
+                    bank_acc = str(get_val(row_idx, 'Bank Account Number')).strip()
+                    bank_name = str(get_val(row_idx, 'Bank Name')).strip()
+                    if bank_acc or bank_name:
+                        EmployeeBankDetail.objects.update_or_create(
+                            bitrix_user_id=contact_id,
+                            defaults={
+                                'bank_account_no': bank_acc,
+                                'bank_name': bank_name
+                            }
+                        )
+
+                    # Save or update Salary Structure
+                    gross_salary = parse_decimal(get_val(row_idx, 'Gross Salary'))
+                    pf_contribution = parse_decimal(get_val(row_idx, 'PF Contribution'))
+                    esi = parse_decimal(get_val(row_idx, 'ESI'))
+                    labour_welfare_fund = parse_decimal(get_val(row_idx, 'Labour Welfare Fund'))
+                    professional_tax = parse_decimal(get_val(row_idx, 'Professional Tax'))
+                    other_deductions = parse_decimal(get_val(row_idx, 'Other Deductions'))
+                    
+                    salary_eff_from = parse_date(get_val(row_idx, 'Salary Effective From'))
+                    joining_date = parse_date(get_val(row_idx, 'Joining Date'))
+                    
+                    effective_from = salary_eff_from or joining_date or datetime.date.today()
+
+                    SalaryStructure.objects.update_or_create(
+                        bitrix_user_id=contact_id,
+                        effective_from=effective_from,
+                        defaults={
+                            'gross_salary': gross_salary,
+                            'pf_contribution': pf_contribution,
+                            'esi': esi,
+                            'labour_welfare_fund': labour_welfare_fund,
+                            'professional_tax': professional_tax,
+                            'other_deductions': other_deductions
+                        }
+                    )
+
+                    transaction.savepoint_commit(sid)
+                    success_count += 1
+                except Exception as e:
+                    transaction.savepoint_rollback(sid)
+                    failed_count += 1
+                    failed_rows_data.append((row_vals, str(e)))
+
+        if failed_count > 0:
+            import openpyxl
+            from openpyxl import Workbook
+            from django.http import HttpResponse
+            
+            error_wb = Workbook()
+            error_ws = error_wb.active
+            error_ws.title = "Import Errors"
+            error_ws.append(headers + ["Errors"])
+            
+            for row_vals, err_msg in failed_rows_data:
+                padded_vals = list(row_vals) + [""] * (len(headers) - len(row_vals))
+                error_ws.append(padded_vals + [err_msg])
+                
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="employee_import_errors.xlsx"'
+            error_wb.save(response)
+            return response
+
+        # Force refresh Bitrix users cache
+        BitrixClient.get_all_users(force_refresh=True)
+
         return Response({
-            'message': 'Direct excel import is disabled in Pure API mode. Please add team members in Bitrix24 directly.'
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'message': f'Successfully imported {success_count} employee records.'
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['GET'], url_path='export-excel')
     def excel_export(self, request):
@@ -643,11 +902,28 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             'Employee ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Alternate Phone',
             'DOB', 'Gender', 'Address Line 1', 'Address Line 2', 'City', 'State', 'PIN Code',
             'Department', 'Designation', 'Employment Type', 'Joining Date', 'Notice Period', 'Bond Period',
-            'Emergency Name', 'Emergency Relationship', 'Emergency Phone', 'Status', 'Onboarding Status'
+            'Emergency Name', 'Emergency Relationship', 'Emergency Phone', 'Status', 'Onboarding Status',
+            'Bank Account Number', 'Bank Name', 'Gross Salary', 'PF Contribution', 'ESI',
+            'Labour Welfare Fund', 'Professional Tax', 'Other Deductions', 'Salary Effective From'
         ]
         ws.append(headers)
 
+        from salary.models import EmployeeBankDetail, SalaryStructure
+
         for emp in queryset:
+            detail = EmployeeBankDetail.objects.filter(bitrix_user_id=emp.bitrix_id).first()
+            bank_acc = detail.bank_account_no if detail else ""
+            bank_nm = detail.bank_name if detail else ""
+            
+            struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id).order_by('-effective_from').first()
+            gross_val = float(struct.gross_salary) if struct else 0.0
+            pf_val = float(struct.pf_contribution) if struct else 0.0
+            esi_val = float(struct.esi) if struct else 0.0
+            lwf_val = float(struct.labour_welfare_fund) if struct else 0.0
+            pt_val = float(struct.professional_tax) if struct else 0.0
+            other_val = float(struct.other_deductions) if struct else 0.0
+            eff_val = struct.effective_from.strftime('%Y-%m-%d') if (struct and struct.effective_from) else ""
+
             ws.append([
                 emp.emp_id,
                 emp.first_name,
@@ -672,7 +948,16 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 emp.get_emergency_relationship_display(),
                 emp.emergency_phone,
                 emp.status,
-                'Completed' if emp.onboarding_complete else 'Under Onboarding'
+                'Completed' if emp.onboarding_complete else 'Under Onboarding',
+                bank_acc,
+                bank_nm,
+                gross_val,
+                pf_val,
+                esi_val,
+                lwf_val,
+                pt_val,
+                other_val,
+                eff_val
             ])
 
         response = HttpResponse(

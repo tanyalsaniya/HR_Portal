@@ -48,7 +48,7 @@ class SalaryStructureViewSet(viewsets.ModelViewSet):
         queryset = SalaryStructure.objects.all().order_by('-effective_from')
         employee_id = self.request.query_params.get('employee_id')
         if employee_id:
-            queryset = queryset.filter(employee_id=employee_id)
+            queryset = queryset.filter(bitrix_user_id=employee_id)
         return queryset
 
     def perform_create(self, serializer):
@@ -199,15 +199,9 @@ class SalaryExportView(APIView):
                 emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
                 designation = emp.designation if emp else ""
                 
-                bank_acc = slip.bank_account_no or ""
-                bank_nm = slip.bank_name or ""
-                if not bank_acc or not bank_nm:
-                    detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
-                    if detail:
-                        if not bank_acc:
-                            bank_acc = detail.bank_account_no or ""
-                        if not bank_nm:
-                            bank_nm = detail.bank_name or ""
+                detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+                bank_acc = detail.bank_account_no if (detail and detail.bank_account_no) else (slip.bank_account_no or "")
+                bank_nm = detail.bank_name if (detail and detail.bank_name) else (slip.bank_name or "")
 
                 row_data = [
                     row_idx - 1,

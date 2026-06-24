@@ -61,6 +61,15 @@ def generate_payslip_pdf(salary_slip):
     user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
     employee = BitrixEmployeeMock(user_data) if user_data else None
     
+    from salary.models import EmployeeBankDetail
+    bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=salary_slip.bitrix_user_id).first()
+    if bank_detail:
+        if bank_detail.bank_account_no:
+            salary_slip.bank_account_no = bank_detail.bank_account_no
+        if bank_detail.bank_name:
+            salary_slip.bank_name = bank_detail.bank_name
+        salary_slip.save(update_fields=['bank_account_no', 'bank_name'])
+    
     bank_acc = salary_slip.bank_account_no or (employee.bank_account if employee else "")
     bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
     
@@ -126,6 +135,14 @@ def generate_payslips_zip(slips, zip_type='employee'):
         for slip in slips:
             user_data = BitrixClient.get_user_detail(slip.bitrix_user_id)
             employee = BitrixEmployeeMock(user_data) if user_data else None
+            
+            from salary.models import EmployeeBankDetail
+            bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+            if bank_detail:
+                if bank_detail.bank_account_no:
+                    slip.bank_account_no = bank_detail.bank_account_no
+                if bank_detail.bank_name:
+                    slip.bank_name = bank_detail.bank_name
             
             bank_acc = slip.bank_account_no or (employee.bank_account if employee else "")
             bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"

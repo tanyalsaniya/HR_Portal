@@ -51,6 +51,17 @@ class OnboardingModuleTests(APITestCase):
         # Create department
         self.dept, _ = Department.objects.get_or_create(name="Engineering")
 
+        # Setup mock patchers for celery tasks to prevent Redis connection issues
+        self.attach_doc_patcher = patch('employee_onboarding.tasks.attach_document_to_bitrix24_timeline.delay')
+        self.mock_attach_doc = self.attach_doc_patcher.start()
+
+        self.offer_letter_email_patcher = patch('employee_onboarding.tasks.send_offer_letter_email.delay')
+        self.mock_offer_letter_email = self.offer_letter_email_patcher.start()
+
+    def tearDown(self):
+        self.attach_doc_patcher.stop()
+        self.offer_letter_email_patcher.stop()
+
     def test_mock_employee_wrapper(self):
         raw_data = {
             'ID': '10',
@@ -245,3 +256,115 @@ class OnboardingModuleTests(APITestCase):
         self.assertIn("SALARY BREAKUP", offer_template.html_content)
         self.assertIn("IN-HAND", offer_template.html_content)
         self.assertIn("Company Representative (Sign)", offer_template.html_content)
+
+    @patch('common.bitrix_client.BitrixClient.get_all_users')
+    @patch('requests.post')
+    def test_employee_excel_import_export_sync(self, mock_post, mock_get_all):
+        from openpyxl import Workbook
+        from salary.models import EmployeeBankDetail, SalaryStructure
+        from decimal import Decimal
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        import io
+        
+        # Mock Bitrix responses
+        mock_get_all.return_value = [
+            {
+                'id': '10',
+                'emp_id': 'BITRIX-10',
+                'first_name': 'John',
+                'last_name': 'Doe',
+                'name': 'John Doe',
+                'email': 'john.doe@test.com',
+                'phone': '9876543210',
+                'designation': 'Software Engineer',
+                'department_name': 'Engineering',
+                'dob': '1995-05-10',
+                'gender': 'Male',
+                'joining_date': '2026-06-01',
+                'status': 'Active',
+                'onboarding_complete': True
+            }
+        ]
+        
+        class MockResponse:
+            ok = True
+            def json(self):
+                return {'result': '10'}
+        mock_post.return_value = MockResponse()
+
+        # Step 1: Verify Export
+        self.client.force_authenticate(user=self.admin_user)
+        url_export = reverse('employees_export_excel')
+        res_export = self.client.get(url_export, HTTP_ACCEPT='application/json')
+        self.assertEqual(res_export.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_export['Content-Type'], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        
+        # Step 2: Create import Excel with new fields
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Employees"
+        
+        headers = [
+            'Employee ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Alternate Phone',
+            'DOB', 'Gender', 'Address Line 1', 'Address Line 2', 'City', 'State', 'PIN Code',
+            'Department', 'Designation', 'Employment Type', 'Joining Date', 'Notice Period', 'Bond Period',
+            'Emergency Name', 'Emergency Relationship', 'Emergency Phone', 'Status', 'Onboarding Status',
+            'Bank Account Number', 'Bank Name', 'Gross Salary', 'PF Contribution', 'ESI',
+            'Labour Welfare Fund', 'Professional Tax', 'Other Deductions', 'Salary Effective From'
+        ]
+        ws.append(headers)
+        
+        row_data = [
+            'BITRIX-10', 'John', 'Doe', 'john.doe@test.com', '9876543210', '',
+            '1995-05-10', 'Male', 'Mohali', '', 'Mohali', 'Punjab', '160055',
+            'Engineering', 'Software Engineer', 'Full Time', '2026-06-01', 30, 0,
+            'Emergency Contact', 'Friend', '9876543210', 'Active', 'Completed',
+            '50123456789', 'HDFC Bank', 75000.0, 5000.0, 0.0,
+            0.0, 200.0, 0.0, '2026-06-01'
+        ]
+        ws.append(row_data)
+        
+        excel_file = io.BytesIO()
+        wb.save(excel_file)
+        excel_file.seek(0)
+        
+        uploaded_file = SimpleUploadedFile(
+            "employees.xlsx",
+            excel_file.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+        # Step 3: Run Import
+        url_import = reverse('employees_import_excel')
+        res_import = self.client.post(url_import, {'file': uploaded_file}, format='multipart', HTTP_ACCEPT='application/json')
+        self.assertEqual(res_import.status_code, status.HTTP_201_CREATED)
+        
+        # Step 4: Verify Database Sync
+        bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id='10').first()
+        self.assertIsNotNone(bank_detail)
+        self.assertEqual(bank_detail.bank_account_no, '50123456789')
+        self.assertEqual(bank_detail.bank_name, 'HDFC Bank')
+        
+        structs = SalaryStructure.objects.filter(bitrix_user_id='10')
+        self.assertEqual(structs.count(), 1)
+        self.assertEqual(structs.first().gross_salary, Decimal('75000.00'))
+        
+        # Step 5: Test Duplication Prevention
+        # Re-import same data with gross changed
+        ws.cell(row=2, column=27, value=80000.0) # Gross Salary column index is 27 (1-based)
+        excel_file2 = io.BytesIO()
+        wb.save(excel_file2)
+        excel_file2.seek(0)
+        
+        uploaded_file2 = SimpleUploadedFile(
+            "employees.xlsx",
+            excel_file2.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        res_import2 = self.client.post(url_import, {'file': uploaded_file2}, format='multipart', HTTP_ACCEPT='application/json')
+        self.assertEqual(res_import2.status_code, status.HTTP_201_CREATED)
+        
+        # Verify structure was updated, NOT duplicated
+        structs = SalaryStructure.objects.filter(bitrix_user_id='10')
+        self.assertEqual(structs.count(), 1)
+        self.assertEqual(structs.first().gross_salary, Decimal('80000.00'))
