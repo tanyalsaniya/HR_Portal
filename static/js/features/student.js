@@ -626,7 +626,12 @@ function onCertCourseChange() {
 
     if (select.selectedIndex > 0) {
         const option = select.options[select.selectedIndex];
-        const duration = option.getAttribute('data-duration') || '6 months';
+        // If currentStudentDetails already has a duration and it's early (contains "Completed"), keep it.
+        // Otherwise use the option's default duration.
+        let duration = option.getAttribute('data-duration') || '6 months';
+        if (currentStudentDetails && currentStudentDetails.duration && currentStudentDetails.duration.includes('Completed')) {
+            duration = currentStudentDetails.duration;
+        }
         const skills = JSON.parse(option.getAttribute('data-skills') || '[]');
 
         document.getElementById('certDurationInput').value = duration;
@@ -812,23 +817,48 @@ async function generateAndSaveCertificate() {
         } else {
             const err = await res.json();
             if (err.requires_override) {
-                if (confirm(err.warning)) {
-                    data.confirm_override = true;
-                    showToast('Generating and saving certificate (with override)...');
-                    const retryRes = await apiFetch('/api/student/certificates/', {
-                        method: 'POST',
-                        body: JSON.stringify(data)
+                const resultConf = await Swal.fire({
+                    title: 'Early Generation Warning',
+                    text: err.warning,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, Generate Early',
+                    cancelButtonText: 'Cancel'
+                });
+
+                if (resultConf.isConfirmed) {
+                    const reasonResult = await Swal.fire({
+                        title: 'Reason for Early Generation',
+                        input: 'textarea',
+                        inputLabel: 'Please provide the reason for generating this certificate before the course completion date.',
+                        inputPlaceholder: 'Enter your reason here...',
+                        showCancelButton: true,
+                        inputValidator: (value) => {
+                            if (!value || !value.trim()) {
+                                return 'A valid reason is required to generate the certificate early.';
+                            }
+                        }
                     });
-                    if (retryRes.ok) {
-                        const retryResult = await retryRes.json();
-                        showToast('Certificate saved & PDF generated successfully!');
-                        generatedPdfUrl = retryResult.pdf_file;
-                        document.getElementById('btnDownloadPDF').disabled = false;
-                        document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
-                        loadStudentData();
-                    } else {
-                        const retryErr = await retryRes.json();
-                        showToast(retryErr.error || JSON.stringify(retryErr), 'error');
+
+                    if (reasonResult.isConfirmed && reasonResult.value) {
+                        data.confirm_override = true;
+                        data.early_generation_reason = reasonResult.value.trim();
+                        showToast('Generating and saving certificate (with override)...');
+                        const retryRes = await apiFetch('/api/student/certificates/', {
+                            method: 'POST',
+                            body: JSON.stringify(data)
+                        });
+                        if (retryRes.ok) {
+                            const retryResult = await retryRes.json();
+                            showToast('Certificate saved & PDF generated successfully!');
+                            generatedPdfUrl = retryResult.pdf_file;
+                            document.getElementById('btnDownloadPDF').disabled = false;
+                            document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
+                            loadStudentData();
+                        } else {
+                            const retryErr = await retryRes.json();
+                            showToast(retryErr.error || JSON.stringify(retryErr), 'error');
+                        }
                     }
                 }
             } else {
@@ -1444,7 +1474,7 @@ async function loadStudentCertificatesList() {
             const tbody = document.getElementById('studentCertificatesTableBody');
             if (tbody) {
                 if (certs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
                     return;
                 }
 
@@ -1453,6 +1483,10 @@ async function loadStudentCertificatesList() {
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${c.serial_no}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.course_name || '-'}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${formatSimpleDate(c.issue_date)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.generated_by_username || 'System'}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">
+                            ${c.early_generation_reason ? `<span style="color:#ef4444; font-weight:600;">Early Gen:</span> ${c.early_generation_reason} (${c.calculated_completed_duration || '-'})` : 'No'}
+                        </td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.place || 'Mohali'}</td>
                         <td style="padding: 10px 20px; text-align: center;">
                             ${c.pdf_file ? `

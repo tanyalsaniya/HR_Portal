@@ -40,7 +40,7 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
     queryset = StudentCertificate.objects.all().order_by('-created_at')
     serializer_class = StudentCertificateSerializer
     permission_classes = [HasModelPermission]
-
+ 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         student_id = request.data.get('student')
@@ -53,18 +53,39 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
             
         confirm_override = request.data.get('confirm_override', False)
+        early_generation_reason = request.data.get('early_generation_reason', '').strip()
         today = datetime.date.today()
         
         # Check completion date warning rule
-        if student.completion_date > today and not confirm_override:
-            return Response({
-                'warning': f"Warning: The completion date ({student.completion_date}) is in the future. Generating this certificate will complete their profile early. Do you wish to override?",
-                'requires_override': True
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if student.completion_date > today:
+            if not confirm_override:
+                return Response({
+                    'warning': "This student's course duration has not been completed yet. Are you sure you want to generate the certificate before the completion date?",
+                    'requires_override': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif not early_generation_reason:
+                return Response({
+                    'error': "A valid reason must be provided for generating the certificate before the course completion date.",
+                    'requires_reason': True
+                }, status=status.HTTP_400_BAD_REQUEST)
             
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        
+        # Calculate completed duration if early
+        completed_duration = None
+        if student.completion_date > today:
+            from .utils import calculate_completed_duration
+            completed_duration = calculate_completed_duration(student.joining_date, today)
+
+        extra_args = {}
+        if student.completion_date > today:
+            extra_args['early_generation_reason'] = early_generation_reason
+            extra_args['calculated_completed_duration'] = completed_duration
+        if request.user and request.user.is_authenticated:
+            extra_args['generated_by'] = request.user
+
+        self.perform_create(serializer, **extra_args)
         
         # Trigger Notification to Admins
         cert_instance = serializer.instance
@@ -85,9 +106,9 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
             
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
+ 
     @transaction.atomic
-    def perform_create(self, serializer):
+    def perform_create(self, serializer, **kwargs):
         student = serializer.validated_data['student']
         course = serializer.validated_data['course']
         
@@ -116,7 +137,7 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
         serial_no = f"{batch_prefix}{next_seq}"
         
         # Save the certificate instance
-        instance = serializer.save(serial_no=serial_no)
+        instance = serializer.save(serial_no=serial_no, **kwargs)
         
         # Now trigger the PDF generation
         from .services import generate_student_certificate_pdf
@@ -188,7 +209,14 @@ class StudentViewSet(viewsets.ModelViewSet):
             his_her = "his/her"
             
         course_name = course.course_name if course else student.course_at_institute
-        duration = course.default_duration if course else student.training_duration
+        
+        today = datetime.date.today()
+        is_early = student.completion_date > today
+        if is_early:
+            from .utils import calculate_completed_duration
+            duration = calculate_completed_duration(student.joining_date, today)
+        else:
+            duration = course.default_duration if course else student.training_duration
         
         # Format completion month
         try:
@@ -259,14 +287,21 @@ class StudentViewSet(viewsets.ModelViewSet):
                 logging.getLogger(__name__).error(f"Self-healing father_name fetch failed in generate_certificate: {e}")
 
         confirm_override = request.data.get('confirm_override', False)
+        early_generation_reason = request.data.get('early_generation_reason', '').strip()
+        today = datetime.date.today()
         
         # Check completion date warning rule
-        today = datetime.date.today()
-        if student.completion_date > today and not confirm_override:
-            return Response({
-                'warning': f"Warning: The completion date ({student.completion_date}) is in the future. Generating this certificate will complete their profile early. Do you wish to override?",
-                'requires_override': True
-            }, status=status.HTTP_200_OK) # return warning trigger payload
+        if student.completion_date > today:
+            if not confirm_override:
+                return Response({
+                    'warning': "This student's course duration has not been completed yet. Are you sure you want to generate the certificate before the completion date?",
+                    'requires_override': True
+                }, status=status.HTTP_200_OK) # return warning trigger payload
+            elif not early_generation_reason:
+                return Response({
+                    'error': "A valid reason must be provided for generating the certificate before the course completion date.",
+                    'requires_reason': True
+                }, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             course = student.enrolled_course
@@ -284,7 +319,15 @@ class StudentViewSet(viewsets.ModelViewSet):
             s_o_d_o = "D/O" if gender == 'FEMALE' else "S/O"
             father_name_str = student.father_name or ""
             address_str = student.address or ""
-            duration = course.default_duration
+            
+            completed_duration = None
+            if student.completion_date > today:
+                from .utils import calculate_completed_duration
+                completed_duration = calculate_completed_duration(student.joining_date, today)
+                duration = completed_duration
+            else:
+                duration = course.default_duration
+                
             course_name = course.course_name
             
             default_content = (
@@ -325,7 +368,10 @@ class StudentViewSet(viewsets.ModelViewSet):
                 issue_date=today,
                 serial_no=serial_no,
                 cert_content=default_content,
-                place="Mohali"
+                place="Mohali",
+                early_generation_reason=early_generation_reason if student.completion_date > today else None,
+                calculated_completed_duration=completed_duration if student.completion_date > today else None,
+                generated_by=request.user if request.user and request.user.is_authenticated else None
             )
             
             # Generate PDF using WeasyPrint
@@ -431,9 +477,20 @@ class StudentViewSet(viewsets.ModelViewSet):
                         father_name_str = student.father_name or ""
                         address_str = student.address or ""
                         
+                        today = datetime.date.today()
+                        if student.completion_date > today:
+                            from .utils import calculate_completed_duration
+                            completed_duration = calculate_completed_duration(student.joining_date, today)
+                            duration_str = completed_duration
+                            early_gen_reason = "Bulk generated early"
+                        else:
+                            completed_duration = None
+                            duration_str = course.default_duration
+                            early_gen_reason = None
+                        
                         default_content = (
                             f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
-                            f"Has successfully Completed {course.default_duration} \"**{course.course_name}**\" course ."
+                            f"Has successfully Completed {duration_str} \"**{course.course_name}**\" course ."
                         )
                         
                         completion_year = student.completion_date.year
@@ -464,10 +521,13 @@ class StudentViewSet(viewsets.ModelViewSet):
                                 course=course,
                                 skill_ratings={skill: 'Excellent' for skill in course.skills_list},
                                 show_dates=False,
-                                issue_date=datetime.date.today(),
+                                issue_date=today,
                                 serial_no=serial_no,
                                 cert_content=default_content,
-                                place="Mohali"
+                                place="Mohali",
+                                early_generation_reason=early_gen_reason,
+                                calculated_completed_duration=completed_duration,
+                                generated_by=request.user if request.user and request.user.is_authenticated else None
                             )
                         generate_student_certificate_pdf(cert)
                     else:
