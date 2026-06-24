@@ -1186,7 +1186,6 @@ function closeExitTemplateEditor() {
 function loadExitTemplateToEditor() {
     const selector = document.getElementById('templateEditorSelector');
     const selectedId = selector.value;
-    const visualEditor = document.getElementById('visualExitTemplateEditor');
     
     if (!selectedId) {
         const visualEditor = document.getElementById('exitVisualTemplateEditor');

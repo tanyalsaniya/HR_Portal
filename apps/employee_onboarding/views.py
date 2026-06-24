@@ -601,8 +601,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         data = request.data or {}
         bitrix_id = None
         
-        # 1. Check direct keys for ID
-        for key in ['id', 'ID', 'bitrix_id', 'bitrix_user_id']:
+        # 1. Check direct keys for ID (including crm.id)
+        for key in ['id', 'ID', 'bitrix_id', 'bitrix_user_id', 'crm.id']:
             if key in data:
                 bitrix_id = data[key]
                 break
@@ -612,12 +612,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             nested_data = data['data']
             if isinstance(nested_data.get('FIELDS'), dict):
                 fields = nested_data['FIELDS']
-                for key in ['ID', 'id']:
+                for key in ['ID', 'id', 'crm.id']:
                     if key in fields:
                         bitrix_id = fields[key]
                         break
             if not bitrix_id:
-                for key in ['id', 'ID', 'bitrix_id', 'bitrix_user_id']:
+                for key in ['id', 'ID', 'bitrix_id', 'bitrix_user_id', 'crm.id']:
                     if key in nested_data:
                         bitrix_id = nested_data[key]
                         break
@@ -625,280 +625,30 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # 3. Check nested inside 'fields' key
         if not bitrix_id and isinstance(data.get('fields'), dict):
             fields = data['fields']
-            for key in ['ID', 'id']:
+            for key in ['ID', 'id', 'crm.id']:
                 if key in fields:
                     bitrix_id = fields[key]
                     break
 
-        if bitrix_id:
-            bitrix_id = str(bitrix_id)
-            try:
-                # Force refresh cache so the new user is definitely retrieved
-                mock_user = BitrixClient.get_user_detail(bitrix_id, force_refresh=True)
-                if mock_user:
-                    # Check if the employee is in the onboarding stage/period
-                    import datetime
-                    today = datetime.date.today()
-                    day_14_ago = today - datetime.timedelta(days=14)
-                    
-                    emp_joining_date = mock_user.get('joining_date')
-                    if isinstance(emp_joining_date, str):
-                        try:
-                            emp_joining_date = datetime.datetime.strptime(emp_joining_date, '%Y-%m-%d').date()
-                        except Exception:
-                            emp_joining_date = today
-                    
-                    is_onboarding = True
-                    if emp_joining_date:
-                        if emp_joining_date <= day_14_ago or mock_user.get('status') == 'Exited':
-                            is_onboarding = False
-                            
-                    if not is_onboarding:
-                        return Response({
-                            'status': 'ignored',
-                            'message': f'Employee {bitrix_id} is not in the onboarding period (joining date: {emp_joining_date}). Ignored.'
-                        }, status=status.HTTP_200_OK)
-
-                    # Log success in BitrixSyncLog
-                    try:
-                        from notifications.models import BitrixSyncLog
-                        BitrixSyncLog.objects.create(
-                            employee_id=bitrix_id,
-                            employee_name=mock_user.get('name') or f"Bitrix User {bitrix_id}",
-                            action_type='Webhook Sync',
-                            status='SUCCESS',
-                            retry_count=0
-                        )
-                    except Exception:
-                        pass
-
-                    # Trigger welcome email task
-                    try:
-                        from .tasks import send_onboarding_welcome_email
-                        send_onboarding_welcome_email.delay(mock_user)
-                    except Exception as mail_err:
-                        import logging
-                        logging.getLogger(__name__).error(f"Failed to queue welcome email task: {mail_err}")
-
-                    # Trigger Admin Notification
-                    try:
-                        from notifications.models import Notification
-                        from django.contrib.auth import get_user_model
-                        User = get_user_model()
-                        admins = User.objects.filter(role__code='ADMIN')
-                        notif_msg = f"New employee synced from Bitrix24 – {mock_user.get('name')} ({mock_user.get('emp_id')})"
-                        for admin in admins:
-                            Notification.objects.create(
-                                recipient=admin,
-                                notif_type='INFO',
-                                message=notif_msg,
-                                link=f"/employees/{mock_user.get('id')}/"
-                            )
-                    except Exception as notif_err:
-                        import logging
-                        logging.getLogger(__name__).error(f"Failed to trigger Admin notification: {notif_err}")
-
-                    # Write to audit logs
-                    try:
-                        from audit_logs.signals import log_action
-                        actor = request.user if (request.user and request.user.is_authenticated) else None
-                        log_action(actor, "CREATE", "Onboarding", f"Bitrix24 Webhook synced employee (ID: {bitrix_id}).")
-                    except Exception:
-                        pass
-
-                    return Response({'status': 'success', 'message': f'Employee {bitrix_id} processed successfully', 'employee': mock_user}, status=status.HTTP_200_OK)
-                else:
-                    # Log failure in BitrixSyncLog
-                    try:
-                        from notifications.models import BitrixSyncLog, Notification
-                        from django.contrib.auth import get_user_model
-                        User = get_user_model()
-                        
-                        BitrixSyncLog.objects.create(
-                            employee_id=bitrix_id,
-                            employee_name=f"Bitrix User {bitrix_id}",
-                            action_type='Webhook Sync',
-                            status='FAILED',
-                            retry_count=0,
-                            error_message=f"Employee with ID {bitrix_id} not found in Bitrix24."
-                        )
-                        
-                        # Notify Admin
-                        admins = User.objects.filter(role__code='ADMIN')
-                        notif_msg = f"Bitrix24 sync failed for ID {bitrix_id} (Employee not found)."
-                        for admin in admins:
-                            Notification.objects.create(
-                                recipient=admin,
-                                notif_type='ERROR',
-                                message=notif_msg,
-                                link="/admin/bitrix/sync-log/"
-                            )
-                    except Exception:
-                        pass
-                    return Response({'error': f'Employee with ID {bitrix_id} not found in Bitrix24.'}, status=status.HTTP_404_NOT_FOUND)
-            except Exception as e:
-                # Log exception failure
-                try:
-                    from notifications.models import BitrixSyncLog
-                    BitrixSyncLog.objects.create(
-                        employee_id=bitrix_id,
-                        action_type='Webhook Sync',
-                        status='FAILED',
-                        retry_count=0,
-                        error_message=str(e)
-                    )
-                except Exception:
-                    pass
-                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # Check if direct fields are provided
         first_name = data.get('first_name') or data.get('name')
         email = data.get('email') or data.get('work_email')
-        
-        if first_name and email:
-            # Replicate the logic from the standard create method
-            webhook = BitrixClient.get_webhook_url()
-            
-            gender_code = 'M'
-            gender_val = data.get('gender')
-            if gender_val in ['FEMALE', 'Female']:
-                gender_code = 'F'
-            elif gender_val in ['OTHER', 'Other']:
-                gender_code = 'O'
 
-            dept_list = [1]
-            if data.get('department'):
-                try:
-                    dept_list = [int(data.get('department'))]
-                except (ValueError, TypeError):
-                    pass
+        if bitrix_id:
+            from .tasks import process_bitrix_webhook_task
+            process_bitrix_webhook_task.delay(data)
+            return Response({
+                'status': 'queued',
+                'message': f'Sync queued for employee ID {bitrix_id}.'
+            }, status=status.HTTP_202_ACCEPTED)
 
-            user_payload = {
-                'EMAIL': email,
-                'NAME': first_name,
-                'LAST_NAME': data.get('last_name') or '',
-                'PERSONAL_MOBILE': data.get('phone') or '',
-                'WORK_POSITION': data.get('designation') or 'Software Engineer',
-                'UF_DEPARTMENT': dept_list,
-                'PERSONAL_BIRTHDAY': data.get('dob') or '',
-                'PERSONAL_GENDER': gender_code,
-                'UF_PERSONAL_EMAIL': data.get('personal_email') or '',
-                'PERSONAL_MAILBOX': data.get('personal_email') or ''
-            }
-            
-            try:
-                import requests
-                # Attempt to create as user profile first
-                res = requests.post(f"{webhook}/user.add.json", json=user_payload, timeout=10)
-                
-                # Fallback to CRM contact creation if user scope fails or fails otherwise
-                if not res.ok:
-                    emails = [{'VALUE': email, 'VALUE_TYPE': 'WORK'}]
-                    if data.get('personal_email'):
-                        emails.append({'VALUE': data.get('personal_email'), 'VALUE_TYPE': 'HOME'})
-                        
-                    crm_payload = {
-                        'fields': {
-                            'NAME': first_name,
-                            'LAST_NAME': data.get('last_name') or '',
-                            'EMAIL': emails,
-                            'PHONE': [{'VALUE': data.get('phone') or '', 'VALUE_TYPE': 'WORK'}],
-                            'POST': data.get('designation') or 'Software Engineer',
-                            'UF_ONBOARDING_STATUS': 'Pending',
-                            'UF_CRM_ONBOARDING_STATUS': 'Pending',
-                            'UF_PERSONAL_EMAIL': data.get('personal_email') or '',
-                            'PERSONAL_MAILBOX': data.get('personal_email') or ''
-                        }
-                    }
-                    res = requests.post(f"{webhook}/crm.contact.add", json=crm_payload, timeout=10)
-                    
-                if res.ok:
-                    contact_id = str(res.json().get('result'))
-                    BitrixClient.get_all_users(force_refresh=True)
-                    mock_user = BitrixClient.get_user_detail(contact_id)
-                    
-                    # Log success in BitrixSyncLog
-                    try:
-                        from notifications.models import BitrixSyncLog
-                        BitrixSyncLog.objects.create(
-                            employee_id=contact_id,
-                            employee_name=mock_user.get('name') if mock_user else f"{first_name} {data.get('last_name', '')}".strip(),
-                            action_type='Contact Create',
-                            status='SUCCESS',
-                            retry_count=0
-                        )
-                    except Exception:
-                        pass
+        elif first_name and email:
+            from .tasks import process_bitrix_webhook_task
+            process_bitrix_webhook_task.delay(data)
+            return Response({
+                'status': 'queued',
+                'message': f'Creation and sync queued for {first_name}.'
+            }, status=status.HTTP_202_ACCEPTED)
 
-                    # Trigger welcome email task
-                    try:
-                        from .tasks import send_onboarding_welcome_email
-                        send_onboarding_welcome_email.delay(mock_user)
-                    except Exception as mail_err:
-                        import logging
-                        logging.getLogger(__name__).error(f"Failed to queue welcome email task: {mail_err}")
-                    
-                    # Trigger Admin Notification
-                    try:
-                        from notifications.models import Notification
-                        from django.contrib.auth import get_user_model
-                        User = get_user_model()
-                        admins = User.objects.filter(role__code='ADMIN')
-                        
-                        notif_msg = f"New employee added via Webhook – {mock_user.get('name')} ({mock_user.get('emp_id')})"
-                        for admin in admins:
-                            Notification.objects.create(
-                                recipient=admin,
-                                notif_type='INFO',
-                                message=notif_msg,
-                                link=f"/employees/{mock_user.get('id')}/"
-                            )
-                    except Exception as notif_err:
-                        import logging
-                        logging.getLogger(__name__).error(f"Failed to trigger Admin notification: {notif_err}")
-
-                    # Write to audit logs
-                    try:
-                        from audit_logs.signals import log_action
-                        actor = request.user if (request.user and request.user.is_authenticated) else None
-                        log_action(actor, "CREATE", "Onboarding", f"Bitrix24 Webhook created employee (ID: {contact_id}).")
-                    except Exception:
-                        pass
-
-                    return Response(mock_user, status=status.HTTP_201_CREATED)
-                else:
-                    # Log failure in BitrixSyncLog
-                    emp_name = f"{first_name} {data.get('last_name', '')}".strip()
-                    try:
-                        from notifications.models import BitrixSyncLog, Notification
-                        from django.contrib.auth import get_user_model
-                        User = get_user_model()
-                        
-                        BitrixSyncLog.objects.create(
-                            employee_name=emp_name,
-                            action_type='Contact Create',
-                            status='FAILED',
-                            retry_count=0,
-                            error_message=res.text
-                        )
-                        
-                        # Notify Admin
-                        admins = User.objects.filter(role__code='ADMIN')
-                        notif_msg = f"Bitrix24 webhook sync failed for {emp_name} (Contact Create). Retry available."
-                        for admin in admins:
-                            Notification.objects.create(
-                                recipient=admin,
-                                notif_type='ERROR',
-                                message=notif_msg,
-                                link="/admin/bitrix/sync-log/"
-                            )
-                    except Exception:
-                        pass
-
-                    return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
         return Response({'error': 'Missing ID or required fields (first_name, email).'}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['POST'], url_path='import-excel')

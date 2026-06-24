@@ -75,13 +75,13 @@ class HasModelPermission(permissions.BasePermission):
 
         # 6. Student Certificate module
         if 'Student' in view_name or 'Course' in view_name or 'Bitrix' in view_name:
-            if action in ['export_excel', 'bulk_generate_zip']:
-                return 'student.export' in user_perms
+            if action in ['export_excel', 'bulk_generate_zip', 'generate_certificate']:
+                return 'student.export' in user_perms or 'student.update' in user_perms
             if action in ['list', 'retrieve'] or (action is None and request.method == 'GET'):
                 return 'student.read' in user_perms
             if action == 'create':
                 return 'student.create' in user_perms
-            if action in ['update', 'partial_update', 'record_payment', 'send_warning', 'generate_certificate']:
+            if action in ['update', 'partial_update', 'record_payment', 'send_warning']:
                 return 'student.update' in user_perms
             if action == 'destroy':
                 return 'student.delete' in user_perms

@@ -469,10 +469,6 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='generate-relieving')
     def generate_relieving_api(self, request, pk=None):
         exit_req = self.get_object()
-        if exit_req.status not in ('COMPLETED', 'CLEARANCES_DONE', 'FF_PROCESSED', 'FULLY_EXITED'):
-            return Response({
-                'error': 'Relieving letter can only be generated after exit questionnaire is completed.'
-            }, status=status.HTTP_400_BAD_REQUEST)
         custom_context = request.data.get('custom_context', None)
         try:
             doc = generate_relieving_letter(exit_req, user=request.user, custom_context=custom_context)
@@ -486,10 +482,6 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='generate-experience')
     def generate_experience_api(self, request, pk=None):
         exit_req = self.get_object()
-        if exit_req.status not in ('COMPLETED', 'CLEARANCES_DONE', 'FF_PROCESSED', 'FULLY_EXITED'):
-            return Response({
-                'error': 'Experience letter can only be generated after exit questionnaire is completed.'
-            }, status=status.HTTP_400_BAD_REQUEST)
         custom_context = request.data.get('custom_context', None)
         try:
             doc = generate_experience_letter(exit_req, user=request.user, custom_context=custom_context)

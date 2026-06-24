@@ -66,3 +66,23 @@ class LetterTemplate(models.Model):
     def __str__(self):
         return self.title
 
+
+class SyncedEmployee(models.Model):
+    bitrix_user_id = models.CharField(max_length=50, unique=True, db_index=True)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
+    designation = models.CharField(max_length=150, blank=True, null=True)
+    department_name = models.CharField(max_length=150, blank=True, null=True)
+    gender = models.CharField(max_length=50, blank=True, null=True)
+    dob = models.DateField(blank=True, null=True)
+    joining_date = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=50, blank=True, null=True)
+    onboarding_complete = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name or ''} (Bitrix ID: {self.bitrix_user_id})"
+
