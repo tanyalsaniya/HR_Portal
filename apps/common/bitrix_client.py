@@ -361,14 +361,16 @@ class BitrixEmployeeMock:
         import datetime
         for date_field in ('dob', 'joining_date'):
             val = data_dict.get(date_field)
-            if isinstance(val, str):
+            if isinstance(val, str) and val.strip():
                 try:
-                    parsed_date = datetime.datetime.strptime(val, '%Y-%m-%d').date()
+                    parsed_date = datetime.datetime.strptime(val.strip(), '%Y-%m-%d').date()
                     setattr(self, date_field, parsed_date)
                 except Exception:
-                    setattr(self, date_field, datetime.date.today())
-            elif val is None:
-                setattr(self, date_field, datetime.date.today())
+                    setattr(self, date_field, None)
+            elif isinstance(val, (datetime.date, datetime.datetime)):
+                setattr(self, date_field, val.date() if isinstance(val, datetime.datetime) else val)
+            else:
+                setattr(self, date_field, None)
 
     @property
     def pk(self):
@@ -377,8 +379,14 @@ class BitrixEmployeeMock:
     @property
     def id(self):
         # Return integer ID for compatibility with views/serializers expecting int primary keys
+        raw_id = self._data.get('id', '0')
+        if isinstance(raw_id, str) and raw_id.startswith('LOCAL-'):
+            try:
+                return int(raw_id.split('-')[1])
+            except (IndexError, ValueError):
+                return 0
         try:
-            return int(self._data.get('id', 0))
+            return int(raw_id)
         except (ValueError, TypeError):
             return 0
 

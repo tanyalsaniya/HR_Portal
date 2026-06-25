@@ -64,6 +64,7 @@ async function apiFetch(endpoint, options = {}) {
     options.headers = options.headers || {};
     options.headers['Accept'] = 'application/json';
     options.headers['X-Requested-With'] = 'XMLHttpRequest';
+    options.headers['ngrok-skip-browser-warning'] = '69420';
     if (accessToken) {
         options.headers['Authorization'] = `Bearer ${accessToken}`;
     }

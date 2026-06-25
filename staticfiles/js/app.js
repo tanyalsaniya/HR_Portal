@@ -64,6 +64,7 @@ async function apiFetch(endpoint, options = {}) {
     options.headers = options.headers || {};
     options.headers['Accept'] = 'application/json';
     options.headers['X-Requested-With'] = 'XMLHttpRequest';
+    options.headers['ngrok-skip-browser-warning'] = '69420';
     if (accessToken) {
         options.headers['Authorization'] = `Bearer ${accessToken}`;
     }
@@ -354,15 +355,19 @@ window.addEventListener('popstate', (event) => {
             studentTab: event.state.studentTab
         });
     } else {
+        let currentPath = window.location.pathname;
+        if (!currentPath.endsWith('/')) {
+            currentPath += '/';
+        }
         let viewId = 'dashboardView';
-        if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
+        if (currentPath.match(/\/salaries\/employee\/(\d+)\//)) {
             viewId = 'salaryHistoryView';
         } else if (getEmployeeDetailIdFromUrl()) {
             viewId = 'employeeDetailView';
         } else if (getStudentIdFromUrl()) {
             viewId = 'studentDetailView';
         } else {
-            viewId = pathToView[window.location.pathname] || 'dashboardView';
+            viewId = pathToView[currentPath] || 'dashboardView';
         }
         switchView(viewId, false, {
             employeeId: getEmployeeDetailIdFromUrl(),

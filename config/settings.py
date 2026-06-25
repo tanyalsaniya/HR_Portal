@@ -40,6 +40,15 @@ ALLOWED_HOSTS = os.getenv(
 if DEBUG:
     ALLOWED_HOSTS.extend(['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.dev'])
 
+# ---------- CSRF TRUSTED ORIGINS ----------
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.ngrok-free.app',
+    'https://*.ngrok-free.dev',
+    'https://*.ngrok.dev',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+
 # ---------- APPLICATION DEFINITION ----------
 INSTALLED_APPS = [
     'django.contrib.admin',

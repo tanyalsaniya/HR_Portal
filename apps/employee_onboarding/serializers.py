@@ -80,12 +80,14 @@ class EmployeeSerializer(serializers.Serializer):
     department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     department_name = serializers.SerializerMethodField()
     department_details = serializers.SerializerMethodField()
-    joining_date = serializers.CharField()
-    dob = serializers.CharField()
+    joining_date = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    dob = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     gender = serializers.CharField()
     profile_photo = serializers.CharField(allow_blank=True, required=False)
     status = serializers.CharField()
     onboarding_complete = serializers.BooleanField()
+    bitrix_sync_status = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    bitrix_sync_error = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     employment_type = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     address_line1 = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -102,23 +104,29 @@ class EmployeeSerializer(serializers.Serializer):
     salary_structures = serializers.SerializerMethodField()
     
     # Masked placeholders for banking/pan compatibility
-    aadhaar_masked = serializers.CharField(default="XXXXXXXX1234", read_only=True)
-    pan_masked = serializers.CharField(default="XXXXXX1234", read_only=True)
+    aadhaar_masked = serializers.SerializerMethodField()
+    pan_masked = serializers.SerializerMethodField()
     bank_account = serializers.SerializerMethodField()
     bank_name = serializers.SerializerMethodField()
     pan_no = serializers.CharField(default="", required=False, allow_blank=True)
     bond_period_months = serializers.IntegerField(default=0, required=False)
     notice_period_days = serializers.IntegerField(default=30, required=False)
 
+    def get_aadhaar_masked(self, obj):
+        return obj.get('aadhaar_masked') or "XXXXXXXX1234"
+
+    def get_pan_masked(self, obj):
+        return obj.get('pan_masked') or "XXXXXX1234"
+
     def get_bank_account(self, obj):
         from salary.models import EmployeeBankDetail
         detail = EmployeeBankDetail.objects.filter(bitrix_user_id=obj.get('id')).first()
-        return detail.bank_account_no if detail else ""
+        return detail.bank_account_no if detail else obj.get('bank_account', '')
 
     def get_bank_name(self, obj):
         from salary.models import EmployeeBankDetail
         detail = EmployeeBankDetail.objects.filter(bitrix_user_id=obj.get('id')).first()
-        return detail.bank_name if detail else ""
+        return detail.bank_name if detail else obj.get('bank_name', '')
 
     def get_documents(self, obj):
         docs = EmployeeDocument.objects.filter(bitrix_user_id=obj.get('id'))

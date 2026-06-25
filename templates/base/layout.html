@@ -42,6 +42,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Devex Hub Pvt Ltd. | HR Portal</title>
+    <link rel="icon" type="image/png" href="{% static 'images/DevEx Hub logo.png' %}">
     <!-- Google Fonts Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -733,15 +734,13 @@
         <div class="sidebar"
             style="width: 250px; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100;">
             <div class="sidebar-brand"
-                style="padding: 24px 20px; display: flex; align-items: center; gap: 8px; border-bottom: none;">
-                <!-- SVG logo for Devex Hub -->
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="8" fill="#7c3aed" />
-                    <path d="M8 22V10H12.5L16 16L19.5 10H24V22H20V15L16 20L12 15V22H8Z" fill="white" />
-                </svg>
-                <span class="sidebar-brand-text"
-                    style="font-size: 16pt; font-weight: 800; color: var(--text-color); letter-spacing: -0.04em;">Devex
-                    Hub</span>
+                style="padding: 16px 20px; display: flex; align-items: center; gap: 10px; border-bottom: none;">
+                <!-- Devex Hub Real Logo -->
+                <img src="{% static 'images/DevEx Hub logo.png' %}" alt="Devex Hub" style="height: 42px; width: auto; object-fit: contain;">
+                <div style="display: flex; flex-direction: column; line-height: 1.2;">
+                    <span style="font-size: 13pt; font-weight: 800; color: var(--text-color); letter-spacing: -0.03em;">Devex Hub</span>
+                    <span style="font-size: 8pt; font-weight: 500; color: var(--text-secondary); letter-spacing: 0.05em;">HR Portal</span>
+                </div>
             </div>
             <ul class="sidebar-menu"
                 style="list-style: none; padding: 10px 0; margin: 0; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
@@ -830,9 +829,11 @@
 
             <div
                 style="padding: 14px 16px; border-top: 1px solid var(--sidebar-border); background: var(--sidebar-bg); display: flex; align-items: center; gap: 10px;">
-                <!-- Avatar -->
-                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #7c3aed; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10pt; flex-shrink: 0;"
-                    id="avatarInitials">HR</div>
+                <!-- Avatar with logo -->
+                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: white; border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10pt; flex-shrink: 0; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.12);"
+                    id="avatarInitials">
+                    <img src="{% static 'images/DevEx Hub logo.png' %}" alt="DH" style="width: 28px; height: 28px; object-fit: contain;">
+                </div>
                 <!-- Name & Email -->
                 <div style="display: flex; flex-direction: column; overflow: hidden; flex-grow: 1; min-width: 0;">
                     <span id="usernameLabel"
@@ -979,12 +980,7 @@
                     const userEmailLabel = document.getElementById('userEmailLabel');
                     if (userEmailLabel) userEmailLabel.textContent = currentUser.email || currentUser.username;
 
-                    const avatarInitials = document.getElementById('avatarInitials');
-                    if (avatarInitials && currentUser.username) {
-                        const nameParts = currentUser.username.split('@')[0].split(/[._-]/);
-                        const initials = nameParts.map(p => p.charAt(0)).join('').substring(0, 2).toUpperCase();
-                        avatarInitials.textContent = initials || 'HR';
-                    }
+                    // avatarInitials now shows the Devex Hub logo — do not overwrite with text initials
 
                     // Apply dynamic permissions on sidebar and dashboard items
                     applyPermissionsToUI();

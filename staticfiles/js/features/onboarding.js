@@ -266,7 +266,12 @@ function renderOnboardingTrackerTable(list) {
             { bg: '#f3e8ff', text: '#9333ea' }, // Purple tint
             { bg: '#ecfeff', text: '#0891b2' }  // Cyan tint
         ];
-        const colorIdx = e.id % colors.length;
+        let numericId = 0;
+        if (e.id) {
+            const match = e.id.toString().match(/\d+/);
+            if (match) numericId = parseInt(match[0], 10);
+        }
+        const colorIdx = numericId % colors.length;
         const pair = colors[colorIdx];
         
         const avatarCell = e.profile_photo 
@@ -300,13 +305,13 @@ function renderOnboardingTrackerTable(list) {
         }
 
         return `
-            <tr onclick="openEmployeeProfileDetail(${e.id})" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
+            <tr onclick="openEmployeeProfileDetail('${e.id}')" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
                 <td style="padding: 12px 20px; width: 40px;" onclick="event.stopPropagation()"><input type="checkbox" style="cursor:pointer; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #cbd5e1;" onclick="event.stopPropagation()"></td>
                 <td style="padding: 12px 20px; white-space: nowrap;">
                     <div style="display:flex; align-items:center;">
                         ${avatarCell}
                         <div>
-                            <a href="#" onclick="openEmployeeProfileDetail(${e.id}); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                            <a href="#" onclick="openEmployeeProfileDetail('${e.id}'); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
                             <div style="font-size: 8.5pt; color: var(--text-muted); margin-top:2px;">${e.email}</div>
                         </div>
                     </div>
@@ -328,13 +333,13 @@ function renderOnboardingTrackerTable(list) {
                 </td>
                 <td style="padding: 12px 20px; text-align: right; position: relative;" onclick="event.stopPropagation()">
                     <div class="dropdown-menu-wrapper">
-                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, ${e.id})" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
+                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, '${e.id}')" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
                         <div class="premium-actions-dropdown" id="actionDropdown-${e.id}" style="position: absolute; right: 0; top: 35px;">
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id})">View Profile</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'salary')">Setup Salary</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'letters')">Generate Letters</button>
-                            <button class="premium-dropdown-item" onclick="manuallyGraduateEmployee(event, ${e.id})">Graduate Onboarding</button>
-                            ${hasPermission('onboarding.delete') ? `<button class="premium-dropdown-item" onclick="softDeleteEmployee(${e.id})" style="color:#ef4444;">Delete Profile</button>` : ''}
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}')">View Profile</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'salary')">Setup Salary</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'letters')">Generate Letters</button>
+                            <button class="premium-dropdown-item" onclick="manuallyGraduateEmployee(event, '${e.id}')">Graduate Onboarding</button>
+                            ${hasPermission('onboarding.delete') ? `<button class="premium-dropdown-item" onclick="softDeleteEmployee('${e.id}')" style="color:#ef4444;">Delete Profile</button>` : ''}
                         </div>
                     </div>
                 </td>
@@ -364,7 +369,12 @@ function renderActiveDirectoryTable(list) {
             { bg: '#f3e8ff', text: '#9333ea' },
             { bg: '#ecfeff', text: '#0891b2' }
         ];
-        const colorIdx = e.id % colors.length;
+        let numericId = 0;
+        if (e.id) {
+            const match = e.id.toString().match(/\d+/);
+            if (match) numericId = parseInt(match[0], 10);
+        }
+        const colorIdx = numericId % colors.length;
         const pair = colors[colorIdx];
 
         const avatarCell = e.profile_photo 
@@ -376,13 +386,13 @@ function renderActiveDirectoryTable(list) {
         else if (e.status === 'Rejoined') statusClass = 'pending';
 
         return `
-            <tr onclick="openEmployeeProfileDetail(${e.id})" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
+            <tr onclick="openEmployeeProfileDetail('${e.id}')" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
                 <td style="padding: 12px 20px; width: 40px;" onclick="event.stopPropagation()"><input type="checkbox" style="cursor:pointer; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #cbd5e1;" onclick="event.stopPropagation()"></td>
                 <td style="padding: 12px 20px; white-space: nowrap;">
                     <div style="display:flex; align-items:center;">
                         ${avatarCell}
                         <div>
-                            <a href="#" onclick="openEmployeeProfileDetail(${e.id}); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                            <a href="#" onclick="openEmployeeProfileDetail('${e.id}'); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
                             <div style="font-size: 8.5pt; color: var(--text-muted); margin-top:2px;">${e.email}</div>
                         </div>
                     </div>
@@ -397,13 +407,13 @@ function renderActiveDirectoryTable(list) {
                 </td>
                 <td style="padding: 12px 20px; text-align: right; position: relative;" onclick="event.stopPropagation()">
                     <div class="dropdown-menu-wrapper">
-                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, ${e.id})" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
+                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, '${e.id}')" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
                         <div class="premium-actions-dropdown" id="actionDropdown-${e.id}" style="position: absolute; right: 0; top: 35px;">
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id})">View Profile</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'salary')">Edit Salary</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'letters')">Documents History</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}')">View Profile</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'salary')">Edit Salary</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'letters')">Documents History</button>
                             ${e.status === 'Active' && hasPermission('exit.create') ? `
-                                <button class="premium-dropdown-item" onclick="triggerExitFormality(${e.id})" style="color:#ef4444;">Initiate Exit</button>
+                                <button class="premium-dropdown-item" onclick="triggerExitFormality('${e.id}')" style="color:#ef4444;">Initiate Exit</button>
                             ` : ''}
                         </div>
                     </div>
@@ -611,8 +621,46 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
             bitrixBadge.textContent = emp.bitrix_sync_status;
             bitrixBadge.style.backgroundColor = emp.bitrix_sync_status === 'Synced' ? '#22c55e' : (emp.bitrix_sync_status === 'Pending' ? '#f59e0b' : '#ef4444');
             bitrixBadge.style.color = 'white';
-            
             document.getElementById('detailBitrixActions').style.display = emp.bitrix_sync_status === 'Failed' ? 'block' : 'none';
+
+            // Check Onboarding Welcome Email form card visibility
+            const welcomeEmailCard = document.getElementById('onboardingWelcomeEmailCard');
+            if (welcomeEmailCard) {
+                const today = new Date().toISOString().split('T')[0];
+                const isBeforeJoiningDate = !emp.joining_date || today < emp.joining_date;
+                
+                if (!emp.onboarding_complete && isBeforeJoiningDate) {
+                    welcomeEmailCard.style.display = 'block';
+                    
+                    const onboardEmailInput = document.getElementById('onboardEmailInput');
+                    const onboardJoiningDateInput = document.getElementById('onboardJoiningDateInput');
+                    
+                    if (onboardEmailInput) {
+                        onboardEmailInput.value = emp.work_email || emp.email || '';
+                    }
+                    if (onboardJoiningDateInput) {
+                        onboardJoiningDateInput.value = emp.joining_date || '';
+                    }
+                    
+                    checkOnboardEmailBtnState();
+                } else {
+                    welcomeEmailCard.style.display = 'none';
+                }
+            }
+
+            // Check "Invite to Bitrix" button visibility (independent of progress completion)
+            const inviteToBitrixBtn = document.getElementById('inviteToBitrixBtn');
+            if (inviteToBitrixBtn) {
+                const isLocal = emp.id && emp.id.toString().startsWith('LOCAL-');
+                const today = new Date().toISOString().split('T')[0];
+                const isJoiningDateReached = emp.joining_date && today >= emp.joining_date;
+                
+                if (isLocal && isJoiningDateReached) {
+                    inviteToBitrixBtn.style.display = 'inline-flex';
+                } else {
+                    inviteToBitrixBtn.style.display = 'none';
+                }
+            }
 
             const img = document.getElementById('detailProfilePhoto');
             const fallback = document.getElementById('detailProfilePhotoFallback');
@@ -728,7 +776,7 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
 
             const joinInput = document.getElementById('editEmpJoining');
             joinInput.value = emp.joining_date;
-            if (currentUser && currentUser.role === 'ADMIN') {
+            if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR')) {
                 joinInput.removeAttribute('disabled');
                 joinInput.style.backgroundColor = 'var(--bg-color)';
                 document.getElementById('joiningDateHelpText').style.display = 'none';
@@ -803,6 +851,15 @@ async function triggerManualBitrixRetry() {
 
 // ---------- EDIT PERSONAL PROFILE SUBMIT ----------
 document.addEventListener('DOMContentLoaded', () => {
+    const onboardEmailInput = document.getElementById('onboardEmailInput');
+    const onboardJoiningDateInput = document.getElementById('onboardJoiningDateInput');
+    if (onboardEmailInput) {
+        onboardEmailInput.addEventListener('input', checkOnboardEmailBtnState);
+    }
+    if (onboardJoiningDateInput) {
+        onboardJoiningDateInput.addEventListener('change', checkOnboardEmailBtnState);
+    }
+
     const editForm = document.getElementById('editEmployeeForm');
     if (editForm) {
         editForm.addEventListener('submit', async (e) => {
@@ -2165,3 +2222,165 @@ async function triggerExitFormality(empId) {
         }
     }, 100);
 }
+
+// ---------- NEW ONBOARDING EMAIL & BITRIX INVITE FLOWS ----------
+function checkOnboardEmailBtnState() {
+    const emailInput = document.getElementById('onboardEmailInput');
+    const dateInput = document.getElementById('onboardJoiningDateInput');
+    const sendBtn = document.getElementById('sendOnboardEmailBtn');
+    
+    if (emailInput && dateInput && sendBtn) {
+        const emailVal = emailInput.value.trim();
+        const joiningDateVal = dateInput.value;
+        
+        if (emailVal && joiningDateVal && emailVal.includes('@')) {
+            sendBtn.removeAttribute('disabled');
+            sendBtn.style.opacity = '1';
+            sendBtn.style.cursor = 'pointer';
+            sendBtn.style.backgroundColor = '#7c3aed';
+        } else {
+            sendBtn.setAttribute('disabled', 'true');
+            sendBtn.style.opacity = '0.5';
+            sendBtn.style.cursor = 'not-allowed';
+            sendBtn.style.backgroundColor = '#94a3b8';
+        }
+    }
+}
+
+async function saveOnboardEmailDetails() {
+    const emailVal = document.getElementById('onboardEmailInput').value.trim();
+    const joiningDateVal = document.getElementById('onboardJoiningDateInput').value;
+    
+    if (!emailVal || !joiningDateVal) {
+        showToast('Please fill in both email and joining date.', 'error');
+        return;
+    }
+    
+    showToast('Saving details...');
+    try {
+        const res = await apiFetch(`/employees/${currentDetailEmployeeId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                work_email: emailVal,
+                email: emailVal,
+                joining_date: joiningDateVal
+            })
+        });
+        
+        if (res.ok) {
+            showToast('Details saved successfully.');
+            await openEmployeeProfileDetail(currentDetailEmployeeId, 'personal', false);
+        } else {
+            const err = await res.json();
+            showToast('Failed to save details: ' + JSON.stringify(err), 'error');
+        }
+    } catch (e) {
+        showToast('Error saving details: ' + e, 'error');
+    }
+}
+
+async function sendOnboardingWelcomeEmailManual() {
+    const emailVal = document.getElementById('onboardEmailInput').value.trim();
+    const joiningDateVal = document.getElementById('onboardJoiningDateInput').value;
+    
+    if (!emailVal || !joiningDateVal) {
+        showToast('Please fill in both email and joining date.', 'error');
+        return;
+    }
+    
+    showToast('Saving details and sending email...');
+    try {
+        const saveRes = await apiFetch(`/employees/${currentDetailEmployeeId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                work_email: emailVal,
+                email: emailVal,
+                joining_date: joiningDateVal
+            })
+        });
+        
+        if (!saveRes.ok) {
+            const err = await saveRes.json();
+            showToast('Failed to save details: ' + JSON.stringify(err), 'error');
+            return;
+        }
+        
+        const res = await apiFetch(`/employees/${currentDetailEmployeeId}/send-welcome-email/`, {
+            method: 'POST'
+        });
+        
+        if (res.ok) {
+            showToast('Onboarding welcome email sent successfully.');
+            await openEmployeeProfileDetail(currentDetailEmployeeId, 'personal', false);
+        } else {
+            const err = await res.json();
+            showToast('Failed to send email: ' + (err.error || JSON.stringify(err)), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e, 'error');
+    }
+}
+
+async function inviteEmployeeToBitrix() {
+    if (!confirm('Are you sure you want to invite this employee to Bitrix24? This will create their user profile/CRM contact on Bitrix.')) {
+        return;
+    }
+    
+    showToast('Fetching latest employee details...');
+    try {
+        const empRes = await apiFetch(`/employees/${currentDetailEmployeeId}/`);
+        if (!empRes.ok) {
+            showToast('Failed to fetch employee details before inviting.', 'error');
+            return;
+        }
+        const emp = await empRes.json();
+        
+        showToast('Inviting employee to Bitrix24...');
+        
+        const payload = {
+            name: `${emp.first_name} ${emp.last_name}`.trim(),
+            first_name: emp.first_name,
+            last_name: emp.last_name || '',
+            email: emp.work_email || emp.email || emp.personal_email || '',
+            work_email: emp.work_email || emp.email || '',
+            personal_email: emp.personal_email || '',
+            phone: emp.phone || '',
+            designation: emp.designation || '',
+            department: emp.department || '',
+            dob: emp.dob || '',
+            gender: emp.gender || '',
+            crmID: emp.id,
+            crmId: emp.id,
+            local_id: emp.id
+        };
+
+        const res = await apiFetch(`/api/onboarding/employees/bitrix-webhook/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+            showToast('Bitrix invitation queued. Please wait a moment while they are synced.');
+            
+            // Wait 2.5 seconds to let the Celery task complete background execution, then refresh
+            setTimeout(async () => {
+                await openEmployeeProfileDetail(currentDetailEmployeeId, 'personal', true);
+            }, 2500);
+        } else {
+            const err = await res.json();
+            showToast('Failed to invite to Bitrix: ' + (err.error || JSON.stringify(err)), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e, 'error');
+    }
+}
+
