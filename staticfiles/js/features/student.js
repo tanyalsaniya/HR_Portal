@@ -8,29 +8,29 @@ let generatedPdfUrl = null;
 let certEditorSkills = [];
 let currentStudentList = [];
 
-let studentDirectoryStart = 0;
-let studentDirectoryNext = null;
-let bitrixStudentStart = 0;
-let bitrixStudentNext = null;
+let studentCurrentPage = 1;
+let studentTotalCount = 0;
+let bitrixStudentCurrentPage = 1;
+let bitrixStudentTotalCount = 0;
+const STUDENT_PAGE_SIZE = 10;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
 async function loadStudentData() {
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
     // Load ongoing students from Bitrix24 API with pagination
     try {
-        const res = await apiFetch(`/api/student/bitrix-active/?start=${studentDirectoryStart}`);
+        const start = (studentCurrentPage - 1) * STUDENT_PAGE_SIZE;
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${start}&limit=${STUDENT_PAGE_SIZE}`);
         if (res.ok) {
             const data = await res.json();
             const studList = data.results || [];
             currentStudentList = studList;
-            studentDirectoryNext = data.next !== undefined ? data.next : null;
-
+            studentTotalCount = data.total || 0;
             const tbody = document.getElementById('studentTableBody');
             if (tbody) {
                 if (studList.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#64748b;">No ongoing students found.</td></tr>';
-                    // Update pagination controls
-                    updateStudentDirectoryPagination(0);
+                    updateStudentPaginationControls();
                     return;
                 }
 
@@ -45,9 +45,7 @@ async function loadStudentData() {
                         </td>
                     </tr>
                 `).join('');
-
-                // Update pagination controls
-                updateStudentDirectoryPagination(studList.length);
+                updateStudentPaginationControls();
             }
         } else {
             const tbody = document.getElementById('studentTableBody');
@@ -64,35 +62,23 @@ async function loadStudentData() {
     }
 }
 
-function updateStudentDirectoryPagination(count) {
-    const pageStart = count === 0 ? 0 : studentDirectoryStart + 1;
-    const pageEnd = count === 0 ? 0 : studentDirectoryStart + count;
-
+function updateStudentPaginationControls() {
+    const pageStart = studentTotalCount === 0 ? 0 : (studentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
+    const pageEnd = Math.min(studentCurrentPage * STUDENT_PAGE_SIZE, studentTotalCount);
     const startEl = document.getElementById('studentPageStart');
     const endEl = document.getElementById('studentPageEnd');
+    const totalEl = document.getElementById('studentTotalCount');
     const prevBtn = document.getElementById('studentPrevBtn');
     const nextBtn = document.getElementById('studentNextBtn');
 
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (studentDirectoryStart === 0);
-    if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
+    if (totalEl) totalEl.textContent = studentTotalCount;
+    if (prevBtn) prevBtn.disabled = studentCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= studentTotalCount;
 }
 
-function updateStudentDirectoryPagination(count) {
-    const pageStart = count === 0 ? 0 : studentDirectoryStart + 1;
-    const pageEnd = count === 0 ? 0 : studentDirectoryStart + count;
 
-    const startEl = document.getElementById('studentPageStart');
-    const endEl = document.getElementById('studentPageEnd');
-    const prevBtn = document.getElementById('studentPrevBtn');
-    const nextBtn = document.getElementById('studentNextBtn');
-
-    if (startEl) startEl.textContent = pageStart;
-    if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (studentDirectoryStart === 0);
-    if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
-}
 
 function openStudentModal() {
     const modal = document.getElementById('studentModal');
@@ -152,7 +138,14 @@ async function openCertTabWithBitrixStudent(index) {
             institute: s.institute || '',
             start_date: s.start_date || '',
             completion_date: s.completion_date || '',
-            total_fees: s.total_fees || '0'
+            total_fees: s.total_fees || '0',
+            father_name: s.father_name || '',
+            phone: s.phone || '',
+            dob: s.dob || '',
+            gender: s.gender || '',
+            address: s.address || '',
+            student_type: s.student_type || '',
+            cert_type: s.cert_type || ''
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
@@ -298,12 +291,12 @@ function switchStudentTab(tab, selectedStudentId = null) {
     if (tab === 'directory') {
         if (dirTab) dirTab.style.display = 'block';
         if (dirBtn) dirBtn.classList.add('active');
-        studentDirectoryStart = 0;
+        studentCurrentPage = 1;
         loadStudentData(); // Load Bitrix ongoing students
     } else if (tab === 'bitrix') {
         if (bitrixTab) bitrixTab.style.display = 'block';
         if (bitrixBtn) bitrixBtn.classList.add('active');
-        bitrixStudentStart = 0;
+        bitrixStudentCurrentPage = 1;
         loadBitrixStudents();
     } else {
         if (certTab) certTab.style.display = 'block';
@@ -322,15 +315,15 @@ async function loadBitrixStudents(forceRefresh = false) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
 
     try {
-        const res = await apiFetch(`/api/student/bitrix-active/?start=${bitrixStudentStart}`);
+        const start = (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE;
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${start}&limit=${STUDENT_PAGE_SIZE}`);
         if (res.ok) {
             const data = await res.json();
             const students = data.results || [];
-            bitrixStudentNext = data.next !== undefined ? data.next : null;
-
+            bitrixStudentTotalCount = data.total || 0;
             if (students.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No active students found.</td></tr>';
-                updateBitrixStudentPagination(0);
+                updateBitrixStudentPaginationControls();
                 return;
             }
 
@@ -348,8 +341,7 @@ async function loadBitrixStudents(forceRefresh = false) {
                     <td><span style="font-size:7.5pt; padding:2px 8px; border-radius:10px; background:#e0f2fe; color:#0369a1; font-weight:600;">${s.stage.split(':').pop()}</span></td>
                 </tr>
             `).join('');
-
-            updateBitrixStudentPagination(students.length);
+            updateBitrixStudentPaginationControls();
         } else {
             tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch data from Bitrix24.</td></tr>';
         }
@@ -359,19 +351,20 @@ async function loadBitrixStudents(forceRefresh = false) {
     }
 }
 
-function updateBitrixStudentPagination(count) {
-    const pageStart = count === 0 ? 0 : bitrixStudentStart + 1;
-    const pageEnd = count === 0 ? 0 : bitrixStudentStart + count;
-
+function updateBitrixStudentPaginationControls() {
+    const pageStart = bitrixStudentTotalCount === 0 ? 0 : (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
+    const pageEnd = Math.min(bitrixStudentCurrentPage * STUDENT_PAGE_SIZE, bitrixStudentTotalCount);
     const startEl = document.getElementById('bitrixStudentPageStart');
     const endEl = document.getElementById('bitrixStudentPageEnd');
+    const totalEl = document.getElementById('bitrixStudentTotalCount');
     const prevBtn = document.getElementById('bitrixStudentPrevBtn');
     const nextBtn = document.getElementById('bitrixStudentNextBtn');
 
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (bitrixStudentStart === 0);
-    if (nextBtn) nextBtn.disabled = (bitrixStudentNext === null);
+    if (totalEl) totalEl.textContent = bitrixStudentTotalCount;
+    if (prevBtn) prevBtn.disabled = bitrixStudentCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= bitrixStudentTotalCount;
 }
 
 async function loadCoursesSelect(elementId) {
@@ -398,19 +391,47 @@ async function loadStudentsSelect(selectedStudentId = null) {
     const el = document.getElementById('certStudentSelect');
     if (!el) return;
     try {
-        const res = await apiFetch('/api/student/students/?status=ACTIVE');
-        if (res.ok) {
-            const data = await res.json();
-            const list = data.results || data;
-            let html = '<option value="">-- Select Student --</option>';
-            list.forEach(s => {
-                html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
-            });
-            el.innerHTML = html;
-            if (selectedStudentId) {
-                el.value = selectedStudentId;
-                loadStudentCertPrefills();
+        // 1. Fetch database students
+        const resDb = await apiFetch('/api/student/students/');
+        let dbStudents = [];
+        if (resDb.ok) {
+            const dataDb = await resDb.json();
+            dbStudents = dataDb.results || dataDb;
+        }
+
+        // 2. Fetch active students from Bitrix24
+        const resBitrix = await apiFetch('/api/student/bitrix-active/?limit=200');
+        let bitrixStudents = [];
+        if (resBitrix.ok) {
+            const dataBitrix = await resBitrix.json();
+            bitrixStudents = dataBitrix.results || [];
+        }
+
+        // Combine. Match by email to avoid duplicates.
+        const dbEmails = new Set(dbStudents.map(s => (s.email || '').toLowerCase()));
+
+        let html = '<option value="">-- Select Student --</option>';
+
+        // Add database students first
+        dbStudents.forEach(s => {
+            html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
+        });
+
+        // Add Bitrix students who aren't in the database yet
+        bitrixStudents.forEach(s => {
+            const email = (s.email || '').toLowerCase();
+            if (email && !dbEmails.has(email)) {
+                const certNo = `BITRIX-${s.id}`;
+                const detailJson = JSON.stringify(s).replace(/"/g, '&quot;');
+                html += `<option value="bitrix_${s.id}" data-student="${detailJson}">${s.name} (${certNo}) [Bitrix24]</option>`;
             }
+        });
+
+        el.innerHTML = html;
+
+        if (selectedStudentId) {
+            el.value = selectedStudentId;
+            await loadStudentCertPrefills();
         }
     } catch (e) {
         console.error(e);
@@ -431,7 +452,64 @@ async function loadStudentCertPrefills() {
     const select = document.getElementById('certStudentSelect');
     if (!select || !select.value) return;
 
-    const studentId = select.value;
+    let studentId = select.value;
+
+    // If it's a Bitrix-only student, dynamically sync them first
+    if (String(studentId).startsWith('bitrix_')) {
+        const option = select.options[select.selectedIndex];
+        const studentDataStr = option.getAttribute('data-student');
+        if (studentDataStr) {
+            showGlobalLoader(true);
+            try {
+                const s = JSON.parse(studentDataStr);
+                const payload = {
+                    id: s.id,
+                    name: s.name,
+                    email: s.email,
+                    course_name: s.course_id ? String(s.course_id) : '',
+                    institute: s.institute || '',
+                    start_date: s.start_date || s.joining_date || '',
+                    completion_date: s.completion_date || '',
+                    total_fees: s.total_fees || '0',
+                    father_name: s.father_name || '',
+                    phone: s.phone || '',
+                    dob: s.dob || '',
+                    gender: s.gender || '',
+                    address: s.address || '',
+                    student_type: s.student_type || '',
+                    cert_type: s.cert_type || ''
+                };
+                const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    const student = await res.json();
+                    option.value = student.id;
+                    option.textContent = `${student.name} (${student.cert_no})`;
+                    select.value = student.id;
+                    studentId = student.id;
+                    showToast(`Synced student from Bitrix24: ${student.name}`);
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                    select.value = "";
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Error syncing student data.', 'error');
+                select.value = "";
+                return;
+            } finally {
+                showGlobalLoader(false);
+            }
+        } else {
+            select.value = "";
+            return;
+        }
+    }
+
     currentSelectedStudentName = select.options[select.selectedIndex].text.split(' (')[0];
 
     try {
@@ -708,6 +786,7 @@ async function generateAndSaveCertificate() {
     const data = {
         student: parseInt(select.value),
         course: parseInt(courseSelect.value),
+        duration: document.getElementById('certDurationInput').value,   // ← was missing in v2
         skill_ratings: skillRatings,
         show_dates: document.getElementById('certShowDatesToggle').checked,
         issue_date: document.getElementById('certIssueDate').value,
@@ -726,44 +805,71 @@ async function generateAndSaveCertificate() {
         if (res.ok) {
             const result = await res.json();
             showToast('Certificate saved & PDF generated successfully!');
-
             generatedPdfUrl = result.pdf_file;
             document.getElementById('btnDownloadPDF').disabled = false;
-
             document.getElementById('prevSerialNo').textContent = `Sr.no ${result.serial_no}`;
             loadStudentData();
+
         } else {
             const err = await res.json();
+
             if (err.requires_override) {
-                if (confirm(err.warning)) {
-                    let reason = prompt("Please provide the reason for generating this certificate before the course completion date.");
-                    if (reason === null) {
-                        return; // user cancelled
+                // Step 1: Confirm early generation
+                const confirmResult = await Swal.fire({
+                    title: 'Early Generation Warning',
+                    text: err.warning,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#f59e0b',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'Yes, Generate Early',
+                    cancelButtonText: 'Cancel'
+                });
+
+                if (!confirmResult.isConfirmed) return;
+
+                // Step 2: Collect reason
+                const reasonResult = await Swal.fire({
+                    title: 'Reason for Early Generation',
+                    input: 'textarea',
+                    inputLabel: 'Please provide the reason for generating this certificate before the course completion date.',
+                    inputPlaceholder: 'Enter your reason here...',
+                    showCancelButton: true,
+                    confirmButtonText: 'Submit & Generate',
+                    cancelButtonText: 'Cancel',
+                    inputValidator: (value) => {
+                        if (!value || !value.trim()) {
+                            return 'A valid reason is required.';
+                        }
                     }
-                    reason = reason.trim();
-                    if (!reason) {
-                        showToast("A valid reason is required to generate the certificate early.", "error");
-                        return;
-                    }
-                    data.confirm_override = true;
-                    data.early_generation_reason = reason;
-                    showToast('Generating and saving certificate (with override)...');
-                    const retryRes = await apiFetch('/api/student/certificates/', {
-                        method: 'POST',
-                        body: JSON.stringify(data)
-                    });
-                    if (retryRes.ok) {
-                        const retryResult = await retryRes.json();
-                        showToast('Certificate saved & PDF generated successfully!');
-                        generatedPdfUrl = retryResult.pdf_file;
-                        document.getElementById('btnDownloadPDF').disabled = false;
-                        document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
-                        loadStudentData();
-                    } else {
-                        const retryErr = await retryRes.json();
-                        showToast(retryErr.error || JSON.stringify(retryErr), 'error');
-                    }
+                });
+
+                if (!reasonResult.isConfirmed || !reasonResult.value) return;
+
+                // Step 3: Retry with override
+                data.confirm_override = true;
+                data.early_generation_reason = reasonResult.value.trim();
+
+                showToast('Generating certificate with early override...');
+                const retryRes = await apiFetch('/api/student/certificates/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+
+                if (retryRes.ok) {
+                    const retryResult = await retryRes.json();
+                    showToast('Certificate saved & PDF generated successfully!');
+                    generatedPdfUrl = retryResult.pdf_file;
+                    document.getElementById('btnDownloadPDF').disabled = false;
+                    document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
+                    loadStudentData();
+                } else {
+                    const retryErr = await retryRes.json();
+                    showToast(retryErr.error || JSON.stringify(retryErr), 'error');
                 }
+
+            } else if (err.requires_reason) {
+                showToast('A reason is required for early generation.', 'error');
             } else {
                 showToast(err.error || JSON.stringify(err), 'error');
             }
@@ -994,7 +1100,14 @@ async function handleStudentRowClick(event, index) {
             institute: s.institute || '',
             start_date: s.start_date || '',
             completion_date: s.completion_date || '',
-            total_fees: s.total_fees || '0'
+            total_fees: s.total_fees || '0',
+            father_name: s.father_name || '',
+            phone: s.phone || '',
+            dob: s.dob || '',
+            gender: s.gender || '',
+            address: s.address || '',
+            student_type: s.student_type || '',
+            cert_type: s.cert_type || ''
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
@@ -1399,20 +1512,14 @@ async function loadStudentCertificatesList() {
 }
 
 function changeStudentPage(direction) {
-    if (direction === 1 && studentDirectoryNext !== null) {
-        studentDirectoryStart = studentDirectoryNext;
-    } else if (direction === -1) {
-        studentDirectoryStart = Math.max(0, studentDirectoryStart - 50);
-    }
+    const maxPage = Math.ceil(studentTotalCount / STUDENT_PAGE_SIZE) || 1;
+    studentCurrentPage = Math.max(1, Math.min(maxPage, studentCurrentPage + direction));
     loadStudentData();
 }
 
 function changeBitrixStudentPage(direction) {
-    if (direction === 1 && bitrixStudentNext !== null) {
-        bitrixStudentStart = bitrixStudentNext;
-    } else if (direction === -1) {
-        bitrixStudentStart = Math.max(0, bitrixStudentStart - 50);
-    }
+    const maxPage = Math.ceil(bitrixStudentTotalCount / STUDENT_PAGE_SIZE) || 1;
+    bitrixStudentCurrentPage = Math.max(1, Math.min(maxPage, bitrixStudentCurrentPage + direction));
     loadBitrixStudents();
 }
 

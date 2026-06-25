@@ -353,3 +353,30 @@ class ExitModuleTests(APITestCase):
         exit_req.refresh_from_db()
         self.assertEqual(exit_req.status, 'FULLY_EXITED')
         self.assertTrue(exit_req.send_email_on_exit)
+
+
+from django.test import TestCase
+
+class ExitLetterCustomizationSanitizationTests(TestCase):
+
+    def test_mock_obj_attribute_sanitization(self):
+        from exit_formality.services import MockObj, sanitize_html_context
+        from django.utils.safestring import SafeData
+        
+        class Original:
+            def __init__(self):
+                self.address = "Original\nAddress"
+                self.first_name = "John"
+        
+        orig = Original()
+        mock = MockObj(orig, address="Custom\nAddress\nWith <b>bold</b>")
+        
+        # Test custom override is sanitized when MockObj is sanitized
+        sanitized_mock = sanitize_html_context(mock)
+        self.assertEqual(sanitized_mock.address, "Custom<br>Address<br>With <b>bold</b>")
+        self.assertTrue(isinstance(sanitized_mock.address, SafeData))
+        
+        # Test original attribute (not overridden) is sanitized on attribute access (via __getattr__)
+        self.assertEqual(sanitized_mock.first_name, "John")
+        self.assertTrue(isinstance(sanitized_mock.first_name, SafeData))
+

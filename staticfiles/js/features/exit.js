@@ -339,16 +339,55 @@ function populateExitDetails(x) {
             respDetailsEl.style.display = 'block';
             document.getElementById('qDetSubmittedAt').textContent = fr.submitted_at ? new Date(fr.submitted_at).toLocaleString() : '-';
             document.getElementById('qDetPersonalEmail').textContent = fr.personal_email || '-';
+            document.getElementById('qDetPersonalPhone').textContent = fr.personal_phone || '-';
+            document.getElementById('qDetPersonalAddress').textContent = fr.personal_address || '-';
+            
             document.getElementById('qDetReasonDropdown').textContent = fr.reason_dropdown || '-';
             document.getElementById('qDetKtStatus').textContent = fr.kt_status || '-';
             document.getElementById('qDetKtHandover').textContent = fr.kt_handover_to || '-';
+            document.getElementById('qDetKtCompletionDate').textContent = fr.kt_completion_date || '-';
+            
+            const getYesNoSpan = (val) => {
+                if (val === true || val === 'true') {
+                    return '<span style="color: #16a34a; font-weight: bold;">YES</span>';
+                }
+                return '<span style="color: #dc2626; font-weight: bold;">NO</span>';
+            };
+            
+            document.getElementById('qDetKtManagerConfirmed').innerHTML = getYesNoSpan(fr.kt_manager_confirmed);
+            document.getElementById('qDetKtNotes').textContent = fr.kt_remarks || '-';
+            
+            // Assets return clearance details
+            document.getElementById('qDetAssetLaptopStatus').innerHTML = getYesNoSpan(fr.asset_laptop_returned);
+            document.getElementById('qDetAssetLaptopSerial').textContent = fr.asset_laptop_serial || '-';
+            document.getElementById('qDetAssetLaptopRemarks').textContent = fr.asset_laptop_remarks || '-';
+            
+            document.getElementById('qDetAssetIdStatus').innerHTML = getYesNoSpan(fr.asset_id_returned);
+            document.getElementById('qDetAssetIdRemarks').textContent = fr.asset_id_remarks || '-';
+            
+            document.getElementById('qDetAssetAccessCardStatus').innerHTML = getYesNoSpan(fr.asset_access_card_returned);
+            document.getElementById('qDetAssetAccessCardRemarks').textContent = fr.asset_access_card_remarks || '-';
+            
+            document.getElementById('qDetAssetMobileStatus').innerHTML = getYesNoSpan(fr.asset_mobile_returned);
+            document.getElementById('qDetAssetMobileNumber').textContent = fr.asset_mobile_number || '-';
+            document.getElementById('qDetAssetMobileRemarks').textContent = fr.asset_mobile_remarks || '-';
+            
+            document.getElementById('qDetAssetLockerStatus').innerHTML = getYesNoSpan(fr.asset_locker_returned);
+            document.getElementById('qDetAssetLockerRemarks').textContent = fr.asset_locker_remarks || '-';
+            
+            document.getElementById('qDetAssetOthers').textContent = fr.asset_others_details || '-';
+            document.getElementById('qDetAssetsConfirmation').innerHTML = getYesNoSpan(fr.assets_confirmation);
+            
+            // Feedback details
             document.getElementById('qDetRecommend').textContent = fr.recommend || '-';
             document.getElementById('qDetRatingEnv').textContent = fr.rating_env || '-';
             document.getElementById('qDetRatingMgmt').textContent = fr.rating_mgmt || '-';
             document.getElementById('qDetRatingBalance').textContent = fr.rating_balance || '-';
             document.getElementById('qDetReasonDetails').textContent = fr.reason_details || '-';
-            document.getElementById('qDetKtNotes').textContent = fr.kt_remarks || '-';
+            document.getElementById('qDetLikedMost').textContent = fr.liked_most || '-';
+            document.getElementById('qDetImprovedMost').textContent = fr.improved_most || '-';
             document.getElementById('qDetFeedback').textContent = fr.other_feedback || '-';
+            document.getElementById('qDetDeclarationConfirmed').innerHTML = getYesNoSpan(fr.declaration_confirmed);
         }
     } else {
         if (noRespEl) noRespEl.style.display = 'block';
@@ -699,6 +738,37 @@ async function actionOverrideExit() {
 
 let currentPreviewPdfUrl = null;
 let currentPreviewPdfName = '';
+
+async function actionSendEmailDocs() {
+    if (!activeExitRequest) return;
+    if (!confirm('Are you sure you want to email the selected documents to the employee now?')) return;
+
+    const email_documents = [];
+    if (document.getElementById('chkEmailRelieving') && document.getElementById('chkEmailRelieving').checked) email_documents.push('RELIEVING_LETTER');
+    if (document.getElementById('chkEmailExperience') && document.getElementById('chkEmailExperience').checked) email_documents.push('EXPERIENCE_LETTER');
+    if (document.getElementById('chkEmailNotice') && document.getElementById('chkEmailNotice').checked) email_documents.push('NOTICE_LETTER');
+    if (document.getElementById('chkEmailNoc') && document.getElementById('chkEmailNoc').checked) email_documents.push('NOC_LETTER');
+    if (document.getElementById('chkEmailFfLetter') && document.getElementById('chkEmailFfLetter').checked) email_documents.push('FF_SETTLEMENT_LETTER');
+    if (document.getElementById('chkEmailFfSlip') && document.getElementById('chkEmailFfSlip').checked) email_documents.push('FF_SALARY_SLIP');
+
+    try {
+        const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/send-documents-email/`, {
+            method: 'POST',
+            body: JSON.stringify({ 
+                email_documents: email_documents
+            })
+        });
+        if (res.ok) {
+            showToast('Documents are being dispatched via email.');
+        } else {
+            const err = await res.json();
+            showToast(JSON.stringify(err), 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Error dispatching emails.', 'error');
+    }
+}
 
 async function actionMarkExited() {
     if (!activeExitRequest) return;
@@ -1198,7 +1268,7 @@ async function saveExitTemplateChanges() {
             body: JSON.stringify({
                 name: template.name,
                 title: template.title,
-                html_content: newContent,
+                html_content: fullHtml,
                 allow_hr_edit: template.allow_hr_edit
             })
         });
@@ -1272,6 +1342,33 @@ async function previewExitTemplateInEditor() {
     const template = exitTemplatesCache.find(t => t.id == activeEditorTemplateId);
     if (!template) return;
     
+    const visualEditor = document.getElementById('visualExitTemplateEditor');
+    if (!visualEditor) return;
+    
+    // Parse current content to separate styles and body content
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(visualEditor.innerHTML, 'text/html');
+    
+    let styles = '';
+    doc.querySelectorAll('style').forEach(s => {
+        styles += s.outerHTML;
+        s.remove();
+    });
+    
+    const bodyContent = doc.body ? doc.body.innerHTML : visualEditor.innerHTML;
+    
+    const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${template.title || 'Exit Template'}</title>
+    ${styles}
+</head>
+<body>
+    ${bodyContent}
+</body>
+</html>`;
+    
     // Map template name to doc type slug
     const nameToSlug = {
         'RELIEVING_LETTER': 'relieving',
@@ -1291,7 +1388,10 @@ async function previewExitTemplateInEditor() {
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/preview-letter/`, {
             method: 'POST',
-            body: JSON.stringify({ doc_type: docType })
+            body: JSON.stringify({ 
+                doc_type: docType,
+                template_html: fullHtml
+            })
         });
         
         if (res.ok) {
@@ -1309,6 +1409,44 @@ async function previewExitTemplateInEditor() {
     } catch (e) {
         console.error(e);
         showToast('Error generating preview.', 'error');
+    }
+}
+
+function execExitEditorCommand(command) {
+    document.execCommand(command, false, null);
+    const visualEditor = document.getElementById('visualExitTemplateEditor');
+    if (visualEditor) {
+        visualEditor.focus();
+    }
+}
+
+function insertExitPlaceholderAtCursor(placeholder) {
+    if (!placeholder) return;
+    const visualEditor = document.getElementById('visualExitTemplateEditor');
+    if (!visualEditor) return;
+    
+    visualEditor.focus();
+    
+    const sel = window.getSelection();
+    if (sel.getRangeAt && sel.rangeCount) {
+        let range = sel.getRangeAt(0);
+        
+        if (visualEditor.contains(range.commonAncestorContainer)) {
+            range.deleteContents();
+            
+            const textNode = document.createTextNode(placeholder);
+            range.insertNode(textNode);
+            
+            range = range.cloneRange();
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            visualEditor.appendChild(document.createTextNode(placeholder));
+        }
+    } else {
+        visualEditor.appendChild(document.createTextNode(placeholder));
     }
 }
 

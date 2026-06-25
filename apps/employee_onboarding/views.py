@@ -596,6 +596,61 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['POST'], url_path='bitrix-webhook', permission_classes=[], authentication_classes=[])
+    def bitrix_webhook(self, request):
+        data = request.data or {}
+        bitrix_id = None
+        
+        # 1. Check direct keys for ID (including crm.id)
+        for key in ['id', 'ID', 'bitrix_id', 'bitrix_user_id', 'crm.id']:
+            if key in data:
+                bitrix_id = data[key]
+                break
+                
+        # 2. Check nested inside 'data' key
+        if not bitrix_id and isinstance(data.get('data'), dict):
+            nested_data = data['data']
+            if isinstance(nested_data.get('FIELDS'), dict):
+                fields = nested_data['FIELDS']
+                for key in ['ID', 'id', 'crm.id']:
+                    if key in fields:
+                        bitrix_id = fields[key]
+                        break
+            if not bitrix_id:
+                for key in ['id', 'ID', 'bitrix_id', 'bitrix_user_id', 'crm.id']:
+                    if key in nested_data:
+                        bitrix_id = nested_data[key]
+                        break
+
+        # 3. Check nested inside 'fields' key
+        if not bitrix_id and isinstance(data.get('fields'), dict):
+            fields = data['fields']
+            for key in ['ID', 'id', 'crm.id']:
+                if key in fields:
+                    bitrix_id = fields[key]
+                    break
+
+        first_name = data.get('first_name') or data.get('name')
+        email = data.get('email') or data.get('work_email')
+
+        if bitrix_id:
+            from .tasks import process_bitrix_webhook_task
+            process_bitrix_webhook_task.delay(data)
+            return Response({
+                'status': 'queued',
+                'message': f'Sync queued for employee ID {bitrix_id}.'
+            }, status=status.HTTP_202_ACCEPTED)
+
+        elif first_name and email:
+            from .tasks import process_bitrix_webhook_task
+            process_bitrix_webhook_task.delay(data)
+            return Response({
+                'status': 'queued',
+                'message': f'Creation and sync queued for {first_name}.'
+            }, status=status.HTTP_202_ACCEPTED)
+
+        return Response({'error': 'Missing ID or required fields (first_name, email).'}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['POST'], url_path='import-excel')
     def excel_import(self, request):
         user = request.user
@@ -998,16 +1053,9 @@ class LetterTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Automatically seed templates if they do not exist
-        if LetterTemplate.objects.count() == 0:
-            for t in DEFAULT_TEMPLATES:
+        for t in DEFAULT_TEMPLATES:
+            if not LetterTemplate.objects.filter(name=t['name']).exists():
                 LetterTemplate.objects.create(**t)
-        else:
-            # Overwrite default BOND_LETTER, APPOINTMENT_LETTER, and OFFER_LETTER to align layout instantly
-            for t in DEFAULT_TEMPLATES:
-                obj = LetterTemplate.objects.filter(name=t['name']).first()
-                if obj and t['name'] in ['BOND_LETTER', 'APPOINTMENT_LETTER', 'OFFER_LETTER']:
-                    obj.html_content = t['html_content']
-                    obj.save()
                     
         # Automatically seed exit templates if they do not exist
         exit_templates_seeding = [
@@ -1062,5 +1110,65 @@ class LetterTemplateViewSet(viewsets.ModelViewSet):
                         raise PermissionDenied("You do not have permission to edit this template.")
                 
         return super().update(request, *args, **kwargs)
+
+
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render
+
+@csrf_exempt
+def employees_hybrid_view(request, *args, **kwargs):
+    """
+    Custom hybrid view for the /employees/ endpoint.
+    Handles GET: lists employees (renders layout or returns API response).
+    Handles POST:
+      - If it's a frontend AJAX request (Accept: application/json or X-Requested-With: XMLHttpRequest),
+        routes to 'create' to add a user to Bitrix.
+      - Otherwise (e.g. from Bitrix webhook), routes to 'bitrix_webhook' to sync the user.
+    """
+    from .views import EmployeeViewSet
+    
+    is_json = (
+        'application/json' in request.META.get('HTTP_ACCEPT', '') or
+        request.headers.get('x-requested-with') == 'XMLHttpRequest' or
+        request.GET.get('format') == 'json'
+    )
+    
+    if request.method == 'GET':
+        if is_json:
+            api_view_func = EmployeeViewSet.as_view({'get': 'list'})
+            response = api_view_func(request, *args, **kwargs)
+            if hasattr(response, 'render'):
+                response.render()
+            return response
+        else:
+            return render(request, 'base/layout.html')
+            
+    elif request.method == 'POST':
+        is_ajax_post = (
+            'application/json' in request.META.get('HTTP_ACCEPT', '') or
+            request.headers.get('x-requested-with') == 'XMLHttpRequest'
+        )
+        
+        if is_ajax_post:
+            import json
+            is_webhook = False
+            try:
+                body_data = json.loads(request.body)
+                if isinstance(body_data, dict) and ('event' in body_data or 'data' in body_data):
+                    is_webhook = True
+            except Exception:
+                pass
+            
+            if is_webhook:
+                api_view_func = EmployeeViewSet.as_view({'post': 'bitrix_webhook'}, permission_classes=[], authentication_classes=[])
+            else:
+                api_view_func = EmployeeViewSet.as_view({'post': 'create'})
+        else:
+            api_view_func = EmployeeViewSet.as_view({'post': 'bitrix_webhook'}, permission_classes=[], authentication_classes=[])
+            
+        response = api_view_func(request, *args, **kwargs)
+        if hasattr(response, 'render'):
+            response.render()
+        return response
 
 

@@ -2,88 +2,55 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Full and Final Settlement Statement</title>
+    <title>Full and Final Settlement</title>
     <style>
         @page {
             size: A4;
-            margin: 20mm;
+            margin: 25mm 20mm;
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 11pt;
+            font-size: 11.5pt;
             line-height: 1.6;
-            color: #333;
-        }
-        .header {
-            text-align: center;
-            border-bottom: 2px solid #0056b3;
-            padding-bottom: 12px;
-            margin-bottom: 30px;
-        }
-        .company-name {
-            font-size: 20pt;
-            font-weight: bold;
-            color: #0056b3;
-            text-transform: uppercase;
-        }
-        .company-sub {
-            font-size: 9pt;
-            color: #555;
-            margin-top: 4px;
+            color: #000000;
         }
         .title {
-            font-size: 14pt;
+            font-size: 15pt;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 30px;
-            color: #0056b3;
+            margin-top: 30px;
+            margin-bottom: 40px;
             text-decoration: underline;
         }
         .content-p {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             text-align: justify;
         }
-        .details-table {
-            width: 100%;
-            margin-top: 30px;
-            margin-bottom: 40px;
-            border-collapse: collapse;
+        .details-section {
+            margin-top: 40px;
+            margin-bottom: 50px;
+            line-height: 2.0;
         }
-        .details-table td {
-            padding: 6px;
-            vertical-align: top;
-        }
-        .details-label {
+        .details-section div {
             font-weight: bold;
-            width: 30%;
         }
         .signature-section {
-            margin-top: 60px;
+            margin-top: 80px;
             width: 100%;
-        }
-        .sig-block {
-            float: left;
-            width: 45%;
-        }
-        .sig-block.right {
-            float: right;
-            text-align: right;
-        }
-        .sig-line {
-            border-top: 1.5px solid #333;
-            margin-top: 50px;
-            padding-top: 5px;
-            font-size: 10pt;
             font-weight: bold;
-            text-align: center;
+        }
+        .sig-left {
+            float: left;
+            width: 50%;
+        }
+        .sig-right {
+            float: right;
+            width: 50%;
+            text-align: right;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="company-name">{{ company_name }}</div>
-        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
-    </div>
     
     <div class="title">Full and Final Settlement</div>
     
@@ -92,39 +59,23 @@
     </p>
 
     <p class="content-p">
-        I understand fully that this is legally binding and the condition shall not be violated by me, particularly relating to confidentiality, non-solicitation, Personal data transfer, client information/details and the other clauses.
+        I understand fully that this is legally binding and the condition shall not be violated by me, particularly relating to confidentiality, non- solicitation, Personal data transfer, client information/details and the other clauses.
     </p>
 
     <p class="content-p">
         I solemnly declare that after leaving <strong>{{ company_name }}</strong>, I will abide by all the conditions of the said agreement.
     </p>
 
-    <table class="details-table">
-        <tr>
-            <td class="details-label">Name :</td>
-            <td>{{ employee.first_name }} {{ employee.last_name }}</td>
-        </tr>
-        <tr>
-            <td class="details-label">Designation:</td>
-            <td>{{ employee.designation }}</td>
-        </tr>
-        <tr>
-            <td class="details-label">Place:</td>
-            <td>{{ employee.city|default:"Mohali" }}</td>
-        </tr>
-        <tr>
-            <td class="details-label">Received Amount :</td>
-            <td><strong>{{ ff.net_payable }}/-</strong></td>
-        </tr>
-    </table>
+    <div class="details-section">
+        <div>Name : {{ employee.first_name }} {{ employee.last_name }}</div>
+        <div>Designation: {{ employee.designation }}</div>
+        <div>Place: {{ employee.city|default:"Mohali" }}</div>
+        <div>Received Amount : {{ ff.net_payable|default:"0" }}/-</div>
+    </div>
 
     <div class="signature-section">
-        <div class="sig-block">
-            <div class="sig-line">Employee Signature</div>
-        </div>
-        <div class="sig-block right">
-            <div class="sig-line">HR Department</div>
-        </div>
+        <div class="sig-left">Employee Signature:_________________</div>
+        <div class="sig-right">HR Department: __________________</div>
         <div style="clear: both;"></div>
     </div>
 </body>

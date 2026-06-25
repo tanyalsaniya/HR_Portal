@@ -6,79 +6,72 @@
     <style>
         @page {
             size: A4;
-            margin: 20mm;
+            margin: 25mm 20mm;
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 11pt;
+            font-size: 11.5pt;
             line-height: 1.6;
-            color: #333;
+            color: #000000;
         }
-        .header {
+        .title {
+            font-size: 15pt;
+            font-weight: bold;
             text-align: center;
-            border-bottom: 2px solid #0056b3;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-        }
-        .company-name {
-            font-size: 20pt;
-            font-weight: bold;
-            color: #0056b3;
-        }
-        .company-sub {
-            font-size: 10pt;
-            color: #555;
-        }
-        .date {
-            text-align: right;
-            margin-bottom: 20px;
-        }
-        .subject {
-            font-weight: bold;
+            margin-top: 40px;
+            margin-bottom: 50px;
             text-decoration: underline;
+        }
+        .content-p {
             margin-bottom: 25px;
-            text-align: center;
+            text-align: justify;
         }
-        .salutation {
-            margin-bottom: 15px;
-        }
-        .content {
+        .sincerely-section {
+            margin-top: 80px;
             margin-bottom: 30px;
         }
         .signature-section {
-            margin-top: 50px;
-            page-break-inside: avoid;
+            width: 100%;
         }
-        .signature-line {
-            width: 200px;
-            border-top: 1px solid #333;
-            margin-top: 40px;
+        .sig-left {
+            float: left;
+            width: 50%;
+            text-align: left;
+        }
+        .sig-right {
+            float: right;
+            width: 50%;
+            text-align: right;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="company-name">{{ company_name }}</div>
-        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
+    
+    <div class="title">To Whom So Ever It May Concern</div>
+    
+    <p class="content-p">
+        This is to formally confirm that <strong>{{ employee.first_name }} {{ employee.last_name }}</strong> who served as <strong>{{ employee.designation }}</strong> at <strong>{{ company_name }}</strong>, has been relieved from his duties effective <strong>{{ exit_request.last_working_day|date:"F d, Y" }}</strong>.
+    </p>
+
+    <p class="content-p">
+        We sincerely appreciate the contributions {% if employee.gender == 'Female' %}she{% else %}he{% endif %} has made during {% if employee.gender == 'Female' %}her{% else %}his{% endif %} tenure with us and extend our best wishes for {% if employee.gender == 'Female' %}her{% else %}his{% endif %} future endeavors.
+    </p>
+
+    <div class="sincerely-section">
+        Sincerely,
     </div>
-    
-    <div class="date">Date: {{ today|date:"F d, Y" }}</div>
-    
-    <div class="salutation">Dear {{ employee.first_name }} {{ employee.last_name }},</div>
-    
-    <div class="subject">Subject: Relieving Letter</div>
-    
-    <div class="content">
-        <p>This is to confirm that your resignation from the services of <strong>{{ company_name }}</strong> has been accepted by the management. Consequently, you are relieved from your duties as <strong>{{ employee.designation }}</strong> with effect from the close of business hours on <strong>{{ exit_request.last_working_day|date:"F d, Y" }}</strong>.</p>
-        
-        <p>We confirm that you have completed all offboarding exit formalities, returned all company-owned assets, and handed over your responsibilities to the satisfaction of your department.</p>
-        
-        <p>Your full and final settlement has been calculated and processed. We wish you the very best in all your future professional endeavors.</p>
-    </div>
-    
+
     <div class="signature-section">
-        <p>For <strong>{{ company_name }}</strong>,</p>
-        <div class="signature-line">Authorized Signatory</div>
+        <div class="sig-left">
+            <div>..............................................</div>
+            <div style="margin-top: 6px;">Company Representative (Sign)</div>
+            <div style="margin-top: 6px;">Date – {{ exit_request.last_working_day|date:"F d, Y" }}</div>
+        </div>
+        <div class="sig-right">
+            <div>..............................................</div>
+            <div style="margin-top: 6px;">( HR Department )</div>
+        </div>
+        <div style="clear: both;"></div>
     </div>
 </body>
 </html>

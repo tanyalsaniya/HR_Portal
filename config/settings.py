@@ -33,7 +33,12 @@ if os.path.exists(tess_path):
 # ---------- SECURITY ----------
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-$$exa==o9et_2o5x5x&nuqgepp!hr0sxh%9-4iu6(rkn0qmvvh')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,overmournfully-overnervous-narcisa.ngrok-free.dev'
+).split(',')
+if DEBUG:
+    ALLOWED_HOSTS.extend(['.ngrok-free.app', '.ngrok-free.dev', '.ngrok.dev'])
 
 # ---------- APPLICATION DEFINITION ----------
 INSTALLED_APPS = [
@@ -208,8 +213,8 @@ CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False') == 'True'
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {

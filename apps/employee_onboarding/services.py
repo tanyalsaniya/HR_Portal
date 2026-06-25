@@ -792,13 +792,7 @@ DEFAULT_TEMPLATES = [
 def sync_db_templates():
     from .models import LetterTemplate
     for t in DEFAULT_TEMPLATES:
-        obj = LetterTemplate.objects.filter(name=t['name']).first()
-        if obj:
-            if obj.html_content != t['html_content'] or obj.title != t['title']:
-                obj.html_content = t['html_content']
-                obj.title = t['title']
-                obj.save()
-        else:
+        if not LetterTemplate.objects.filter(name=t['name']).exists():
             LetterTemplate.objects.create(**t)
 
 def render_letter_to_html(employee, doc_type, custom_context=None):
@@ -854,6 +848,28 @@ def generate_document_pdf(employee, doc_type, template_name, context, user=None)
         uploaded_by=user
     )
     return doc
+
+
+import re
+from django.utils.safestring import mark_safe, SafeData
+
+def sanitize_html_context(val):
+    if callable(val):
+        return val
+    elif isinstance(val, dict):
+        return {k: sanitize_html_context(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [sanitize_html_context(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(sanitize_html_context(v) for v in val)
+    elif isinstance(val, str) and not isinstance(val, SafeData):
+        formatted = val.replace('\n', '<br>')
+        # Convert ordinals like 1st, 2nd, 3rd, 22nd to superscript HTML
+        def replace_ordinal(match):
+            return f"{match.group(1)}<sup>{match.group(2)}</sup>"
+        formatted = re.sub(r'\b(\d+)(st|nd|rd|th|ST|ND|RD|TH)\b', replace_ordinal, formatted)
+        return mark_safe(formatted)
+    return val
 
 
 def get_letter_context(employee, custom_context=None):
@@ -958,7 +974,7 @@ def get_letter_context(employee, custom_context=None):
         ] if salary_struct else [],
     })
     
-    return context
+    return sanitize_html_context(context)
 
 def generate_offer_letter(employee, user=None, custom_context=None):
     context = get_letter_context(employee, custom_context)

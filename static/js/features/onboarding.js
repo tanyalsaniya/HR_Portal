@@ -1350,7 +1350,16 @@ async function openLetterWorkspace(type) {
             }
             
             const today = new Date();
-            const formattedToday = today.getDate() + 'th ' + today.toLocaleString('default', { month: 'long' }) + ' ' + today.getFullYear();
+            const getOrdinalSuffix = (day) => {
+                if (day > 3 && day < 21) return 'th';
+                switch (day % 10) {
+                    case 1:  return 'st';
+                    case 2:  return 'nd';
+                    case 3:  return 'rd';
+                    default: return 'th';
+                }
+            };
+            const formattedToday = today.getDate() + getOrdinalSuffix(today.getDate()) + ' ' + today.toLocaleString('default', { month: 'long' }) + ' ' + today.getFullYear();
             
             document.getElementById('custLetterDate').value = formattedToday;
             document.getElementById('custJoiningDate').value = emp.joining_date || '';

@@ -263,6 +263,26 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
         exit_req.save(update_fields=['status', 'send_email_on_exit', 'email_documents'])
         return Response({'message': 'Employee marked as Fully Exited. Final documents are being dispatched.'})
 
+    @action(detail=True, methods=['POST'], url_path='send-documents-email')
+    def send_documents_email(self, request, pk=None):
+        exit_req = self.get_object()
+        user = request.user
+        is_admin = user.is_superuser or (user.role and user.role.code == 'ADMIN')
+        if not is_admin:
+            user_perms = list(user.role.permissions.values_list('codename', flat=True)) if user.role else []
+            if 'exit.send_email' not in user_perms:
+                raise PermissionDenied("You do not have permission to dispatch exit documents via email.")
+
+        email_docs = request.data.get('email_documents', [])
+        if isinstance(email_docs, list):
+            exit_req.email_documents = email_docs
+            exit_req.save(update_fields=['email_documents'])
+
+        from .tasks import send_exit_documents_after_fully_exited
+        send_exit_documents_after_fully_exited.delay(exit_req.id)
+        
+        return Response({'message': 'Documents are being dispatched via email.'})
+
     @action(detail=True, methods=['PUT'], url_path='extend-lwd')
     def extend_lwd(self, request, pk=None):
         exit_req = self.get_object()
@@ -433,8 +453,15 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
             raise ValidationError({'doc_type': 'This field is required.'})
             
         custom_context = request.data.get('custom_context', {})
+        template_html = request.data.get('template_html', None)
         try:
-            html_content = render_exit_letter_to_html(exit_req, mapped_type, custom_context)
+            if template_html:
+                from django.template import Template, Context
+                from .services import get_exit_letter_context
+                context = get_exit_letter_context(exit_req, custom_context)
+                html_content = Template(template_html).render(Context(context))
+            else:
+                html_content = render_exit_letter_to_html(exit_req, mapped_type, custom_context)
             return Response({'html': html_content})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -442,10 +469,6 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='generate-relieving')
     def generate_relieving_api(self, request, pk=None):
         exit_req = self.get_object()
-        if exit_req.status not in ('COMPLETED', 'CLEARANCES_DONE', 'FF_PROCESSED', 'FULLY_EXITED'):
-            return Response({
-                'error': 'Relieving letter can only be generated after exit questionnaire is completed.'
-            }, status=status.HTTP_400_BAD_REQUEST)
         custom_context = request.data.get('custom_context', None)
         try:
             doc = generate_relieving_letter(exit_req, user=request.user, custom_context=custom_context)
@@ -459,10 +482,6 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='generate-experience')
     def generate_experience_api(self, request, pk=None):
         exit_req = self.get_object()
-        if exit_req.status not in ('COMPLETED', 'CLEARANCES_DONE', 'FF_PROCESSED', 'FULLY_EXITED'):
-            return Response({
-                'error': 'Experience letter can only be generated after exit questionnaire is completed.'
-            }, status=status.HTTP_400_BAD_REQUEST)
         custom_context = request.data.get('custom_context', None)
         try:
             doc = generate_experience_letter(exit_req, user=request.user, custom_context=custom_context)

@@ -1,7 +1,7 @@
 # apps/employee_onboarding/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DepartmentViewSet, EmployeeViewSet, EmployeeDocumentViewSet, LetterTemplateViewSet
+from .views import DepartmentViewSet, EmployeeViewSet, EmployeeDocumentViewSet, LetterTemplateViewSet, employees_hybrid_view
 from accounts.views import hybrid_view
 
 # API Router
@@ -16,8 +16,8 @@ urlpatterns = [
     path('', include(router.urls)),
     
     # Hybrid View page + XHR API
-    path('employees/', hybrid_view(EmployeeViewSet, {'get': 'list', 'post': 'create'}), name='employees_view'),
-    path('employees/onboard/', hybrid_view(EmployeeViewSet, {'get': 'list', 'post': 'create'}), name='employees_onboard_view'),
+    path('employees/', employees_hybrid_view, name='employees_view'),
+    path('employees/onboard/', employees_hybrid_view, name='employees_onboard_view'),
     path('employees/detail/', hybrid_view(EmployeeViewSet, {'get': 'list'}), name='employees_detail_page'),
     path('employees/export-excel/', hybrid_view(EmployeeViewSet, {'get': 'excel_export'}), name='employees_export_excel'),
     path('employees/import-excel/', hybrid_view(EmployeeViewSet, {'post': 'excel_import'}), name='employees_import_excel'),
