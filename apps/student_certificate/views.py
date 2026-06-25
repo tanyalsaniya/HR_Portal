@@ -995,12 +995,22 @@ class StudentViewSet(viewsets.ModelViewSet):
                 joining_date = datetime.datetime.strptime(joining_date_str.split('T')[0], '%Y-%m-%d').date()
             except ValueError:
                 pass
+
         dob = None
         if dob_str:
             try:
                 dob = datetime.datetime.strptime(dob_str.split('T')[0], '%Y-%m-%d').date()
             except ValueError:
                 pass
+
+        # Handle missing dates logically
+        if not joining_date and not completion_date:
+            joining_date = today
+            completion_date = today + datetime.timedelta(days=180)
+        elif not joining_date:
+            joining_date = completion_date - datetime.timedelta(days=180)
+        elif not completion_date:
+            completion_date = joining_date + datetime.timedelta(days=180)
 
         # Find or create department
         from employee_onboarding.models import Department

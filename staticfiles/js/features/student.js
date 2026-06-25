@@ -408,9 +408,9 @@ async function loadStudentsSelect(selectedStudentId = null) {
 
         // Combine. Match by email to avoid duplicates.
         const dbEmails = new Set(dbStudents.map(s => (s.email || '').toLowerCase()));
-        
+
         let html = '<option value="">-- Select Student --</option>';
-        
+
         // Add database students first
         dbStudents.forEach(s => {
             html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
@@ -452,7 +452,7 @@ async function loadStudentCertPrefills() {
     if (!select || !select.value) return;
 
     let studentId = select.value;
-    
+
     // If it's a Bitrix-only student, dynamically sync them first
     if (String(studentId).startsWith('bitrix_')) {
         const option = select.options[select.selectedIndex];
@@ -801,7 +801,7 @@ async function generateAndSaveCertificate() {
     const data = {
         student: parseInt(select.value),
         course: parseInt(courseSelect.value),
-        duration: document.getElementById('certDurationInput').value,
+        duration: document.getElementById('certDurationInput').value,   // was missing in v2
         skill_ratings: skillRatings,
         show_dates: document.getElementById('certShowDatesToggle').checked,
         issue_date: document.getElementById('certIssueDate').value,
@@ -820,59 +820,71 @@ async function generateAndSaveCertificate() {
         if (res.ok) {
             const result = await res.json();
             showToast('Certificate saved & PDF generated successfully!');
-
             generatedPdfUrl = result.pdf_file;
             document.getElementById('btnDownloadPDF').disabled = false;
-
             document.getElementById('prevSerialNo').textContent = `Sr.no ${result.serial_no}`;
             loadStudentData();
+
         } else {
             const err = await res.json();
+
             if (err.requires_override) {
-                const resultConf = await Swal.fire({
+                // Step 1: Confirm early generation
+                const confirmResult = await Swal.fire({
                     title: 'Early Generation Warning',
                     text: err.warning,
                     icon: 'warning',
                     showCancelButton: true,
+                    confirmButtonColor: '#f59e0b',
+                    cancelButtonColor: '#6b7280',
                     confirmButtonText: 'Yes, Generate Early',
                     cancelButtonText: 'Cancel'
                 });
 
-                if (resultConf.isConfirmed) {
-                    const reasonResult = await Swal.fire({
-                        title: 'Reason for Early Generation',
-                        input: 'textarea',
-                        inputLabel: 'Please provide the reason for generating this certificate before the course completion date.',
-                        inputPlaceholder: 'Enter your reason here...',
-                        showCancelButton: true,
-                        inputValidator: (value) => {
-                            if (!value || !value.trim()) {
-                                return 'A valid reason is required to generate the certificate early.';
-                            }
-                        }
-                    });
+                if (!confirmResult.isConfirmed) return;
 
-                    if (reasonResult.isConfirmed && reasonResult.value) {
-                        data.confirm_override = true;
-                        data.early_generation_reason = reasonResult.value.trim();
-                        showToast('Generating and saving certificate (with override)...');
-                        const retryRes = await apiFetch('/api/student/certificates/', {
-                            method: 'POST',
-                            body: JSON.stringify(data)
-                        });
-                        if (retryRes.ok) {
-                            const retryResult = await retryRes.json();
-                            showToast('Certificate saved & PDF generated successfully!');
-                            generatedPdfUrl = retryResult.pdf_file;
-                            document.getElementById('btnDownloadPDF').disabled = false;
-                            document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
-                            loadStudentData();
-                        } else {
-                            const retryErr = await retryRes.json();
-                            showToast(retryErr.error || JSON.stringify(retryErr), 'error');
+                // Step 2: Collect reason
+                const reasonResult = await Swal.fire({
+                    title: 'Reason for Early Generation',
+                    input: 'textarea',
+                    inputLabel: 'Please provide the reason for generating this certificate before the course completion date.',
+                    inputPlaceholder: 'Enter your reason here...',
+                    showCancelButton: true,
+                    confirmButtonText: 'Submit & Generate',
+                    cancelButtonText: 'Cancel',
+                    inputValidator: (value) => {
+                        if (!value || !value.trim()) {
+                            return 'A valid reason is required.';
                         }
                     }
+                });
+
+                if (!reasonResult.isConfirmed || !reasonResult.value) return;
+
+                // Step 3: Retry with override
+                data.confirm_override = true;
+                data.early_generation_reason = reasonResult.value.trim();
+
+                showToast('Generating certificate with early override...');
+                const retryRes = await apiFetch('/api/student/certificates/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+
+                if (retryRes.ok) {
+                    const retryResult = await retryRes.json();
+                    showToast('Certificate saved & PDF generated successfully!');
+                    generatedPdfUrl = retryResult.pdf_file;
+                    document.getElementById('btnDownloadPDF').disabled = false;
+                    document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
+                    loadStudentData();
+                } else {
+                    const retryErr = await retryRes.json();
+                    showToast(retryErr.error || JSON.stringify(retryErr), 'error');
                 }
+
+            } else if (err.requires_reason) {
+                showToast('A reason is required for early generation.', 'error');
             } else {
                 showToast(err.error || JSON.stringify(err), 'error');
             }
