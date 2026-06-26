@@ -22,7 +22,7 @@ from .serializers import (
     SalaryStructureSerializer, SalarySlipSerializer, SalaryImportBatchSerializer,
     SalaryIncrementReminderSerializer, SalaryIncrementApprovalSerializer
 )
-from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words
+from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words, auto_generate_slip_from_previous
 
 # Helper to check roles
 def check_role(user):
@@ -182,7 +182,7 @@ class SalaryExportView(APIView):
         locked_style = Protection(locked=True)
         unlocked_style = Protection(locked=False)
 
-        # Check if salary slips already exist
+        # Check if salary slips already exist for the requested month/year
         slips = SalarySlip.objects.filter(month=month, year=year)
         
         # Resolve employees for all slips
@@ -194,6 +194,9 @@ class SalaryExportView(APIView):
         from salary.models import EmployeeBankDetail
 
         if slips.exists():
+            # ----------------------------------------------------------------
+            # Slips already exist for this month — export them as-is (unchanged)
+            # ----------------------------------------------------------------
             for slip in slips:
                 emp = user_map.get(str(slip.bitrix_user_id))
                 emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
@@ -232,7 +235,19 @@ class SalaryExportView(APIView):
                         cell.protection = unlocked_style
                 row_idx += 1
         else:
-            # Export empty template using active employees & structures
+            # ----------------------------------------------------------------
+            # No slips yet for this month — generate a pre-filled template.
+            #
+            # ENHANCEMENT: Instead of zeroing out salary fields, carry forward
+            # each employee's most recent salary slip as editable defaults.
+            # This eliminates re-entry when nothing has changed month-to-month.
+            # Fallback order for each field:
+            #   1. Latest prior SalarySlip  (preferred — reflects actual paid values)
+            #   2. SalaryStructure gross_salary for month_salary (when no prior slip)
+            #   3. 0.0 for attendance fields (worked_days, weekend, cl, extra, etc.)
+            # Bank details continue to prefer the persistent EmployeeBankDetail
+            # record; the prior slip is only used when that record is empty.
+            # ----------------------------------------------------------------
             import calendar
             from exit_formality.models import ExitRequest
             month_days_val = calendar.monthrange(year, month)[1]
@@ -250,12 +265,19 @@ class SalaryExportView(APIView):
                     ).exclude(status__in=['CANCELLED', 'FULLY_EXITED']).exists()
                     if has_pending_exit:
                         employees.append(emp)
+
             for emp in employees:
-                struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
+                struct = SalaryStructure.objects.filter(
+                    bitrix_user_id=emp.bitrix_id,
+                    effective_from__lte=datetime.date(year, month, 28)
+                ).order_by('-effective_from').first()
                 if not struct:
                     # Fallback to absolute latest if none effective yet
-                    struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id).order_by('-effective_from').first()
+                    struct = SalaryStructure.objects.filter(
+                        bitrix_user_id=emp.bitrix_id
+                    ).order_by('-effective_from').first()
 
+                # Resolve bank details from the persistent record first
                 bank_acc = ""
                 bank_nm = ""
                 detail = EmployeeBankDetail.objects.filter(bitrix_user_id=emp.bitrix_id).first()
@@ -265,21 +287,68 @@ class SalaryExportView(APIView):
                 if not bank_acc:
                     bank_acc = emp.bank_account or ""
 
+                # ----------------------------------------------------------
+                # Look up the most recent salary slip that is NOT for the
+                # current target month (so we never self-reference).
+                # ----------------------------------------------------------
+                prev_slip = (
+                    SalarySlip.objects
+                    .filter(bitrix_user_id=emp.bitrix_id)
+                    .exclude(month=month, year=year)
+                    .order_by('-year', '-month')
+                    .first()
+                )
+
+                if prev_slip:
+                    # Carry forward all salary & attendance values from the
+                    # previous slip.  month_days is always recalculated for
+                    # the target month so it stays accurate.
+                    prev_worked_days     = float(prev_slip.worked_days)
+                    prev_weekend         = float(prev_slip.weekend)
+                    prev_cl              = float(prev_slip.cl)
+                    prev_extra           = float(prev_slip.extra)
+                    prev_payable_days    = float(prev_slip.payable_days)
+                    prev_month_salary    = float(prev_slip.month_salary)
+                    prev_payable_salary  = float(prev_slip.payable_salary)
+                    prev_extra_days_work = float(prev_slip.extra_days_working)
+                    prev_fine_advance    = float(prev_slip.fine_advance)
+                    prev_net_payable     = float(prev_slip.net_payable)
+                    # Only fall back to slip bank details when persistent
+                    # EmployeeBankDetail record is absent/incomplete
+                    if not bank_acc:
+                        bank_acc = prev_slip.bank_account_no or ""
+                    if not bank_nm:
+                        bank_nm = prev_slip.bank_name or ""
+                else:
+                    # No prior slip exists — zero out attendance-based fields
+                    # and seed month_salary from the salary structure so at
+                    # least the base salary is pre-populated.
+                    prev_worked_days     = 0.0
+                    prev_weekend         = 0.0
+                    prev_cl              = 0.0
+                    prev_extra           = 0.0
+                    prev_payable_days    = 0.0
+                    prev_month_salary    = float(struct.gross_salary) if struct else 0.0
+                    prev_payable_salary  = 0.0
+                    prev_extra_days_work = 0.0
+                    prev_fine_advance    = 0.0
+                    prev_net_payable     = 0.0
+
                 row_data = [
                     row_idx - 1,
                     emp.name,
                     emp.designation,
-                    float(month_days_val),
-                    0.0,  # Worked days
-                    0.0,  # Weekend
-                    0.0,  # CL
-                    0.0,  # Extra
-                    0.0,  # Payable Days
-                    float(struct.gross_salary) if struct else 0.0,
-                    0.0,  # Payable Salary
-                    0.0,  # Extra days working
-                    0.0,  # Fine/Advance
-                    0.0,  # Net Payable
+                    float(month_days_val),   # always current month's calendar days
+                    prev_worked_days,
+                    prev_weekend,
+                    prev_cl,
+                    prev_extra,
+                    prev_payable_days,
+                    prev_month_salary,
+                    prev_payable_salary,
+                    prev_extra_days_work,
+                    prev_fine_advance,
+                    prev_net_payable,
                     bank_acc,
                     bank_nm
                 ]
@@ -701,6 +770,9 @@ class SalaryHistoryView(APIView):
             if not user_data:
                 return Response({'error': 'Employee profile not found in Bitrix24.'}, status=status.HTTP_404_NOT_FOUND)
             employee = BitrixEmployeeMock(user_data)
+            # Auto-generate current month's slip from previous if admin hasn't imported yet
+            today = datetime.date.today()
+            auto_generate_slip_from_previous(employee.bitrix_id, today.month, today.year)
             slips = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, status='published').order_by('-year', '-month')
         else:
             # Admin / HR
@@ -807,6 +879,9 @@ class SalarySlipDownloadView(APIView):
                 return Response({'error': 'Employee profile not found.'}, status=status.HTTP_404_NOT_FOUND)
             employee = BitrixEmployeeMock(user_data)
             employee_id = employee.bitrix_id
+            # Auto-generate current month's slip from previous if admin hasn't imported yet
+            today = datetime.date.today()
+            auto_generate_slip_from_previous(employee_id, today.month, today.year)
             # Employees can only download published slips
             slips_qs = SalarySlip.objects.filter(bitrix_user_id=employee_id, status='published')
         else:
