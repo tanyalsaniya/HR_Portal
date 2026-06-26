@@ -253,8 +253,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         
         filtered_users = []
         for u in queryset:
-            # Set a new joiner flag (e.g. joined within the last 30 days)
-            if u.joining_date and (today - datetime.timedelta(days=30)) <= u.joining_date <= today:
+            # Set a new joiner flag (e.g. joined within the last 15 days)
+            if u.joining_date and (today - datetime.timedelta(days=15)) <= u.joining_date <= today:
                 u._data['is_new_joiner'] = True
             else:
                 u._data['is_new_joiner'] = False
@@ -1554,8 +1554,18 @@ def employees_hybrid_view(request, *args, **kwargs):
                 response.render()
             return response
         else:
-            return render(request, 'base/layout.html')
-            
+            path = request.path.rstrip('/')
+            initial_tab = 'onboarding'
+            if path.endswith('active'):
+                initial_tab = 'all'
+            elif path.endswith('offboarding'):
+                initial_tab = 'offboarding'
+            elif path.endswith('dismissed'):
+                initial_tab = 'dismissed'
+                
+            return render(request, 'base/layout.html', {
+                'initial_onboarding_tab': initial_tab
+            })
     elif request.method == 'POST':
         is_ajax_post = (
             'application/json' in request.META.get('HTTP_ACCEPT', '') or

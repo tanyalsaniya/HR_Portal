@@ -20,7 +20,10 @@ urlpatterns = [
     
     # Hybrid View page + XHR API
     path('employees/', employees_hybrid_view, name='employees_view'),
-    path('employees/onboard/', employees_hybrid_view, name='employees_onboard_view'),
+    path('employees/onboarding/', employees_hybrid_view, name='employees_onboarding_view'),
+    path('employees/active/', employees_hybrid_view, name='employees_active_view'),
+    path('employees/offboarding/', employees_hybrid_view, name='employees_offboarding_view'),
+    path('employees/dismissed/', employees_hybrid_view, name='employees_dismissed_view'),
     path('employees/detail/', hybrid_view(EmployeeViewSet, {'get': 'list'}), name='employees_detail_page'),
     path('employees/export-excel/', hybrid_view(EmployeeViewSet, {'get': 'excel_export'}), name='employees_export_excel'),
     path('employees/import-excel/', hybrid_view(EmployeeViewSet, {'post': 'excel_import'}), name='employees_import_excel'),

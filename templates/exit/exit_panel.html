@@ -406,40 +406,57 @@
                                 style="font-size: 7.5pt; padding: 5px 10px; flex: 1;">Customize & Preview</button>
                             <button class="btn" onclick="generateDocument('ff-slip')"
                                 style="font-size: 7.5pt; padding: 5px 10px;">⬇ Download</button>
-                        </div>
                     </div>
                 </div>
 
-                <!-- Workflow Override Actions -->
+                <div style="margin-top: 20px; display: flex; justify-content: flex-end; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                    <button class="btn btn-success" id="btnSendManualEmail" onclick="sendSelectedDocumentsManual()"
+                        style="font-size: 8.5pt; font-weight: bold; background-color: var(--primary-color); border: 1px solid var(--primary-color);">
+                        ✉ Dispatch Selected Documents to Employee
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT 4: EMPLOYEE EXIT FORM -->
+        <div id="exitTabForm" class="exit-tab-content" style="display: none;">
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
                 <div
-                    style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; border-top: 1px solid #cbd5e1; padding-top: 20px;">
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn" id="btnResendToken" onclick="actionResendLink()"
-                            style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Resend
-                            Link</button>
-                        <button class="btn" id="btnExtendLwd" onclick="actionExtendLwd()"
-                            style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Extend
-                            LWD</button>
-                        <button class="btn" id="btnReopenExit" onclick="actionReopenExit()"
-                            style="background-color:#fef3c7; border:1px solid #f59e0b; color:#92400e; font-size:8.5pt;">Reopen
-                            Exit</button>
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                        <label
-                            style="display: inline-flex; align-items: center; gap: 6px; font-size: 8.5pt; font-weight: normal; margin-right: 5px; cursor: pointer;"
-                            id="lblSendEmailOnExit">
-                            <input type="checkbox" id="chkSendEmailOnExit" checked style="width: auto; margin: 0;">
-                            Email documents to employee
-                        </label>
-                        <button class="btn" id="btnCancelExit" onclick="actionCancelExit()"
-                            style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Cancel
-                            Exit</button>
-                        <button class="btn" id="btnOverrideExit" onclick="actionOverrideExit()"
-                            style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Admin
-                            Override</button>
-                        <button class="btn btn-success" id="btnMarkExited" onclick="actionMarkExited()"
-                            style="font-size:8.5pt;">Mark Fully Exited</button>
-                    </div>
+                    style="font-weight: 700; font-size: 15px; border-left: 4px solid var(--primary-color); padding-left: 12px; margin-bottom: 20px; color: var(--text-main);">
+                    Submitted Exit Questionnaire</div>
+
+                <div id="exitFormNoResponse"
+                    style="padding: 20px; text-align: center; color: #64748b; font-weight: 500; background-color: #ffffff; border: 1px dashed #cbd5e1; border-radius: 8px;">
+                    No response submitted yet.
+                </div>
+            </div>
+        </div>
+
+        <!-- Details Overlay Card Footer/Actions -->
+        <div style="margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+            <div style="font-weight: 700; font-size: 11pt; color: var(--text-main); margin-bottom: 12px;">Administrative Actions</div>
+            <div
+                style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn" id="btnResendToken" onclick="actionResendLink()"
+                        style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Resend
+                        Link</button>
+                    <button class="btn" id="btnExtendLwd" onclick="actionExtendLwd()"
+                        style="background-color:#ffffff; border:1px solid #cbd5e1; font-size:8.5pt;">Extend
+                        LWD</button>
+                    <button class="btn" id="btnReopenExit" onclick="actionReopenExit()"
+                        style="background-color:#fef3c7; border:1px solid #f59e0b; color:#92400e; font-size:8.5pt;">Reopen
+                        Exit</button>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <button class="btn" id="btnCancelExit" onclick="actionCancelExit()"
+                        style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Cancel
+                        Exit</button>
+                    <button class="btn" id="btnOverrideExit" onclick="actionOverrideExit()"
+                        style="background-color:#fee2e2; border:1px solid #fecaca; color:#b91c1c; font-size:8.5pt;">Admin
+                        Override</button>
+                    <button class="btn btn-success" id="btnMarkExited" onclick="actionMarkExited()"
+                        style="font-size:8.5pt;">Mark Fully Exited</button>
                 </div>
             </div>
         </div>

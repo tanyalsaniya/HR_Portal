@@ -28,8 +28,18 @@ function populateStatesDropdown(selectId = 'empState') {
 }
 
 // Switch between Active, Onboarding, Offboarding, Dismissed sub-tabs
-function switchOnboardingSubTab(tabId) {
+function getOnboardingPathFromTab(tabId) {
+    if (tabId === 'all') return '/employees/active/';
+    if (tabId === 'offboarding') return '/employees/offboarding/';
+    if (tabId === 'dismissed') return '/employees/dismissed/';
+    return '/employees/onboarding/';
+}
+
+function switchOnboardingSubTab(tabId, updateUrl = true) {
     activeOnboardingSubTab = tabId;
+    if (updateUrl) {
+        history.replaceState(history.state || { viewId: 'onboardingView' }, '', getOnboardingPathFromTab(tabId));
+    }
     
     // Toggle active header tab classes
     const tabs = ['all', 'onboarding', 'offboarding', 'dismissed'];
@@ -100,7 +110,16 @@ async function loadOnboardingData() {
     await loadDepartmentsSelect('onboardingDeptFilter');
     
     // Default sub tab
-    switchOnboardingSubTab(activeOnboardingSubTab);
+    function getOnboardingTabFromPath() {
+        const path = window.location.pathname;
+        if (path.includes('/active')) return 'all';
+        if (path.includes('/offboarding')) return 'offboarding';
+        if (path.includes('/dismissed')) return 'dismissed';
+        return 'onboarding';
+    }
+    const urlTab = getOnboardingTabFromPath();
+    if (urlTab) activeOnboardingSubTab = urlTab;
+    switchOnboardingSubTab(activeOnboardingSubTab, false);
 }
 
 // Pagination state variables
@@ -384,6 +403,8 @@ function renderActiveDirectoryTable(list) {
         let statusClass = 'synced';
         if (e.status === 'Exited') statusClass = 'action-needed';
         else if (e.status === 'Rejoined') statusClass = 'pending';
+        
+        const newJoinerBadge = e.is_new_joiner ? `<span style="margin-left: 8px; font-size: 7pt; font-weight: 700; background-color: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #fde047; vertical-align: middle;">New Joiner</span>` : '';
 
         return `
             <tr onclick="openEmployeeProfileDetail('${e.id}')" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
@@ -392,7 +413,10 @@ function renderActiveDirectoryTable(list) {
                     <div style="display:flex; align-items:center;">
                         ${avatarCell}
                         <div>
-                            <a href="#" onclick="openEmployeeProfileDetail('${e.id}'); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                            <div style="display: flex; align-items: center;">
+                                <a href="#" onclick="openEmployeeProfileDetail('${e.id}'); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                                ${newJoinerBadge}
+                            </div>
                             <div style="font-size: 8.5pt; color: var(--text-muted); margin-top:2px;">${e.email}</div>
                         </div>
                     </div>
@@ -426,7 +450,14 @@ function renderActiveDirectoryTable(list) {
 // Manual onboarding completion trigger
 async function manuallyGraduateEmployee(event, empId) {
     event.stopPropagation();
-    if (!confirm('Are you sure you want to graduate this employee from onboarding?')) return;
+    const _gradConf = await showConfirm({
+        title: 'Graduate Employee?',
+        body: 'This employee will be moved from onboarding to the Active Directory. Make sure all onboarding steps are complete.',
+        confirmText: 'Yes, Graduate',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_gradConf || !_gradConf.confirmed) return;
     
     showToast('Graduating employee...');
     try {
@@ -596,10 +627,15 @@ function renderDocumentsChecklist(docList, bondPeriod) {
     }).join('');
 }
 
-async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldSwitchView = true) {
+// Full view detail opening
+async function openEmployeeProfileDetail(empId, defaultTab = 'personal', updateUrl = true) {
+    // If URL already has a ptab, use it instead of the argument default
+    const urlTab = getUrlParam('ptab');
+    if (urlTab) defaultTab = urlTab;
+    
     currentDetailEmployeeId = empId;
-    if (shouldSwitchView) {
-        switchView('employeeDetailView', true, { employeeId: empId, employeeTab: tabToFocus });
+    if (updateUrl) {
+        switchView('employeeDetailView', true, { employeeId: empId, employeeTab: defaultTab });
     }
     
     try {
@@ -798,7 +834,7 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
                 }
             }
             
-            switchProfileTab(tabToFocus);
+            switchProfileTab(defaultTab, false);
         }
     } catch (e) {
         console.error(e);
@@ -806,9 +842,10 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
     }
 }
 
-// Switch Profile Detail Tab Views
-function switchProfileTab(tabId) {
+// Switch Employee Profile Sub-tabs
+function switchProfileTab(tabId, updateUrl = true) {
     activeProfileTab = tabId;
+    if (updateUrl) setUrlParam('ptab', tabId);
     
     const tabs = ['personal', 'docs', 'salary', 'letters', 'audit'];
     tabs.forEach(t => {
@@ -865,8 +902,6 @@ document.addEventListener('DOMContentLoaded', () => {
         editForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentDetailEmployeeId) return;
-            
-            showToast('Saving changes...');
             
             const formData = new FormData();
             formData.append('first_name', document.getElementById('editEmpFirstName').value);
@@ -944,8 +979,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (onboardForm) {
         onboardForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            showToast('Creating employee profile...');
-            
             const formData = new FormData();
             formData.append('first_name', document.getElementById('empFirstName').value);
             formData.append('last_name', document.getElementById('empLastName').value);
@@ -1163,6 +1196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             showToast('Uploading file...');
+
             const formData = new FormData();
             formData.append('employee', currentDetailEmployeeId);
             formData.append('doc_type', docType);
@@ -1269,8 +1303,6 @@ document.addEventListener('DOMContentLoaded', () => {
         salForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentDetailEmployeeId) return;
-
-            showToast('Saving salary structure...');
 
             const data = {
                 employee: currentDetailEmployeeId,
@@ -1391,7 +1423,9 @@ let activeLetterType = null;
 let previewDebounceTimer = null;
 let loadedTemplates = [];
 
-function switchLettersSubTab(tab) {
+// Secondary level tabs inside Letters
+function switchLettersSubTab(tab, updateUrl = true) {
+    if (updateUrl) setUrlParam('ltab', tab);
     const genBtn = document.getElementById('subTabGenerateBtn');
     const tempBtn = document.getElementById('subTabTemplateBtn');
     const genTab = document.getElementById('lettersSubTabGenerate');
@@ -1793,6 +1827,15 @@ async function updateLetterPreview() {
 async function downloadCustomizedLetter() {
     if (!currentDetailEmployeeId || !activeLetterType) return;
     
+    const _letterConf = await showConfirm({
+        title: `Generate ${activeLetterType.toUpperCase()} Letter?`,
+        body: 'This will generate a customized PDF letter and automatically download it. The letter will also be saved to the employee document history.',
+        confirmText: 'Yes, Generate & Download',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_letterConf || !_letterConf.confirmed) return;
+
     showToast(`Generating ${activeLetterType.toUpperCase()} PDF...`);
     
     const custom_context = {
@@ -1838,9 +1881,12 @@ async function downloadCustomizedLetter() {
         
         if (res.ok) {
             const data = await res.json();
-            showToast(`${activeLetterType.toUpperCase()} generated and saved in history.`);
+            showSuccessModal({
+                title: 'Letter Generated!',
+                subtitle: `The ${activeLetterType.toUpperCase()} letter has been saved to the employee's document history and downloaded automatically.`,
+                btnText: 'Done',
+            });
             loadProfileLettersList();
-            
             if (data.document && data.document.file) {
                 downloadSecureFile(data.document.file, `${activeLetterType}_letter.pdf`);
             }
@@ -1971,15 +2017,19 @@ async function saveTemplateChanges() {
         payload.allow_hr_edit = document.getElementById('allowHrEditCheckbox').checked;
     }
     
-    showToast('Saving template changes...');
     try {
+
         const res = await apiFetch(`/onboarding/templates/${selectedId}/`, {
             method: 'PATCH',
             body: JSON.stringify(payload)
         });
         
         if (res.ok) {
-            showToast('Template updated successfully!');
+            showSuccessModal({
+                title: 'Template Updated!',
+                subtitle: 'The letter template has been saved successfully. New letters generated from this template will use the updated content.',
+                btnText: 'Done',
+            });
             const updated = await res.json();
             const index = loadedTemplates.findIndex(t => t.id === selectedId);
             if (index !== -1) {
@@ -2188,7 +2238,13 @@ function formatSimpleDate(dateStr) {
 }
 
 async function softDeleteEmployee(empId) {
-    if (!confirm('Are you sure you want to soft delete this employee profile?')) return;
+    const _delConf = await showDangerConfirm({
+        title: 'Delete Employee Profile?',
+        body: 'This will soft-delete the employee profile. The record will be removed from the active directory but can be recovered by an administrator.',
+        confirmText: 'Yes, Delete Profile',
+        cancelText: 'Cancel',
+    });
+    if (!_delConf || !_delConf.confirmed) return;
     try {
         const res = await apiFetch(`/employees/${empId}/`, {
             method: 'DELETE'
@@ -2383,7 +2439,13 @@ async function sendOnboardingWelcomeEmailManual() {
 }
 
 async function inviteEmployeeToBitrix() {
-    if (!confirm('Are you sure you want to invite this employee to Bitrix24? This will create their user profile/CRM contact on Bitrix.')) {
+    const _bitrixConf = await showConfirm({
+        title: 'Invite to Bitrix24?',
+        body: 'This will create the employee\'s user profile and CRM contact on Bitrix24. The action will sync their details to the platform.',
+        confirmText: 'Yes, Invite',
+        cancelText: 'Cancel',
+    });
+    if (!_bitrixConf || !_bitrixConf.confirmed) {
         return;
     }
     

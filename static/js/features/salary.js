@@ -10,6 +10,11 @@ async function loadSalaryData() {
     salaryCurrentPage = 1;
     document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
     
+    const urlTab = getUrlParam('tab');
+    if (urlTab) activeSalaryTab = urlTab;
+    // Don't update URL here, just set UI
+    switchSalaryTab(activeSalaryTab, false);
+    
     // Adjust visual panel options based on role
     const role = currentUser.role;
     const adminPanel = document.getElementById('payrollAdminPanel');
@@ -38,8 +43,9 @@ async function loadSalaryData() {
     }
 }
 
-function switchSalaryTab(tab) {
+function switchSalaryTab(tab, updateUrl = true) {
     activeSalaryTab = tab;
+    if (updateUrl) setUrlParam('tab', tab);
     
     // Toggle active classes on tab headers
     const headers = ['tabSlips', 'tabStructures', 'tabBatches'];
@@ -116,9 +122,16 @@ async function publishSlipsMonth() {
     const month = document.getElementById('payrollMonth').value;
     const year = document.getElementById('payrollYear').value;
     
-    if (!confirm(`Are you sure you want to publish all draft salary slips for ${month}/${year}?`)) {
+    const _publishConf = await showConfirm({
+        title: 'Publish Salary Slips?',
+        body: `All draft salary slips for <strong>${month}/${year}</strong> will be published and made visible to employees. This action cannot be reversed.`,
+        confirmText: 'Yes, Publish',
+        cancelText: 'Cancel',
+    });
+    if (!_publishConf || !_publishConf.confirmed) {
         return;
     }
+
     
     showToast('Publishing slips...');
     try {
@@ -128,8 +141,12 @@ async function publishSlipsMonth() {
         });
         if (res.ok) {
             const data = await res.json();
-            showToast(data.message || 'Slips published successfully.');
             await loadSlipsRegistry();
+            showSuccessModal({
+                title: 'Salary Slips Published!',
+                subtitle: data.message || `All salary slips for ${month}/${year} are now live and visible to employees.`,
+                btnText: 'View Registry',
+            });
         } else {
             const err = await res.json();
             showToast(err.error || 'Failed to publish slips.', 'error');

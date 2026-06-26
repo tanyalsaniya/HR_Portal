@@ -90,7 +90,9 @@ async function apiFetch(endpoint, options = {}) {
         endpoint.startsWith('/exits') ||
         endpoint.startsWith('/students') ||
         endpoint.startsWith('/logs') ||
-        endpoint.startsWith('/roles')
+        endpoint.startsWith('/roles') ||
+        endpoint.startsWith('/media') ||
+        endpoint.startsWith('/static')
     ) {
         url = endpoint;
     } else {
@@ -181,23 +183,15 @@ function getCookie(name) {
 }
 
 // ---------- UI TOAST NOTIFICATION ----------
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type} show`;
-    toast.innerHTML = `
-        <span class="toast-message">${message}</span>
-        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
-    `;
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+// NOTE: showToast is fully defined by alerts.js (loaded before app.js).
+// This stub provides a safe fallback in case alerts.js hasn't executed yet.
+if (typeof window.showToast !== 'function') {
+    window.showToast = function (message, type = 'success') {
+        console.warn('[HR Portal] alerts.js not loaded yet — fallback toast:', type, message);
+        // Minimal fallback: log only. alerts.js will override this.
+    };
 }
+
 
 // ---------- SPA ROUTER ----------
 const viewToPath = {
@@ -208,6 +202,7 @@ const viewToPath = {
     'salaryView': '/salaries/',
     'salaryHistoryView': '/salaries/employee/',
     'exitView': '/exits/',
+    'exitDetailView': '/exits/detail/',
     'studentView': '/students/',
     'studentDetailView': '/students/detail/',
     'logsView': '/logs/',
@@ -218,11 +213,18 @@ const pathToView = {
     '/': 'dashboardView',
     '/dashboard/': 'dashboardView',
     '/employees/': 'onboardingView',
+    '/employees/onboarding/': 'onboardingView',
+    '/employees/active/': 'onboardingView',
+    '/employees/offboarding/': 'onboardingView',
+    '/employees/dismissed/': 'onboardingView',
     '/employees/onboard/': 'onboardingFormView',
     '/employees/detail/': 'employeeDetailView',
     '/salaries/': 'salaryView',
     '/exits/': 'exitView',
     '/exits/detail/': 'exitDetailView',
+    '/exits/clearances/': 'exitDetailView',
+    '/exits/documents/': 'exitDetailView',
+    '/exits/form/': 'exitDetailView',
     '/students/': 'studentView',
     '/students/detail/': 'studentDetailView',
     '/logs/': 'logsView',
@@ -252,13 +254,22 @@ function getEmployeeIdFromUrl() {
 }
 
 function getEmployeeDetailIdFromUrl() {
-    const match = window.location.pathname.match(/^\/employees\/(\d+)\/?$/);
+    const match = window.location.pathname.match(/^\/employees\/([A-Za-z0-9\-]+)\/?$/);
+    if (match && ['onboard', 'onboarding', 'active', 'offboarding', 'dismissed', 'detail'].includes(match[1])) {
+        return null;
+    }
+    return match ? match[1] : null;
+}
+
+function getExitIdFromUrl() {
+    // Matches /exits/123/ or /exits/123/clearances/ or /exits/123/documents/ or /exits/123/form/
+    const match = window.location.pathname.match(/^\/exits\/(\d+)(\/|\/(clearances|documents|form)\/)?$/);
     return match ? parseInt(match[1]) : null;
 }
 
 function getStudentIdFromUrl() {
-    const match = window.location.pathname.match(/^\/students\/(\d+)\/?$/);
-    return match ? parseInt(match[1]) : null;
+    const match = window.location.pathname.match(/^\/students\/([A-Za-z0-9\-]+)\/?$/);
+    return match ? match[1] : null;
 }
 
 function switchView(viewId, pushState = true, extraParams = {}) {
@@ -279,9 +290,18 @@ function switchView(viewId, pushState = true, extraParams = {}) {
 
     // Update sidebar active classes
     const links = document.querySelectorAll('.sidebar-link');
-    // Salary sub-views should highlight the parent salaryView sidebar item
+    // Sub-views should highlight the parent sidebar item
     const salarySubViews = ['salaryHistoryView'];
-    const effectiveSidebarView = salarySubViews.includes(viewId) ? 'salaryView' : viewId;
+    const onboardingSubViews = ['employeeDetailView', 'onboardingFormView'];
+    const studentSubViews = ['studentDetailView'];
+    
+    let effectiveSidebarView = viewId;
+    if (salarySubViews.includes(viewId)) effectiveSidebarView = 'salaryView';
+    if (onboardingSubViews.includes(viewId)) effectiveSidebarView = 'onboardingView';
+    if (studentSubViews.includes(viewId)) effectiveSidebarView = 'studentView';
+    // Exit detail is a sub-view of Exit Tracker — keep sidebar item highlighted
+    const exitSubViews = ['exitDetailView', 'exitLetterWorkspace', 'exitTemplateEditor'];
+    if (exitSubViews.includes(viewId)) effectiveSidebarView = 'exitView';
     links.forEach(l => {
         l.classList.remove('active');
         if (l.getAttribute('data-view') === effectiveSidebarView) {
@@ -308,6 +328,10 @@ function switchView(viewId, pushState = true, extraParams = {}) {
             }
         }
         else if (viewId === 'exitView') loadExitData();
+        else if (viewId === 'exitDetailView' && extraParams.exitId && !extraParams.skipDataLoad && typeof openExitDetailModal === 'function') {
+            // Only load data when arriving via refresh/popstate — NOT when called from within openExitDetailModal
+            openExitDetailModal(extraParams.exitId, true);
+        }
         else if (viewId === 'studentView') loadStudentData();
         else if (viewId === 'studentDetailView' && extraParams.studentId && !extraParams.skipStudentDetailLoad && typeof openStudentProfileDetail === 'function') {
             openStudentProfileDetail(extraParams.studentId, extraParams.studentTab || 'personal', false);
@@ -328,13 +352,16 @@ function switchView(viewId, pushState = true, extraParams = {}) {
             path = `/employees/${extraParams.employeeId}/`;
         } else if (viewId === 'studentDetailView' && extraParams.studentId) {
             path = `/students/${extraParams.studentId}/`;
+        } else if (viewId === 'exitDetailView' && extraParams.exitId) {
+            path = `/exits/${extraParams.exitId}/clearances/`;
         }
         history.pushState({
             viewId: viewId,
             employeeId: extraParams.employeeId || null,
             employeeTab: extraParams.employeeTab || null,
             studentId: extraParams.studentId || null,
-            studentTab: extraParams.studentTab || null
+            studentTab: extraParams.studentTab || null,
+            exitId: extraParams.exitId || null,
         }, '', path);
     }
 
@@ -352,7 +379,8 @@ window.addEventListener('popstate', (event) => {
             employeeId: event.state.employeeId,
             employeeTab: event.state.employeeTab,
             studentId: event.state.studentId,
-            studentTab: event.state.studentTab
+            studentTab: event.state.studentTab,
+            exitId: event.state.exitId,
         });
     } else {
         let currentPath = window.location.pathname;
@@ -360,8 +388,11 @@ window.addEventListener('popstate', (event) => {
             currentPath += '/';
         }
         let viewId = 'dashboardView';
+        const exitId = getExitIdFromUrl();
         if (currentPath.match(/\/salaries\/employee\/(\d+)\//)) {
             viewId = 'salaryHistoryView';
+        } else if (exitId) {
+            viewId = 'exitDetailView';
         } else if (getEmployeeDetailIdFromUrl()) {
             viewId = 'employeeDetailView';
         } else if (getStudentIdFromUrl()) {
@@ -371,7 +402,8 @@ window.addEventListener('popstate', (event) => {
         }
         switchView(viewId, false, {
             employeeId: getEmployeeDetailIdFromUrl(),
-            studentId: getStudentIdFromUrl()
+            studentId: getStudentIdFromUrl(),
+            exitId: exitId,
         });
     }
 });
@@ -385,7 +417,7 @@ async function checkNotifications() {
         if (res.ok) {
             const data = await res.json();
             // Backend now always returns { unread_count, results }
-            const notifications = Array.isArray(data) ? data : (data.results || []);
+            const notifications = (Array.isArray(data) ? data : (data.results || [])).slice(0, 5);
             const unreadCount = data.unread_count !== undefined ? data.unread_count : notifications.filter(n => !n.is_read).length;
 
             // Update Bell Badge
