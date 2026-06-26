@@ -115,43 +115,59 @@ def send_onboarding_welcome_email(employee_data):
     # HTML Email body
     html_content = f"""
     <html>
-      <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0;">
-        <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
-          <div style="padding: 30px; font-size: 14px; color: #333333; line-height: 1.6;">
-            <p>Dear {first_name},</p>
-            
-            <p>Congratulations..!!</p>
-            
-            <p>We would like to inform you that you have been selected as the best candidate for the position of <strong>{designation}</strong> at Devex Hub Pvt Ltd. Your Joining date will be <strong>{joining_date_str}</strong> and you have to report at <strong>{reporting_time}</strong>. We believe that your knowledge, skills and experience would be an ideal fit for our company. We hope you will enjoy your role and make a significant contribution to the overall success of Devex Hub Pvt Ltd.</p>
-            
-            <p>Kindly carry original + Photo copies of below mentioned documents that we need at the time of your joining and please share soft copies as well.</p>
-            
-            <p style="margin: 5px 0;">• Aadhar Card.</p>
-            <p style="margin: 5px 0;">• Pan Card.</p>
-            <p style="margin: 5px 0;">• Two Passport Size Photos.</p>
-            <p style="margin: 5px 0;">• Higher Qualification Certificate.</p>
-            <p style="margin: 5px 0;">• Bank Account Details.</p>
-            <p style="margin: 5px 0;">• Previous Experience Letters and salary slips.</p>
-            
-            <p style="margin-top: 15px;">Please accept this letter and send us your acknowledgement.</p>
-            
-            <p>If you have any questions and concerns then feel free to contact us back. Looking forward to working with you at Devex Hub Pvt Ltd.</p>
-            
-            <p style="margin-top: 30px; line-height: 1.4;">
-              Regards,<br/><br/>
-              <strong>NEHA ARYA</strong><br/>
-              Sr. HR<br/>
-              Devex Hub Pvt Ltd<br/>
-              #254, GR Square, Fourth Floor<br/>
-              Phase 8A, Industrial Area, Mohali<br/>
-              India, 160055<br/><br/>
-              Website: <a href="http://www.devexhub.com" style="color: #4f46e5; text-decoration: none;">www.devexhub.com</a>
-            </p>
-            <div style="margin-top: 20px;">
-              <img src="cid:company_logo" alt="Company Logo" style="max-width: 150px; height: auto;" />
-            </div>
-          </div>
-        </div>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 40px 0;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); overflow: hidden;">
+          <tr>
+            <td align="center" style="padding: 30px 0 20px 0; background-color: #ffffff; border-bottom: 2px solid #f0f0f0;">
+              <img src="cid:company_logo" alt="Devex Hub Logo" style="display: block; max-width: 180px; height: auto;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; color: #333333; font-size: 15px; line-height: 1.6;">
+              <p style="margin-top: 0; font-size: 16px;">Dear {first_name},</p>
+              
+              <p style="color: #2c3e50; font-size: 18px; font-weight: bold; margin: 20px 0;">Congratulations..!!</p>
+              
+              <p style="margin-bottom: 20px;">We would like to inform you that you have been selected as the best candidate for the position of <strong>{designation}</strong> at Devex Hub Pvt Ltd. Your Joining date will be <strong>{joining_date_str}</strong> and you have to report at <strong>{reporting_time}</strong>. We believe that your knowledge, skills and experience would be an ideal fit for our company. We hope you will enjoy your role and make a significant contribution to the overall success of Devex Hub Pvt Ltd.</p>
+              
+              <div style="background-color: #f8fbfa; border-left: 4px solid #2980b9; padding: 15px 20px; margin: 25px 0;">
+                  <p style="margin-top: 0; font-weight: 600; color: #2c3e50;">Kindly carry original + Photo copies of below mentioned documents that we need at the time of your joining and please share soft copies as well.</p>
+                  
+                  <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #444444;">
+                      <li style="margin-bottom: 5px;">Aadhar Card.</li>
+                      <li style="margin-bottom: 5px;">Pan Card.</li>
+                      <li style="margin-bottom: 5px;">Two Passport Size Photos.</li>
+                      <li style="margin-bottom: 5px;">Higher Qualification Certificate.</li>
+                      <li style="margin-bottom: 5px;">Bank Account Details.</li>
+                      <li style="margin-bottom: 0;">Previous Experience Letters and salary slips.</li>
+                  </ul>
+              </div>
+              
+              <p style="margin-bottom: 20px;">Please accept this letter and send us your acknowledgement.</p>
+              
+              <p style="margin-bottom: 30px;">If you have any questions and concerns then feel free to contact us back. Looking forward to working with you at Devex Hub Pvt Ltd.</p>
+              
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="color: #555555; font-size: 14px; line-height: 1.5;">
+                    <p style="margin: 0 0 10px 0;">Regards,</p>
+                    <p style="margin: 0; font-weight: bold; color: #333333; font-size: 15px;">NEHA ARYA</p>
+                    <p style="margin: 2px 0; color: #777777;">Sr. HR</p>
+                    <p style="margin: 2px 0;">Devex Hub Pvt Ltd</p>
+                    <p style="margin: 2px 0;">#254, GR Square, Fourth Floor</p>
+                    <p style="margin: 2px 0;">Phase 8A, Industrial Area, Mohali</p>
+                    <p style="margin: 2px 0;">India, 160055</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="background-color: #2c3e50; padding: 15px; color: #ffffff; font-size: 13px;">
+              Website: <a href="http://www.devexhub.com" style="color: #3498db; text-decoration: none; font-weight: bold;">www.devexhub.com</a>
+            </td>
+          </tr>
+        </table>
       </body>
     </html>
     """
@@ -166,17 +182,12 @@ We would like to inform you that you have been selected as the best candidate fo
 
 Kindly carry original + Photo copies of below mentioned documents that we need at the time of your joining and please share soft copies as well.
 
-Aadhar Card.
-
-Pan Card.
-
-Two Passport Size Photos.
-
-Higher Qualification Certificate.
-
-Bank Account Details.
-
-Previous Experience Letters and salary slips.
+• Aadhar Card.
+• Pan Card.
+• Two Passport Size Photos.
+• Higher Qualification Certificate.
+• Bank Account Details.
+• Previous Experience Letters and salary slips.
 
 Please accept this letter and send us your acknowledgement.
 
@@ -205,6 +216,7 @@ Website: www.devexhub.com
             from_email=formatted_from,
             to=[recipient_email]
         )
+        msg.mixed_subtype = 'related'  # Required for inline CID images to work in Gmail
         msg.attach_alternative(html_content, "text/html")
         
         # Attach the company logo image as inline

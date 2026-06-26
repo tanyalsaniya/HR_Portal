@@ -1,7 +1,7 @@
 # apps/employee_onboarding/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DepartmentViewSet, EmployeeViewSet, EmployeeDocumentViewSet, LetterTemplateViewSet, employees_hybrid_view
+from .views import DepartmentViewSet, EmployeeViewSet, EmployeeDocumentViewSet, LetterTemplateViewSet, employees_hybrid_view, BitrixDataReceiveAPIView
 from accounts.views import hybrid_view
 
 # API Router
@@ -12,6 +12,9 @@ router.register('api/onboarding/documents', EmployeeDocumentViewSet, basename='e
 router.register('api/onboarding/templates', LetterTemplateViewSet, basename='lettertemplate')
 
 urlpatterns = [
+    # New standalone API for Bitrix
+    path('api/onboarding/bitrix-receive/', BitrixDataReceiveAPIView.as_view(), name='bitrix_data_receive'),
+    
     # Router endpoints
     path('', include(router.urls)),
     

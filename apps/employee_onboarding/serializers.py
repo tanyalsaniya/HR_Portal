@@ -112,6 +112,11 @@ class EmployeeSerializer(serializers.Serializer):
     bond_period_months = serializers.IntegerField(default=0, required=False)
     notice_period_days = serializers.IntegerField(default=30, required=False)
 
+    is_new_joiner = serializers.SerializerMethodField()
+
+    def get_is_new_joiner(self, obj):
+        return obj.get('is_new_joiner', False)
+
     def get_aadhaar_masked(self, obj):
         return obj.get('aadhaar_masked') or "XXXXXXXX1234"
 

@@ -585,6 +585,28 @@ async function loadActiveEmployeesSelect(selectId) {
     }
 }
 
+// Dynamic calculation of modal salary fields
+function calculateModalSalary() {
+    const ctc = parseFloat(document.getElementById('structCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('structPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('structEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('structGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
+    const pf = parseFloat(document.getElementById('structPfContribution').value || 0);
+    const esi = parseFloat(document.getElementById('structEsi').value || 0);
+    const lwf = parseFloat(document.getElementById('structLabourWelfareFund').value || 0);
+    const pt = parseFloat(document.getElementById('structProfessionalTax').value || 0);
+
+    const totalDeductions = pf + esi + lwf + pt;
+    const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('structInHandSalary');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
+}
+
 // Event Listeners for Forms
 document.addEventListener('DOMContentLoaded', () => {
     // Structure Form
@@ -595,12 +617,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = {
                 bitrix_user_id: document.getElementById('structEmployeeSelect').value,
                 effective_from: document.getElementById('structEffectiveFrom').value,
-                gross_salary: document.getElementById('structGrossSalary').value,
-                pf_contribution: document.getElementById('structPfContribution').value,
-                esi: document.getElementById('structEsi').value,
-                labour_welfare_fund: document.getElementById('structLabourWelfareFund').value,
-                professional_tax: document.getElementById('structProfessionalTax').value,
-                other_deductions: document.getElementById('structOtherDeductions').value
+                gross_salary: parseFloat(document.getElementById('structGrossSalary').value || 0),
+                pf_contribution: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi: parseFloat(document.getElementById('structEsi').value || 0),
+                labour_welfare_fund: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                professional_tax: parseFloat(document.getElementById('structProfessionalTax').value || 0),
+                other_deductions: 0,
+                
+                ctc: parseFloat(document.getElementById('structCTC').value || 0),
+                basic_salary: 0,
+                hra: 0,
+                conveyance: 0,
+                medical_allowance: 0,
+                special_allowance: 0,
+                monthly_bonus: 0,
+                esi_employer: parseFloat(document.getElementById('structEsiEmployer').value || 0),
+                pf_employer: parseFloat(document.getElementById('structPfEmployer').value || 0),
+                pf_employee: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi_employee: parseFloat(document.getElementById('structEsi').value || 0),
+                lwf: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                in_hand_salary: parseFloat(document.getElementById('structInHandSalary').value || 0)
             };
             
             try {

@@ -395,6 +395,18 @@
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 15px;">
                                     <div>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Monthly CTC *</label>
+                                        <input type="number" step="0.01" id="salCTC" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">PF Employer Share</label>
+                                        <input type="number" step="0.01" id="salPfEmployer" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">ESI Employer Share</label>
+                                        <input type="number" step="0.01" id="salEsiEmployer" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                    </div>
+                                    <div>
                                         <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Gross Salary *</label>
                                         <input type="number" step="0.01" id="salGrossSalary" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
@@ -408,15 +420,15 @@
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 15px;">
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">PF Contribution</label>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">PF Employee Share</label>
                                         <input type="number" step="0.01" id="salPfContribution" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">ESI</label>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">ESI Employee Share</label>
                                         <input type="number" step="0.01" id="salEsi" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Labour Welfare Fund</label>
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Labour Welfare Fund (LWF)</label>
                                         <input type="number" step="0.01" id="salLabourWelfareFund" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
@@ -424,8 +436,8 @@
                                         <input type="number" step="0.01" id="salProfessionalTax" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                     <div>
-                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Other Deductions</label>
-                                        <input type="number" step="0.01" id="salOtherDeductions" oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
+                                        <label style="display: block; font-weight: 600; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">In-Hand Salary *</label>
+                                        <input type="number" step="0.01" id="salInHandSalary" required oninput="calculateTakeHomeSalary()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border-accent); border-radius:8px; background:var(--bg-card); color:var(--text-main); font-size:14px; outline:none;" onfocus="this.style.borderColor='var(--primary-color)'">
                                     </div>
                                 </div>
                             </div>
@@ -632,79 +644,54 @@
                                 
                                 <div style="display: flex; gap: 10px;">
                                     <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Monthly CTC / Gross</label>
-                                        <input type="number" id="custCTC" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Monthly CTC</label>
+                                        <input type="number" id="custCTC" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                     <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">In-Hand Salary</label>
-                                        <input type="number" id="custInHand" class="form-control" style="font-size: 12px; padding: 6px 10px;">
-                                    </div>
-                                </div>
-
-                                <div style="display: flex; gap: 10px;">
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Basic Salary</label>
-                                        <input type="number" id="custBasic" class="form-control" style="font-size: 12px; padding: 6px 10px;">
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">HRA</label>
-                                        <input type="number" id="custHra" class="form-control" style="font-size: 12px; padding: 6px 10px;">
-                                    </div>
-                                </div>
-
-                                <div style="display: flex; gap: 10px;">
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Conveyance</label>
-                                        <input type="number" id="custConveyance" class="form-control" style="font-size: 12px; padding: 6px 10px;">
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Medical Allowance</label>
-                                        <input type="number" id="custMedical" class="form-control" style="font-size: 12px; padding: 6px 10px;">
-                                    </div>
-                                </div>
-
-                                <div style="display: flex; gap: 10px;">
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Special Allowance</label>
-                                        <input type="number" id="custSpecial" class="form-control" style="font-size: 12px; padding: 6px 10px;">
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Monthly Bonus</label>
-                                        <input type="number" id="custBonus" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">PF Employer Share</label>
+                                        <input type="number" id="custPfEmployer" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                 </div>
 
                                 <div style="display: flex; gap: 10px;">
                                     <div style="flex: 1;">
                                         <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">ESI Employer Share</label>
-                                        <input type="number" id="custEsiEmployer" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <input type="number" id="custEsiEmployer" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                     <div style="flex: 1;">
-                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">PF Employer Share</label>
-                                        <input type="number" id="custPfEmployer" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Gross Salary</label>
+                                        <input type="number" id="custGrossSalary" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                 </div>
 
                                 <div style="display: flex; gap: 10px;">
                                     <div style="flex: 1;">
                                         <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">PF Employee Share</label>
-                                        <input type="number" id="custPfEmployee" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <input type="number" id="custPfEmployee" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                     <div style="flex: 1;">
                                         <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">ESI Employee Share</label>
-                                        <input type="number" id="custEsiEmployee" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <input type="number" id="custEsiEmployee" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                 </div>
 
                                 <div style="display: flex; gap: 10px;">
                                     <div style="flex: 1;">
                                         <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">LWF (Labour Welfare)</label>
-                                        <input type="number" id="custLwf" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <input type="number" id="custLwf" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
                                     <div style="flex: 1;">
                                         <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Professional Tax</label>
-                                        <input type="number" id="custPT" class="form-control" style="font-size: 12px; padding: 6px 10px;">
+                                        <input type="number" id="custPT" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
                                     </div>
+                                </div>
+
+                                <div style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">In-Hand Salary</label>
+                                        <input type="number" id="custInHand" class="form-control" style="font-size: 12px; padding: 6px 10px;" oninput="calculateCustomizerSalary()">
+                                    </div>
+                                    <div style="flex: 1;"></div>
                                 </div>
                             </form>
                             

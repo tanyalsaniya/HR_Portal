@@ -155,28 +155,40 @@
             </div>
             <div class="form-grid" style="margin-top: 10px;">
                 <div>
+                    <label>Monthly CTC*</label>
+                    <input type="number" id="structCTC" step="0.01" value="0" required oninput="calculateModalSalary()">
+                </div>
+                <div>
+                    <label>PF Employer Share</label>
+                    <input type="number" id="structPfEmployer" step="0.01" value="0" oninput="calculateModalSalary()">
+                </div>
+                <div>
+                    <label>ESI Employer Share</label>
+                    <input type="number" id="structEsiEmployer" step="0.01" value="0" oninput="calculateModalSalary()">
+                </div>
+                <div>
                     <label>Gross Salary (Monthly)*</label>
-                    <input type="number" id="structGrossSalary" step="0.01" required>
+                    <input type="number" id="structGrossSalary" step="0.01" required oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>PF Contribution</label>
-                    <input type="number" id="structPfContribution" step="0.01" value="0">
+                    <label>PF Employee Share</label>
+                    <input type="number" id="structPfContribution" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>ESI</label>
-                    <input type="number" id="structEsi" step="0.01" value="0">
+                    <label>ESI Employee Share</label>
+                    <input type="number" id="structEsi" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>Labour Welfare Fund</label>
-                    <input type="number" id="structLabourWelfareFund" step="0.01" value="0">
+                    <label>Labour Welfare Fund (LWF)</label>
+                    <input type="number" id="structLabourWelfareFund" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
                     <label>Professional Tax</label>
-                    <input type="number" id="structProfessionalTax" step="0.01" value="0">
+                    <input type="number" id="structProfessionalTax" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>Other Deductions</label>
-                    <input type="number" id="structOtherDeductions" step="0.01" value="0">
+                    <label>In-Hand Salary*</label>
+                    <input type="number" id="structInHandSalary" step="0.01" required value="0" oninput="calculateModalSalary()">
                 </div>
             </div>
             <div style="margin-top: 20px; text-align: right;">

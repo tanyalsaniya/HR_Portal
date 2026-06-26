@@ -65,17 +65,40 @@ function renderActivityFeed(logs) {
         'DELETE': { cls: 'dot-delete', symbol: '✕' },
     };
 
+// ── Format log description — strip verbose field lists ──
+function formatLogDescription(raw) {
+    if (!raw) return '—';
+    // "Updated SalarySlip fields: a, b, c (ID: 41)." → "Updated SalarySlip (ID: 41)"
+    const updatedMatch = raw.match(/^(Updated|Edited)\s+([\w\s]+?)\s+fields?:.*?(\(ID:\s*\d+\))?[.!]?$/i);
+    if (updatedMatch) {
+        const action = updatedMatch[1];
+        const model  = updatedMatch[2].trim();
+        const id     = updatedMatch[3] || '';
+        return (action + ' ' + model + (id ? ' ' + id : '')).trim();
+    }
+    // "Created a new SalarySlip (ID: 41)." → "Created SalarySlip (ID: 41)"
+    const createdMatch = raw.match(/^Created a new ([\w\s]+?)\s*(\(ID:\s*\d+\))?[.!]?$/i);
+    if (createdMatch) {
+        const model = createdMatch[1].trim();
+        const id    = createdMatch[2] || '';
+        return ('Created ' + model + (id ? ' ' + id : '')).trim();
+    }
+    // Generic fallback: truncate at 85 chars
+    return raw.length > 85 ? raw.substring(0, 82) + '\u2026' : raw;
+}
+
     body.innerHTML = logs.map(l => {
         const key  = (l.action || '').toUpperCase();
-        const meta = iconMap[key] || { cls: 'dot-default', symbol: '·' };
+        const meta = iconMap[key] || { cls: 'dot-default', symbol: '\u00b7' };
         const timeStr = formatRelativeTime(l.timestamp);
         const actor   = l.actor_username || 'System';
         const model   = l.model_name || '';
+        const desc    = formatLogDescription(l.description);
         return `
         <div class="db-activity-item">
             <div class="db-activity-dot ${meta.cls}">${meta.symbol}</div>
             <div class="db-activity-content">
-                <div class="db-activity-desc">${l.description || '—'}</div>
+                <div class="db-activity-desc">${desc}</div>
                 <div class="db-activity-meta">
                     <span class="db-actor-chip">
                         <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -85,12 +108,14 @@ function renderActivityFeed(logs) {
                         ${actor}
                     </span>
                     <span>${timeStr}</span>
-                    ${model ? `<span style="opacity:0.5">·</span><span>${model}</span>` : ''}
+                    ${model ? `<span style="opacity:0.5">&middot;</span><span>${model}</span>` : ''}
                 </div>
             </div>
         </div>`;
     }).join('');
 }
+
+
 
 // ── Relative time helper ──
 function formatRelativeTime(iso) {

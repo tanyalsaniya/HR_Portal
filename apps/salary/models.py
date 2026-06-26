@@ -40,23 +40,59 @@ class SalaryStructure(models.Model):
     other_deductions = EncryptedDecimalField(default=Decimal('0.00'))
     effective_from = models.DateField()
 
+    # New detailed breakup fields
+    ctc = EncryptedDecimalField(default=Decimal('0.00'))
+    basic_salary = EncryptedDecimalField(default=Decimal('0.00'))
+    hra = EncryptedDecimalField(default=Decimal('0.00'))
+    conveyance = EncryptedDecimalField(default=Decimal('0.00'))
+    medical_allowance = EncryptedDecimalField(default=Decimal('0.00'))
+    special_allowance = EncryptedDecimalField(default=Decimal('0.00'))
+    monthly_bonus = EncryptedDecimalField(default=Decimal('0.00'))
+    esi_employer = EncryptedDecimalField(default=Decimal('0.00'))
+    pf_employer = EncryptedDecimalField(default=Decimal('0.00'))
+    pf_employee = EncryptedDecimalField(default=Decimal('0.00'))
+    esi_employee = EncryptedDecimalField(default=Decimal('0.00'))
+    lwf = EncryptedDecimalField(default=Decimal('0.00'))
+    in_hand_salary = EncryptedDecimalField(default=Decimal('0.00'))
+
     @property
     def basic(self):
-        # Fallback helper for any legacy views referencing basic
+        if self.basic_salary != Decimal('0.00'):
+            return self.basic_salary
         return self.gross_salary
+
+    @property
+    def effective_pf_employee(self):
+        if self.pf_employee != Decimal('0.00'):
+            return self.pf_employee
+        return self.pf_contribution
+
+    @property
+    def effective_esi_employee(self):
+        if self.esi_employee != Decimal('0.00'):
+            return self.esi_employee
+        return self.esi
+
+    @property
+    def effective_lwf(self):
+        if self.lwf != Decimal('0.00'):
+            return self.lwf
+        return self.labour_welfare_fund
 
     @property
     def total_deductions(self):
         return (
-            self.pf_contribution +
-            self.esi +
-            self.labour_welfare_fund +
+            self.effective_pf_employee +
+            self.effective_esi_employee +
+            self.effective_lwf +
             self.professional_tax +
             self.other_deductions
         )
 
     @property
     def net_salary(self):
+        if self.in_hand_salary != Decimal('0.00'):
+            return self.in_hand_salary
         return self.gross_salary - self.total_deductions
 
     def __str__(self):

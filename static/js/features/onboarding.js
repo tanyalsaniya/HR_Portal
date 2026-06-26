@@ -1203,15 +1203,24 @@ function togglePfInput() {
 
 // Live calculation of Gross, Deductions, and Net salary
 function calculateTakeHomeSalary() {
-    const gross = parseFloat(document.getElementById('salGrossSalary').value || 0);
+    const ctc = parseFloat(document.getElementById('salCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('salPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('salEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('salGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
     const pf = parseFloat(document.getElementById('salPfContribution').value || 0);
     const esi = parseFloat(document.getElementById('salEsi').value || 0);
     const lwf = parseFloat(document.getElementById('salLabourWelfareFund').value || 0);
     const pt = parseFloat(document.getElementById('salProfessionalTax').value || 0);
-    const other = parseFloat(document.getElementById('salOtherDeductions').value || 0);
 
-    const totalDeductions = pf + esi + lwf + pt + other;
+    const totalDeductions = pf + esi + lwf + pt;
     const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('salInHandSalary');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
 
     const summaryGross = document.getElementById('salSummaryGross');
     if (summaryGross) summaryGross.value = gross.toFixed(2);
@@ -1221,6 +1230,30 @@ function calculateTakeHomeSalary() {
 
     const summaryNet = document.getElementById('salSummaryNet');
     if (summaryNet) summaryNet.value = net.toFixed(2);
+}
+
+// Dynamic calculation of customizer salary override fields
+function calculateCustomizerSalary() {
+    const ctc = parseFloat(document.getElementById('custCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('custPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('custEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('custGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
+    const pf = parseFloat(document.getElementById('custPfEmployee').value || 0);
+    const esi = parseFloat(document.getElementById('custEsiEmployee').value || 0);
+    const lwf = parseFloat(document.getElementById('custLwf').value || 0);
+    const pt = parseFloat(document.getElementById('custPT').value || 0);
+
+    const totalDeductions = pf + esi + lwf + pt;
+    const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('custInHand');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
+
+    debounceLetterPreview();
 }
 
 // Repeatable allowances/deductions legacy no-ops
@@ -1247,7 +1280,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 esi: parseFloat(document.getElementById('salEsi').value || 0),
                 labour_welfare_fund: parseFloat(document.getElementById('salLabourWelfareFund').value || 0),
                 professional_tax: parseFloat(document.getElementById('salProfessionalTax').value || 0),
-                other_deductions: parseFloat(document.getElementById('salOtherDeductions').value || 0)
+                other_deductions: 0,
+                
+                ctc: parseFloat(document.getElementById('salCTC').value || 0),
+                basic_salary: 0,
+                hra: 0,
+                conveyance: 0,
+                medical_allowance: 0,
+                special_allowance: 0,
+                monthly_bonus: 0,
+                esi_employer: parseFloat(document.getElementById('salEsiEmployer').value || 0),
+                pf_employer: parseFloat(document.getElementById('salPfEmployer').value || 0),
+                pf_employee: parseFloat(document.getElementById('salPfContribution').value || 0),
+                esi_employee: parseFloat(document.getElementById('salEsi').value || 0),
+                lwf: parseFloat(document.getElementById('salLabourWelfareFund').value || 0),
+                in_hand_salary: parseFloat(document.getElementById('salInHandSalary').value || 0)
             };
 
             try {
@@ -1292,23 +1339,32 @@ async function loadProfileSalaryHistory() {
                 const effFrom = document.getElementById('salEffectiveFrom');
                 if (effFrom) effFrom.value = latest.effective_from || '';
 
+                const ctc = document.getElementById('salCTC');
+                if (ctc) ctc.value = latest.ctc || '';
+
                 const gross = document.getElementById('salGrossSalary');
                 if (gross) gross.value = latest.gross_salary || '';
 
+                const pfEmployer = document.getElementById('salPfEmployer');
+                if (pfEmployer) pfEmployer.value = latest.pf_employer || '';
+
+                const esiEmployer = document.getElementById('salEsiEmployer');
+                if (esiEmployer) esiEmployer.value = latest.esi_employer || '';
+
                 const pf = document.getElementById('salPfContribution');
-                if (pf) pf.value = latest.pf_contribution || '';
+                if (pf) pf.value = latest.pf_employee || latest.pf_contribution || '';
 
                 const esi = document.getElementById('salEsi');
-                if (esi) esi.value = latest.esi || '';
+                if (esi) esi.value = latest.esi_employee || latest.esi || '';
 
                 const lwf = document.getElementById('salLabourWelfareFund');
-                if (lwf) lwf.value = latest.labour_welfare_fund || '';
+                if (lwf) lwf.value = latest.lwf || latest.labour_welfare_fund || '';
 
                 const pt = document.getElementById('salProfessionalTax');
                 if (pt) pt.value = latest.professional_tax || '';
 
-                const other = document.getElementById('salOtherDeductions');
-                if (other) other.value = latest.other_deductions || '';
+                const inHand = document.getElementById('salInHandSalary');
+                if (inHand) inHand.value = latest.in_hand_salary || '';
                 
                 calculateTakeHomeSalary();
 
@@ -1436,23 +1492,20 @@ async function openLetterWorkspace(type) {
             document.getElementById('custSignatoryDesignation').value = 'Authorized Signatory';
             
             if (latestSalary) {
-                document.getElementById('custCTC').value = parseFloat(latestSalary.gross_salary || 0);
-                document.getElementById('custInHand').value = parseFloat(latestSalary.net_salary || 0);
-                document.getElementById('custBasic').value = parseFloat(latestSalary.gross_salary || 0);
-                document.getElementById('custHra').value = 0;
-                document.getElementById('custConveyance').value = 0;
-                document.getElementById('custMedical').value = 0;
-                document.getElementById('custSpecial').value = 0;
-                document.getElementById('custBonus').value = 0;
+                document.getElementById('custCTC').value = parseFloat(latestSalary.ctc || latestSalary.gross_salary || 0);
+                document.getElementById('custInHand').value = parseFloat(latestSalary.in_hand_salary || latestSalary.net_salary || 0);
                 
-                document.getElementById('custEsiEmployer').value = 0;
-                document.getElementById('custPfEmployer').value = 0;
-                document.getElementById('custPfEmployee').value = parseFloat(latestSalary.pf_contribution || 0);
-                document.getElementById('custEsiEmployee').value = parseFloat(latestSalary.esi || 0);
-                document.getElementById('custLwf').value = parseFloat(latestSalary.labour_welfare_fund || 0);
+                const grossEl = document.getElementById('custGrossSalary');
+                if (grossEl) grossEl.value = parseFloat(latestSalary.gross_salary || 0);
+                
+                document.getElementById('custEsiEmployer').value = parseFloat(latestSalary.esi_employer || 0);
+                document.getElementById('custPfEmployer').value = parseFloat(latestSalary.pf_employer || 0);
+                document.getElementById('custPfEmployee').value = parseFloat(latestSalary.pf_employee || latestSalary.pf_contribution || 0);
+                document.getElementById('custEsiEmployee').value = parseFloat(latestSalary.esi_employee || latestSalary.esi || 0);
+                document.getElementById('custLwf').value = parseFloat(latestSalary.lwf || latestSalary.labour_welfare_fund || 0);
                 document.getElementById('custPT').value = parseFloat(latestSalary.professional_tax || 200);
             } else {
-                const salaryFields = ['custCTC', 'custInHand', 'custBasic', 'custHra', 'custConveyance', 'custMedical', 'custSpecial', 'custBonus', 'custEsiEmployer', 'custPfEmployer', 'custPfEmployee', 'custEsiEmployee', 'custLwf', 'custPT'];
+                const salaryFields = ['custCTC', 'custInHand', 'custGrossSalary', 'custEsiEmployer', 'custPfEmployer', 'custPfEmployee', 'custEsiEmployee', 'custLwf', 'custPT'];
                 salaryFields.forEach(f => {
                     const el = document.getElementById(f);
                     if (el) el.value = 0;
@@ -1508,18 +1561,19 @@ async function updateLetterPreview() {
         
         ctc: document.getElementById('custCTC').value,
         in_hand: document.getElementById('custInHand').value,
-        basic: document.getElementById('custBasic').value,
-        hra: document.getElementById('custHra').value,
-        conveyance: document.getElementById('custConveyance').value,
-        medical: document.getElementById('custMedical').value,
-        special: document.getElementById('custSpecial').value,
-        monthly_bonus: document.getElementById('custBonus').value,
+        basic: 0,
+        hra: 0,
+        conveyance: 0,
+        medical: 0,
+        special: 0,
+        monthly_bonus: 0,
         esi_employer: document.getElementById('custEsiEmployer').value,
         pf_employer: document.getElementById('custPfEmployer').value,
         pf_employee: document.getElementById('custPfEmployee').value,
         esi_employee: document.getElementById('custEsiEmployee').value,
         lwf: document.getElementById('custLwf').value,
         professional_tax: document.getElementById('custPT').value,
+        gross_salary: document.getElementById('custGrossSalary').value,
     };
     
     try {
@@ -1759,18 +1813,19 @@ async function downloadCustomizedLetter() {
         
         ctc: document.getElementById('custCTC').value,
         in_hand: document.getElementById('custInHand').value,
-        basic: document.getElementById('custBasic').value,
-        hra: document.getElementById('custHra').value,
-        conveyance: document.getElementById('custConveyance').value,
-        medical: document.getElementById('custMedical').value,
-        special: document.getElementById('custSpecial').value,
-        monthly_bonus: document.getElementById('custBonus').value,
+        basic: 0,
+        hra: 0,
+        conveyance: 0,
+        medical: 0,
+        special: 0,
+        monthly_bonus: 0,
         esi_employer: document.getElementById('custEsiEmployer').value,
         pf_employer: document.getElementById('custPfEmployer').value,
         pf_employee: document.getElementById('custPfEmployee').value,
         esi_employee: document.getElementById('custEsiEmployee').value,
         lwf: document.getElementById('custLwf').value,
         professional_tax: document.getElementById('custPT').value,
+        gross_salary: document.getElementById('custGrossSalary').value,
     };
     
     try {
