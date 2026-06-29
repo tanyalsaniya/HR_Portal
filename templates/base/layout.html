@@ -1035,6 +1035,16 @@
                         Roles & Permissions
                     </a>
                 </li>
+                <li class="sidebar-item" id="probationLink" style="display: none;">
+                    <a class="sidebar-link" data-view="probationView" onclick="switchView('probationView')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        Probation & AI Analysis
+                    </a>
+                </li>
             </ul>
 
             <div
@@ -1129,6 +1139,7 @@
             {% include "student/student_detail_panel.html" %}
             {% include "audit/audit_panel.html" %}
             {% include "roles/roles_panel.html" %}
+            {% include "probation/probation_panel.html" %}
 
         </div>
     </div>
@@ -1173,18 +1184,23 @@
     <script src="{% static 'js/features/alerts.js' %}?v=5.1"></script>
 
     <!-- LOAD CENTRAL APP JS -->
-    <script src="{% static 'js/app.js' %}?v=4.9"></script>
+    <!-- <script src="{% static 'js/app.js' %}?v=5.0"></script> -->
+    <script src="/static/js/app.js"></script>
+    
 
     <!-- LOAD FEATURES JS SCRIPTS -->
-    <script src="{% static 'js/features/common_utils.js' %}?v=4.1"></script>
+    <script src="{% static 'js/features/common_utils.js' %}?v=4.2"></script>
     <script src="{% static 'js/features/dashboard.js' %}?v=4.1"></script>
     <script src="{% static 'js/features/onboarding.js' %}?v=4.4"></script>
     <script src="{% static 'js/features/salary.js' %}?v=3.9"></script>
     <script src="{% static 'js/features/exit.js' %}?v=3.7"></script>
     <script src="{% static 'js/features/student.js' %}?v=4.2"></script>
-    <script src="{% static 'js/features/audit.js' %}?v=3.1"></script>
+    <!-- <script src="{% static 'js/features/audit.js' %}?v=3.1"></script> -->
+    <script src="/static/js/features/audit.js"></script>
     <script src="{% static 'js/features/roles.js' %}?v=3.2"></script>
     <script src="{% static 'js/features/users.js' %}?v=3.1"></script>
+    <script src="{% static 'js/features/probation.js' %}?v=1.2"></script>
+
 
     <script>
         // Check Auth on page load and boot the application
@@ -1241,11 +1257,19 @@
                         checkNotifications();
                         setInterval(checkNotifications, 30000);
                     }
+                    
+                    // Hide loader overlay once initialization completes
+                    if (typeof hideGlobalLoader === 'function') {
+                        hideGlobalLoader();
+                    }
                 } else {
                     logout();
                 }
             } catch (e) {
                 console.error(e);
+                if (typeof hideGlobalLoader === 'function') {
+                    hideGlobalLoader();
+                }
                 logout();
             }
         });

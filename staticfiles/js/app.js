@@ -1,6 +1,5 @@
 // static/js/app.js
 // Central client-side logic for the MTVL HR Portal V2.0
-
 const API_BASE = '/api';
 let currentUser = null;
 
@@ -206,7 +205,8 @@ const viewToPath = {
     'studentView': '/students/',
     'studentDetailView': '/students/detail/',
     'logsView': '/logs/',
-    'rolesView': '/roles/'
+    'rolesView': '/roles/',
+    'probationView': '/probation/'
 };
 
 const pathToView = {
@@ -228,7 +228,8 @@ const pathToView = {
     '/students/': 'studentView',
     '/students/detail/': 'studentDetailView',
     '/logs/': 'logsView',
-    '/roles/': 'rolesView'
+    '/roles/': 'rolesView',
+    '/probation/': 'probationView'
 };
 
 const views = [
@@ -245,7 +246,8 @@ const views = [
     'logsView',
     'rolesView',
     'exitLetterWorkspace',
-    'exitTemplateEditor'
+    'exitTemplateEditor',
+    'probationView'
 ];
 
 function getEmployeeIdFromUrl() {
@@ -338,6 +340,9 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         }
         else if (viewId === 'logsView') loadLogsData();
         else if (viewId === 'rolesView') loadRolesData();
+        else if (viewId === 'probationView') {
+            if (typeof loadProbationData === 'function') loadProbationData();
+        }
     } catch (e) {
         console.error(`Error loading view "${viewId}":`, e);
         showToast('Unable to load this page section. Please refresh and try again.', 'error');
@@ -412,11 +417,19 @@ window.addEventListener('popstate', (event) => {
 async function checkNotifications() {
     if (!localStorage.getItem('accessToken')) return;
 
+    // Type → icon emoji map
+    const typeIcons = {
+        info:    '💬',
+        success: '✅',
+        warning: '⚠️',
+        urgent:  '🔴',
+        error:   '❌',
+    };
+
     try {
         const res = await apiFetch('/notifications/feed/');
         if (res.ok) {
             const data = await res.json();
-            // Backend now always returns { unread_count, results }
             const notifications = (Array.isArray(data) ? data : (data.results || [])).slice(0, 5);
             const unreadCount = data.unread_count !== undefined ? data.unread_count : notifications.filter(n => !n.is_read).length;
 
@@ -431,25 +444,41 @@ async function checkNotifications() {
                 }
             }
 
-            // Populate Panel — shows only unread (returned by backend, max 5)
+            // Update subtitle
+            const subtitle = document.getElementById('notifSubtitle');
+            if (subtitle) {
+                subtitle.textContent = unreadCount > 0
+                    ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
+                    : 'You\'re all caught up!';
+            }
+
+            // Populate Panel
             const listContainer = document.getElementById('notifList');
             if (listContainer) {
                 if (notifications.length === 0) {
                     listContainer.innerHTML = `
                         <div class="notif-empty">
-                            <span style="font-size:1.5rem;">&#10003;</span>
-                            <div>You're all caught up!</div>
-                            <div style="font-size:0.75rem;opacity:0.6;margin-top:4px;">No new notifications</div>
+                            <div class="notif-empty-icon">🔔</div>
+                            <h4>All caught up!</h4>
+                            <p>No new notifications right now.<br>Check back later.</p>
                         </div>`;
                     return;
                 }
 
                 listContainer.innerHTML = notifications.map(n => {
-                    const typeClass = 'notif-' + (n.notif_type || 'info').toLowerCase();
+                    const typeKey = (n.notif_type || 'info').toLowerCase();
+                    const typeClass = 'notif-' + typeKey;
+                    const icon = typeIcons[typeKey] || '🔔';
                     return `
                         <div class="notif-item unread ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
-                            <div class="notif-text">${n.message}</div>
-                            <div class="notif-time">${formatDate(n.created_at)}</div>
+                            <div class="notif-icon-wrap">${icon}</div>
+                            <div class="notif-content">
+                                <div class="notif-text">${n.message}</div>
+                                <div class="notif-time">
+                                    <span>🕐</span>
+                                    ${formatDate(n.created_at)}
+                                </div>
+                            </div>
                         </div>
                     `;
                 }).join('');

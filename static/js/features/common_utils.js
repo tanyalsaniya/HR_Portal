@@ -66,6 +66,12 @@ function applyPermissionsToUI() {
     const adminRolesLink = document.getElementById('adminRolesLink');
     if (adminRolesLink) adminRolesLink.style.display = hasPermission('roles.manage') ? 'block' : 'none';
 
+    const probationLink = document.getElementById('probationLink');
+    if (probationLink) {
+        probationLink.style.display = (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR')) ? 'block' : 'none';
+    }
+
+
     // Dashboard items
     const incrementWidget = document.getElementById('adminWidgetIncrements');
     if (incrementWidget) {

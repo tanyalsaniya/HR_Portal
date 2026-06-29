@@ -6,6 +6,7 @@ let allPermissions = [];
 let allRoles = [];
 
 async function loadRolesData() {
+    console.log('loadinasjdfAFBUID')
     document.getElementById('pageTitle').textContent = 'Roles & Permissions Control';
     
     const urlTab = getUrlParam('tab');
@@ -16,6 +17,7 @@ async function loadRolesData() {
         const permRes = await apiFetch('/roles/permissions/');
         if (permRes.ok) {
             const data = await permRes.json();
+            console.log('Fetched permissions:', data);
             allPermissions = data.results || data;
         }
 

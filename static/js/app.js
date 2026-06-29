@@ -1,6 +1,6 @@
 // static/js/app.js
 // Central client-side logic for the MTVL HR Portal V2.0
-
+console.log('HR Portal V2.0 - app.js loaded');
 const API_BASE = '/api';
 let currentUser = null;
 
@@ -206,7 +206,8 @@ const viewToPath = {
     'studentView': '/students/',
     'studentDetailView': '/students/detail/',
     'logsView': '/logs/',
-    'rolesView': '/roles/'
+    'rolesView': '/roles/',
+    'probationView': '/probation/'
 };
 
 const pathToView = {
@@ -228,7 +229,8 @@ const pathToView = {
     '/students/': 'studentView',
     '/students/detail/': 'studentDetailView',
     '/logs/': 'logsView',
-    '/roles/': 'rolesView'
+    '/roles/': 'rolesView',
+    '/probation/': 'probationView'
 };
 
 const views = [
@@ -245,7 +247,8 @@ const views = [
     'logsView',
     'rolesView',
     'exitLetterWorkspace',
-    'exitTemplateEditor'
+    'exitTemplateEditor',
+    'probationView'
 ];
 
 function getEmployeeIdFromUrl() {
@@ -338,6 +341,9 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         }
         else if (viewId === 'logsView') loadLogsData();
         else if (viewId === 'rolesView') loadRolesData();
+        else if (viewId === 'probationView') {
+            if (typeof loadProbationData === 'function') loadProbationData();
+        }
     } catch (e) {
         console.error(`Error loading view "${viewId}":`, e);
         showToast('Unable to load this page section. Please refresh and try again.', 'error');

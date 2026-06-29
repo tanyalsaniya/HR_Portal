@@ -19,6 +19,7 @@ urlpatterns = [
     path('', include('notifications.urls')),
     path('', include('audit_logs.urls')),
     path('', include('roles.urls')),
+    path('', include('probation.urls')),
 ]
 
 # Serve media files in development (fallback for non-secure files, like profile photos)
