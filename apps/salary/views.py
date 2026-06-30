@@ -22,7 +22,7 @@ from .serializers import (
     SalaryStructureSerializer, SalarySlipSerializer, SalaryImportBatchSerializer,
     SalaryIncrementReminderSerializer, SalaryIncrementApprovalSerializer
 )
-from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words
+from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words, get_latest_prior_slip
 
 # Helper to check roles
 def check_role(user):
@@ -194,8 +194,15 @@ class SalaryExportView(APIView):
         from salary.models import EmployeeBankDetail
 
         if slips.exists():
-            for slip in slips:
-                emp = user_map.get(str(slip.bitrix_user_id))
+            # Create a mapping of bitrix_user_id to slip for accurate employee matching
+            slips_map = {str(slip.bitrix_user_id): slip for slip in slips}
+            
+            # Iterate through employees in consistent order to ensure correct mapping
+            for emp in user_map.values():
+                slip = slips_map.get(str(emp.bitrix_id))
+                if not slip:
+                    continue
+                    
                 emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
                 designation = emp.designation if emp else ""
                 
@@ -232,15 +239,14 @@ class SalaryExportView(APIView):
                         cell.protection = unlocked_style
                 row_idx += 1
         else:
-            # Export empty template using active employees & structures
+            # Export with carry-forward logic: use latest prior imported salary if available
             import calendar
             from exit_formality.models import ExitRequest
             month_days_val = calendar.monthrange(year, month)[1]
-            users = BitrixClient.get_all_users()
             
+            # Use the same user_map for consistent employee ordering
             employees = []
-            for u in users:
-                emp = BitrixEmployeeMock(u)
+            for emp in user_map.values():
                 if emp.status != 'Exited':
                     employees.append(emp)
                 else:
@@ -250,38 +256,69 @@ class SalaryExportView(APIView):
                     ).exclude(status__in=['CANCELLED', 'FULLY_EXITED']).exists()
                     if has_pending_exit:
                         employees.append(emp)
+            
             for emp in employees:
-                struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id, effective_from__lte=datetime.date(year, month, 28)).order_by('-effective_from').first()
-                if not struct:
-                    # Fallback to absolute latest if none effective yet
-                    struct = SalaryStructure.objects.filter(bitrix_user_id=emp.bitrix_id).order_by('-effective_from').first()
+                # Try to get latest prior imported salary for carry-forward
+                prior_slip = get_latest_prior_slip(emp.bitrix_id, month, year)
+                
+                # Get salary structure for new employees (no prior imports)
+                struct = None
+                if not prior_slip:
+                    struct = SalaryStructure.objects.filter(
+                        bitrix_user_id=emp.bitrix_id,
+                        effective_from__lte=datetime.date(year, month, 28)
+                    ).order_by('-effective_from').first()
+                    if not struct:
+                        struct = SalaryStructure.objects.filter(
+                            bitrix_user_id=emp.bitrix_id
+                        ).order_by('-effective_from').first()
 
-                bank_acc = ""
-                bank_nm = ""
                 detail = EmployeeBankDetail.objects.filter(bitrix_user_id=emp.bitrix_id).first()
-                if detail:
-                    bank_acc = detail.bank_account_no or ""
-                    bank_nm = detail.bank_name or ""
-                if not bank_acc:
-                    bank_acc = emp.bank_account or ""
+                bank_acc = (detail.bank_account_no if detail and detail.bank_account_no else None) or \
+                           (prior_slip.bank_account_no if prior_slip else None) or \
+                           getattr(emp, 'bank_account', '') or ""
+                bank_nm = (detail.bank_name if detail and detail.bank_name else None) or \
+                          (prior_slip.bank_name if prior_slip else None) or ""
 
-                row_data = [
-                    row_idx - 1,
-                    emp.name,
-                    emp.designation,
-                    float(month_days_val),
-                    0.0,  # Worked days
-                    0.0,  # Weekend
-                    0.0,  # CL
-                    0.0,  # Extra
-                    0.0,  # Payable Days
-                    float(struct.gross_salary) if struct else 0.0,
-                    0.0,  # Payable Salary
-                    0.0,  # Extra days working
-                    0.0,  # Fine/Advance
-                    0.0,  # Net Payable
-                    bank_acc,
-                    bank_nm
+                # Use carry-forward data if available, otherwise blank with structure gross
+                if prior_slip:
+                    row_data = [
+                        row_idx - 1,
+                        emp.name,
+                        emp.designation,
+                        float(month_days_val),          # always use actual month days
+                        float(prior_slip.worked_days),
+                        float(prior_slip.weekend),
+                        float(prior_slip.cl),
+                        float(prior_slip.extra),
+                        float(prior_slip.payable_days),
+                        float(prior_slip.month_salary),
+                        float(prior_slip.payable_salary),
+                        float(prior_slip.extra_days_working),
+                        float(prior_slip.fine_advance),
+                        float(prior_slip.net_payable),
+                        bank_acc,
+                        bank_nm
+                    ]
+                else:
+                    # New employee — blank row with only gross from structure
+                    row_data = [
+                        row_idx - 1,
+                        emp.name,
+                        emp.designation,
+                        float(month_days_val),
+                        0.0,  # Worked days
+                        0.0,  # Weekend
+                        0.0,  # CL
+                        0.0,  # Extra
+                        0.0,  # Payable Days
+                        float(struct.gross_salary) if struct else 0.0,
+                        0.0,  # Payable Salary
+                        0.0,  # Extra days working
+                        0.0,  # Fine/Advance
+                        0.0,  # Net Payable
+                        bank_acc,
+                        bank_nm
                 ]
                 ws.append(row_data)
 

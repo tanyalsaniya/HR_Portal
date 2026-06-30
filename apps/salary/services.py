@@ -5,7 +5,89 @@ import zipfile
 from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.conf import settings
+from django.db.models import Q
 from .models import SalaryStructure, SalarySlip, SalaryIncrementApproval
+
+
+def get_latest_prior_slip(bitrix_user_id, month, year):
+    """
+    Returns the most recently imported SalarySlip for the given employee
+    that is strictly BEFORE the specified month/year, in reverse chrono order.
+
+    Returns None if no prior slip exists (new employee / no imports yet).
+
+    Examples
+    --------
+    Selected = April 2026, imported = Jan 2026 + Feb 2026  → returns Feb 2026
+    Selected = April 2026, imported = Jan 2026 only         → returns Jan 2026
+    Selected = April 2026, no prior imports                 → returns None
+    """
+    return (
+        SalarySlip.objects
+        .filter(bitrix_user_id=str(bitrix_user_id))
+        .filter(Q(year__lt=year) | Q(year=year, month__lt=month))
+        .order_by('-year', '-month')
+        .first()
+    )
+
+
+def generate_payslip_pdf_bytes(salary_slip, override_month=None, override_year=None):
+    """
+    Renders a payslip to PDF bytes WITHOUT saving anything to DB.
+
+    Useful for carry-forward months where no actual SalarySlip record exists:
+    we temporarily set month/year on the slip object only in memory.
+
+    Args:
+        salary_slip:    A real or temporary SalarySlip-like object with salary data.
+        override_month: If provided, use this month on the rendered PDF instead of
+                        salary_slip.month (carry-forward use case).
+        override_year:  If provided, use this year on the rendered PDF.
+
+    Returns:
+        (pdf_bytes, filename) tuple — nothing written to DB or disk.
+    """
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+
+    user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
+    employee = BitrixEmployeeMock(user_data) if user_data else None
+
+    from salary.models import EmployeeBankDetail
+    bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=salary_slip.bitrix_user_id).first()
+    bank_acc = ""
+    if bank_detail and bank_detail.bank_account_no:
+        bank_acc = bank_detail.bank_account_no
+    elif salary_slip.bank_account_no:
+        bank_acc = salary_slip.bank_account_no
+    elif employee:
+        bank_acc = getattr(employee, 'bank_account', '') or ''
+
+    bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
+    net_pay_words = num_to_words(salary_slip.net_salary)
+
+    # For carry-forward: display the requested month/year on the slip, not the source month
+    display_month = override_month if override_month is not None else salary_slip.month
+    display_year = override_year if override_year is not None else salary_slip.year
+
+    context = {
+        'slip': salary_slip,
+        'display_month': display_month,
+        'display_year': display_year,
+        'employee': employee,
+        'bank_account_masked': bank_account_masked,
+        'net_pay_words': net_pay_words,
+        'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
+        'today': datetime.date.today(),
+    }
+
+    html_string = render_to_string('salary/pdf_payslip.html', context)
+    pdf_bytes = HTML(string=html_string).write_pdf()
+
+    emp_id = employee.emp_id if employee else salary_slip.bitrix_user_id
+    filename = f"payslip_{emp_id}_{display_month}_{display_year}.pdf"
+    return pdf_bytes, filename
 
 def num_to_words(number):
     """
