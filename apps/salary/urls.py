@@ -5,7 +5,8 @@ from .views import (
     SalaryStructureViewSet, SalaryIncrementViewSet,
     SalaryExportView, SalaryImportView, SalaryPublishView,
     SalaryEditView, SalaryHistoryView, SalarySlipDownloadView,
-    SalaryImportBatchesView, SalaryEmployeeSummaryView, SalaryEmployeeHistoryExportView
+    SalaryImportBatchesView, SalaryEmployeeSummaryView, SalaryEmployeeHistoryExportView,
+    SalaryIndividualGenerateView
 )
 from accounts.views import hybrid_view
 
@@ -33,4 +34,5 @@ urlpatterns = [
     path('api/admin/salary/import-batches', SalaryImportBatchesView.as_view(), name='salary_import_batches'),
     path('api/salary/employee/<int:employee_id>/summary', SalaryEmployeeSummaryView.as_view(), name='salary_employee_summary'),
     path('api/salary/employee/<int:employee_id>/export', SalaryEmployeeHistoryExportView.as_view(), name='salary_employee_history_export'),
+    path('api/admin/salary/generate-individual', SalaryIndividualGenerateView.as_view(), name='salary_generate_individual'),
 ]

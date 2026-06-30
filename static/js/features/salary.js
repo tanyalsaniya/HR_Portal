@@ -832,6 +832,54 @@ document.addEventListener('DOMContentLoaded', () => {
             if (el) el.textContent = `Rs. ${val.toFixed(2)}`;
         });
     }
+
+    // Manual Individual Generate Form
+    const manualGenerateForm = document.getElementById('salaryManualGenerateForm');
+    if (manualGenerateForm) {
+        manualGenerateForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const employeeId = document.getElementById('manualGenerateEmployee').value;
+            const month = document.getElementById('manualGenerateMonth').value;
+            const year = document.getElementById('manualGenerateYear').value;
+            
+            if (!employeeId || !month || !year) {
+                showToast('Please fill all required fields.', 'warning');
+                return;
+            }
+            
+            showToast('Generating individual payslip...');
+            try {
+                const res = await apiFetch('/admin/salary/generate-individual', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        month: parseInt(month),
+                        year: parseInt(year)
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    showToast(data.message || 'Payslip generated successfully.', 'success');
+                    closeManualGenerateModal();
+                    
+                    // Reload slips list or history
+                    if (activeSalaryTab === 'slips') {
+                        loadSlipsRegistry();
+                    }
+                    if (document.getElementById('salaryHistoryView') && document.getElementById('salaryHistoryView').style.display !== 'none') {
+                        loadDedicatedEmployeeSalaryHistoryData();
+                    }
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Failed to generate payslip.', 'error');
+                }
+            } catch (error) {
+                console.error("Error generating manual payslip:", error);
+                showToast('Connection error.', 'error');
+            }
+        });
+    }
 });
 
 // Dedicated Salary History Page Logic
@@ -1166,4 +1214,54 @@ async function viewPayslipSingle(employeeId, month, year) {
         console.error(e);
         showToast('Preview error.', 'error');
     }
+}
+
+function openManualGenerateModal() {
+    const modal = document.getElementById('salaryManualGenerateModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Populate employee select
+        const employeeSelect = document.getElementById('manualGenerateEmployee');
+        if (employeeSelect) {
+            employeeSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
+            apiFetch('/employees/?type=all&no_pagination=true')
+                .then(res => res.json())
+                .then(data => {
+                    const emps = data.results || data;
+                    emps.forEach(emp => {
+                        const opt = document.createElement('option');
+                        opt.value = emp.bitrix_id || emp.id;
+                        opt.textContent = `${emp.name} (${emp.emp_id || 'N/A'})`;
+                        employeeSelect.appendChild(opt);
+                    });
+                    
+                    const historyView = document.getElementById('salaryHistoryView');
+                    if (historyView && historyView.style.display !== 'none' && currentHistoryEmployeeId) {
+                        const matchingEmp = emps.find(e => String(e.id) === String(currentHistoryEmployeeId) || String(e.bitrix_id) === String(currentHistoryEmployeeId));
+                        if (matchingEmp) {
+                            employeeSelect.value = matchingEmp.bitrix_id || matchingEmp.id;
+                        }
+                    }
+                })
+                .catch(err => console.error("Error loading employees for dropdown:", err));
+        }
+        
+        // Set default month/year to target inputs
+        const targetMonthEl = document.getElementById('payrollMonth');
+        const targetYearEl = document.getElementById('payrollYear');
+        const defaultMonth = targetMonthEl ? targetMonthEl.value : String(new Date().getMonth() + 1);
+        const defaultYear = targetYearEl ? targetYearEl.value : String(new Date().getFullYear());
+        if (document.getElementById('manualGenerateMonth')) {
+            document.getElementById('manualGenerateMonth').value = defaultMonth;
+        }
+        if (document.getElementById('manualGenerateYear')) {
+            document.getElementById('manualGenerateYear').value = defaultYear;
+        }
+    }
+}
+
+function closeManualGenerateModal() {
+    const modal = document.getElementById('salaryManualGenerateModal');
+    if (modal) modal.style.display = 'none';
 }

@@ -24,11 +24,47 @@ def get_latest_prior_slip(bitrix_user_id, month, year):
     """
     return (
         SalarySlip.objects
-        .filter(bitrix_user_id=str(bitrix_user_id))
+        .filter(bitrix_user_id=str(bitrix_user_id), uploaded_batch__isnull=False)
         .filter(Q(year__lt=year) | Q(year=year, month__lt=month))
         .order_by('-year', '-month')
         .first()
     )
+
+
+def calculate_carry_forward_slip(employee_id, month, year, prior_slip):
+    """
+    Returns an unsaved (in-memory) SalarySlip instance calculated using the
+    prior_slip's salary data and the target month's calendar days.
+    """
+    import calendar
+    from decimal import Decimal
+    from salary.models import SalarySlip
+    
+    month_days = Decimal(calendar.monthrange(year, month)[1])
+    
+    slip = SalarySlip(
+        bitrix_user_id=str(employee_id),
+        month=month,
+        year=year,
+        location=prior_slip.location,
+        month_days=month_days,
+        worked_days=prior_slip.worked_days,
+        weekend=prior_slip.weekend,
+        cl=prior_slip.cl,
+        extra=prior_slip.extra,
+        payable_days=prior_slip.payable_days,
+        month_salary=prior_slip.month_salary,
+        payable_salary=prior_slip.payable_salary,
+        extra_days_working=prior_slip.extra_days_working,
+        fine_advance=prior_slip.fine_advance,
+        net_payable=prior_slip.net_payable,
+        bank_account_no=prior_slip.bank_account_no,
+        bank_name=prior_slip.bank_name,
+        payment_status='pending',
+        status='published'
+    )
+    slip._skip_recalculation = True
+    return slip
 
 
 def generate_payslip_pdf_bytes(salary_slip, override_month=None, override_year=None):

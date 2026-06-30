@@ -22,7 +22,7 @@ from .serializers import (
     SalaryStructureSerializer, SalarySlipSerializer, SalaryImportBatchSerializer,
     SalaryIncrementReminderSerializer, SalaryIncrementApprovalSerializer
 )
-from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words, get_latest_prior_slip
+from .services import generate_payslip_pdf, generate_increment_letter_pdf, generate_payslips_zip, num_to_words, get_latest_prior_slip, calculate_carry_forward_slip
 
 # Helper to check roles
 def check_role(user):
@@ -282,21 +282,22 @@ class SalaryExportView(APIView):
 
                 # Use carry-forward data if available, otherwise blank with structure gross
                 if prior_slip:
+                    temp_slip = calculate_carry_forward_slip(emp.bitrix_id, month, year, prior_slip)
                     row_data = [
                         row_idx - 1,
                         emp.name,
                         emp.designation,
-                        float(month_days_val),          # always use actual month days
-                        float(prior_slip.worked_days),
-                        float(prior_slip.weekend),
-                        float(prior_slip.cl),
-                        float(prior_slip.extra),
-                        float(prior_slip.payable_days),
-                        float(prior_slip.month_salary),
-                        float(prior_slip.payable_salary),
-                        float(prior_slip.extra_days_working),
-                        float(prior_slip.fine_advance),
-                        float(prior_slip.net_payable),
+                        float(temp_slip.month_days),
+                        float(temp_slip.worked_days),
+                        float(temp_slip.weekend),
+                        float(temp_slip.cl),
+                        float(temp_slip.extra),
+                        float(temp_slip.payable_days),
+                        float(temp_slip.month_salary),
+                        float(temp_slip.payable_salary),
+                        float(temp_slip.extra_days_working),
+                        float(temp_slip.fine_advance),
+                        float(temp_slip.net_payable),
                         bank_acc,
                         bank_nm
                     ]
@@ -725,6 +726,84 @@ class SalaryEditView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+def get_employee_slips_for_range(employee_id, from_year, from_month, to_year, to_month, status_filter=None, payment_status=None):
+    # 1. Fetch real slips
+    real_slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
+    if status_filter:
+        real_slips = real_slips.filter(status=status_filter)
+    if payment_status:
+        real_slips = real_slips.filter(payment_status=payment_status)
+
+    # Keep track of which periods have real slips
+    real_periods = set()
+    slips_list = []
+    for s in real_slips:
+        real_periods.add((s.year, s.month))
+        slips_list.append(s)
+
+    imported_periods = set(
+        SalarySlip.objects.filter(bitrix_user_id=str(employee_id))
+        .values_list('year', 'month')
+    )
+
+    # Determine bounds for date range
+    first_slip = SalarySlip.objects.filter(bitrix_user_id=str(employee_id)).order_by('year', 'month').first()
+    
+    # Cap carry-forward up to current local date
+    from django.utils import timezone
+    today = timezone.localdate()
+    cap_Y, cap_M = today.year, today.month
+
+    # Sort out bounds
+    fY, fM = from_year, from_month
+    if fY is None and first_slip:
+        fY, fM = first_slip.year, first_slip.month
+    elif fY is None:
+        fY, fM = 2000, 1
+
+    tY, tM = to_year, to_month
+    if tY is None:
+        tY, tM = cap_Y, cap_M
+
+    # Cap range end for carry-forward mock generation to current local date
+    gen_to_Y, gen_to_M = tY, tM
+    if gen_to_Y > cap_Y or (gen_to_Y == cap_Y and gen_to_M > cap_M):
+        gen_to_Y, gen_to_M = cap_Y, cap_M
+
+    # Iterate month-by-month and generate carry-forward slips
+    curr_year, curr_month = fY, fM
+    if first_slip:
+        start_year, start_month = first_slip.year, first_slip.month
+        while (curr_year < gen_to_Y) or (curr_year == gen_to_Y and curr_month <= gen_to_M):
+            if (curr_year > start_year) or (curr_year == start_year and curr_month >= start_month):
+                if (curr_year, curr_month) not in imported_periods:
+                    prior_slip = get_latest_prior_slip(employee_id, curr_month, curr_year)
+                    if prior_slip:
+                        if not status_filter or prior_slip.status == status_filter:
+                            if not payment_status or prior_slip.payment_status == payment_status:
+                                mock_slip = calculate_carry_forward_slip(employee_id, curr_month, curr_year, prior_slip)
+                                slips_list.append(mock_slip)
+            # Increment month
+            curr_month += 1
+            if curr_month > 12:
+                curr_month = 1
+                curr_year += 1
+
+    # Filter and sort
+    final_slips = []
+    for s in slips_list:
+        if fY is not None:
+            if s.year < fY or (s.year == fY and s.month < fM):
+                continue
+        if tY is not None:
+            if s.year > tY or (s.year == tY and s.month > tM):
+                continue
+        final_slips.append(s)
+        
+    final_slips.sort(key=lambda s: (s.year, s.month), reverse=True)
+    return final_slips
+
+
 class SalaryHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -732,48 +811,57 @@ class SalaryHistoryView(APIView):
         role = check_role(request.user)
         
         # Scoped logic
+        employee_id = None
         if role == 'employee':
-            # Force self
             user_data = next((u for u in BitrixClient.get_all_users() if u.get('email') == request.user.email), None)
             if not user_data:
                 return Response({'error': 'Employee profile not found in Bitrix24.'}, status=status.HTTP_404_NOT_FOUND)
             employee = BitrixEmployeeMock(user_data)
-            slips = SalarySlip.objects.filter(bitrix_user_id=employee.bitrix_id, status='published').order_by('-year', '-month')
+            employee_id = employee.bitrix_id
         else:
-            # Admin / HR
             employee_id = request.query_params.get('employee_id') or kwargs.get('employee_id') or request.query_params.get('bitrix_user_id')
-            if employee_id:
-                slips = SalarySlip.objects.filter(bitrix_user_id=str(employee_id)).order_by('-year', '-month')
-            else:
-                # Paginate all employees slips
-                slips = SalarySlip.objects.all().order_by('-year', '-month')
 
         # Payment status filtering
         payment_status = request.query_params.get('payment_status')
-        if payment_status:
-            slips = slips.filter(payment_status=payment_status)
 
         # Date range filtering
         from_param = request.query_params.get('from') # format: YYYY-MM
         to_param = request.query_params.get('to')     # format: YYYY-MM
 
+        fY, fM = None, None
         if from_param:
             try:
                 fY, fM = map(int, from_param.split('-'))
-                slips = slips.filter(
-                    models.Q(year__gt=fY) | models.Q(year=fY, month__gte=fM)
-                )
             except ValueError:
                 pass
 
+        tY, tM = None, None
         if to_param:
             try:
                 tY, tM = map(int, to_param.split('-'))
-                slips = slips.filter(
-                    models.Q(year__lt=tY) | models.Q(year=tY, month__lte=tM)
-                )
             except ValueError:
                 pass
+
+        if employee_id:
+            status_filter = 'published' if role == 'employee' else None
+            slips = get_employee_slips_for_range(
+                employee_id=employee_id,
+                from_year=fY,
+                from_month=fM,
+                to_year=tY,
+                to_month=tM,
+                status_filter=status_filter,
+                payment_status=payment_status
+            )
+        else:
+            # Admin / HR paginating all employees
+            slips = SalarySlip.objects.all().order_by('-year', '-month')
+            if payment_status:
+                slips = slips.filter(payment_status=payment_status)
+            if fY is not None:
+                slips = slips.filter(models.Q(year__gt=fY) | models.Q(year=fY, month__gte=fM))
+            if tY is not None:
+                slips = slips.filter(models.Q(year__lt=tY) | models.Q(year=tY, month__lte=tM))
 
         # Pagination
         paginator = StandardResultsSetPagination()
@@ -863,22 +951,44 @@ class SalarySlipDownloadView(APIView):
             if not month_str or not year_str:
                 return Response({'error': 'month and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
             slips = slips_qs.filter(month=int(month_str), year=int(year_str))
+            
+            slips = list(slips)
+            if not slips and employee_id:
+                # Carry forward logic!
+                month = int(month_str)
+                year = int(year_str)
+                prior_slip = get_latest_prior_slip(employee_id, month, year)
+                if prior_slip:
+                    if role != 'employee' or prior_slip.status == 'published':
+                        carry_slip = calculate_carry_forward_slip(employee_id, month, year, prior_slip)
+                        pdf_bytes, filename = generate_payslip_pdf_bytes(carry_slip)
+                        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+                        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                        return response
         elif download_type == 'last3':
             slips = slips_qs.order_by('-year', '-month')[:3]
+            slips = list(slips)
         elif download_type == 'last4':
             slips = slips_qs.order_by('-year', '-month')[:4]
+            slips = list(slips)
         elif download_type == 'range':
             from_month = int(request.query_params.get('from_month', 1))
             from_year = int(request.query_params.get('from_year', 2000))
             to_month = int(request.query_params.get('to_month', 12))
             to_year = int(request.query_params.get('to_year', 2100))
             
-            # Filters BETWEEN from and to inclusive
-            slips = slips_qs.filter(
-                models.Q(year__gt=from_year) | models.Q(year=from_year, month__gte=from_month)
-            ).filter(
-                models.Q(year__lt=to_year) | models.Q(year=to_year, month__lte=to_month)
-            ).order_by('year', 'month')
+            if not employee_id:
+                return Response({'error': 'employee_id parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            status_filter = 'published' if role == 'employee' else None
+            slips = get_employee_slips_for_range(
+                employee_id=employee_id,
+                from_year=from_year,
+                from_month=from_month,
+                to_year=to_year,
+                to_month=to_month,
+                status_filter=status_filter
+            )
         elif download_type == 'bulk_month':
             if role not in ['admin', 'hr']:
                 raise PermissionDenied("Only Admin/HR can bulk download slips.")
@@ -887,6 +997,7 @@ class SalarySlipDownloadView(APIView):
             if not month_str or not year_str:
                 return Response({'error': 'month and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
             slips = slips_qs.filter(month=int(month_str), year=int(year_str))
+            slips = list(slips)
         elif download_type == 'selected':
             slip_ids_str = request.query_params.get('slip_ids')
             if not slip_ids_str:
@@ -894,24 +1005,29 @@ class SalarySlipDownloadView(APIView):
             try:
                 ids = [int(x) for x in slip_ids_str.split(',')]
                 slips = slips_qs.filter(id__in=ids)
+                slips = list(slips)
             except ValueError:
                 return Response({'error': 'Invalid slip_ids parameter.'}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({'error': 'Invalid download type.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        slips = list(slips)
         if not slips:
             return Response({'error': 'No salary slips found matching parameters.'}, status=status.HTTP_404_NOT_FOUND)
 
         if len(slips) == 1:
             slip = slips[0]
-            # Ensure PDF exists
-            generate_payslip_pdf(slip)
-            
-            # Serve single PDF
-            response = HttpResponse(slip.pdf_file.read(), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="payslip_{slip.employee.emp_id}_{slip.month}_{slip.year}.pdf"'
-            return response
+            # Ensure PDF exists (only for real database records, mock ones don't have id/pdf_file field saved)
+            if getattr(slip, 'id', None) is not None:
+                generate_payslip_pdf(slip)
+                response = HttpResponse(slip.pdf_file.read(), content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="payslip_{slip.employee.emp_id}_{slip.month}_{slip.year}.pdf"'
+                return response
+            else:
+                # Mock slip single download
+                pdf_bytes, filename = generate_payslip_pdf_bytes(slip)
+                response = HttpResponse(pdf_bytes, content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
         else:
             # Serve ZIP
             zip_type = 'bulk' if download_type == 'bulk_month' else 'employee'
@@ -1070,3 +1186,127 @@ class SalaryEmployeeHistoryExportView(APIView):
         response['Content-Disposition'] = f'attachment; filename="salary_history_{employee.emp_id}.xlsx"'
         wb.save(response)
         return response
+
+
+class SalaryIndividualGenerateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can manually generate payslips.")
+
+        employee_id = request.data.get('employee_id')
+        month_str = request.data.get('month')
+        year_str = request.data.get('year')
+
+        if not employee_id or not month_str or not year_str:
+            return Response({'error': 'employee_id, month, and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month_str)
+            year = int(year_str)
+            if not (1 <= month <= 12):
+                raise ValueError()
+        except ValueError:
+            return Response({'error': 'Invalid month or year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if an imported slip already exists
+        existing_imported_slip = SalarySlip.objects.filter(bitrix_user_id=str(employee_id), month=month, year=year, uploaded_batch__isnull=False).first()
+        if existing_imported_slip:
+            generate_payslip_pdf(existing_imported_slip)
+            return Response({'message': 'Payslip generated successfully.', 'id': existing_imported_slip.id}, status=status.HTTP_200_OK)
+
+        # Get existing non-imported slip if any
+        existing_slip = SalarySlip.objects.filter(bitrix_user_id=str(employee_id), month=month, year=year).first()
+        is_update = existing_slip is not None
+
+        # 1. Try to copy from latest prior slip
+        prior_slip = get_latest_prior_slip(employee_id, month, year)
+        if prior_slip:
+            slip_data = calculate_carry_forward_slip(employee_id, month, year, prior_slip)
+            if existing_slip:
+                # Update existing non-imported slip with carry forward values
+                existing_slip.location = slip_data.location
+                existing_slip.month_days = slip_data.month_days
+                existing_slip.worked_days = slip_data.worked_days
+                existing_slip.weekend = slip_data.weekend
+                existing_slip.cl = slip_data.cl
+                existing_slip.extra = slip_data.extra
+                existing_slip.payable_days = slip_data.payable_days
+                existing_slip.month_salary = slip_data.month_salary
+                existing_slip.payable_salary = slip_data.payable_salary
+                existing_slip.extra_days_working = slip_data.extra_days_working
+                existing_slip.fine_advance = slip_data.fine_advance
+                existing_slip.net_payable = slip_data.net_payable
+                existing_slip.bank_account_no = slip_data.bank_account_no
+                existing_slip.bank_name = slip_data.bank_name
+                existing_slip.status = 'published'
+                existing_slip._skip_recalculation = True
+                existing_slip.save()
+                slip = existing_slip
+            else:
+                slip_data.status = 'published'
+                slip_data._skip_recalculation = True
+                slip_data.save()
+                slip = slip_data
+        else:
+            # 2. Try to generate from active SalaryStructure
+            from salary.models import SalaryStructure, EmployeeBankDetail
+            structure = SalaryStructure.objects.filter(bitrix_user_id=str(employee_id)).order_by('-effective_from').first()
+            if not structure:
+                return Response({'error': 'No prior salary slip or salary structure found for this employee to carry forward from.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=str(employee_id)).first()
+            bank_acc = bank_detail.bank_account_no if bank_detail else ""
+            bank_name = bank_detail.bank_name if bank_detail else ""
+            
+            # Use month days
+            import calendar
+            month_days = Decimal(calendar.monthrange(year, month)[1])
+            
+            if existing_slip:
+                existing_slip.location = 'Mohali'
+                existing_slip.month_days = month_days
+                existing_slip.worked_days = month_days
+                existing_slip.weekend = Decimal('0.00')
+                existing_slip.cl = Decimal('0.00')
+                existing_slip.extra = Decimal('0.00')
+                existing_slip.payable_days = month_days
+                existing_slip.month_salary = structure.gross_salary
+                existing_slip.payable_salary = structure.gross_salary
+                existing_slip.extra_days_working = Decimal('0.00')
+                existing_slip.fine_advance = Decimal('0.00')
+                existing_slip.net_payable = structure.net_salary
+                existing_slip.bank_account_no = bank_acc
+                existing_slip.bank_name = bank_name
+                existing_slip.status = 'published'
+                existing_slip._skip_recalculation = True
+                existing_slip.save()
+                slip = existing_slip
+            else:
+                slip = SalarySlip(
+                    bitrix_user_id=str(employee_id),
+                    month=month,
+                    year=year,
+                    location='Mohali',
+                    month_days=month_days,
+                    worked_days=month_days,
+                    weekend=Decimal('0.00'),
+                    cl=Decimal('0.00'),
+                    extra=Decimal('0.00'),
+                    payable_days=month_days,
+                    month_salary=structure.gross_salary,
+                    payable_salary=structure.gross_salary,
+                    extra_days_working=Decimal('0.00'),
+                    fine_advance=Decimal('0.00'),
+                    net_payable=structure.net_salary,
+                    bank_account_no=bank_acc,
+                    bank_name=bank_name,
+                    payment_status='pending',
+                    status='published'
+                )
+                slip._skip_recalculation = True
+                slip.save()
+
+        generate_payslip_pdf(slip)
+        return Response({'message': 'Payslip generated successfully.', 'id': slip.id}, status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED)

@@ -140,11 +140,7 @@
             <div class="company-address">GR SQUARE, PLOT NO D-254, 4th FLOOR, PHASE-8A, MOHALI</div>
             <div class="slip-title">
                 SALARY SLIP FOR THE MONTH OF
-                {% if slip.month == 1 %}JANUARY{% elif slip.month == 2 %}FEBRUARY{% elif slip.month == 3 %}MARCH{% elif
-                slip.month == 4 %}APRIL{% elif slip.month == 5 %}MAY{% elif slip.month == 6 %}JUNE{% elif slip.month ==
-                7 %}JULY{% elif slip.month == 8 %}AUGUST{% elif slip.month == 9 %}SEPTEMBER{% elif slip.month == 10
-                %}OCTOBER{% elif slip.month == 11 %}NOVEMBER{% elif slip.month == 12 %}DECEMBER{% endif %} {{ slip.year
-                }}
+                {% if slip.month == 1 %}JANUARY{% elif slip.month == 2 %}FEBRUARY{% elif slip.month == 3 %}MARCH{% elif slip.month == 4 %}APRIL{% elif slip.month == 5 %}MAY{% elif slip.month == 6 %}JUNE{% elif slip.month == 7 %}JULY{% elif slip.month == 8 %}AUGUST{% elif slip.month == 9 %}SEPTEMBER{% elif slip.month == 10 %}OCTOBER{% elif slip.month == 11 %}NOVEMBER{% elif slip.month == 12 %}DECEMBER{% endif %} {{ slip.year }}
             </div>
         </div>
 
@@ -234,8 +230,7 @@
                     <td style="border-left: none; border-bottom: none;"></td>
                     <td style="border-bottom: none;"></td>
                     <td>NET PAYABLE</td>
-                    <td class="amount" style="border-right: none; border-bottom: none; color: #000;">{{ slip.net_payable
-                        }}</td>
+                    <td class="amount" style="border-right: none; border-bottom: none; color: #000;">{{ slip.net_payable }}</td>
                 </tr>
 
                 <!-- NET PAY IN WORDS -->

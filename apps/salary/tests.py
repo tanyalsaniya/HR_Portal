@@ -570,5 +570,87 @@ class SalaryModuleTests(APITestCase):
         # And payable_days is calculated correctly based on attendance even though it was 0 in Excel
         self.assertEqual(slip.payable_days, Decimal('35.00'))
 
+    def test_future_salary_slip_visibility(self):
+        # Create a slip in the future (e.g. November 2026, while today is June 2026)
+        SalarySlip.objects.create(
+            bitrix_user_id=self.employee.bitrix_id,
+            month=11,
+            year=2026,
+            month_salary=Decimal('87000.00'),
+            worked_days=Decimal('30.00'),
+            month_days=Decimal('30.00'),
+            net_payable=Decimal('87000.00'),
+            status='published'
+        )
+
+        # Authenticate as admin
+        self.client.force_authenticate(user=self.admin_user)
+
+        # Fetch history for a range covering November 2026
+        url = reverse('salary_history') + f"?employee_id={self.employee.bitrix_id}&from=2026-11&to=2030-12"
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        
+        # Verify that the future slip is successfully returned
+        slips = res.data['results'] if 'results' in res.data else res.data
+        self.assertEqual(len(slips), 1)
+        self.assertEqual(slips[0]['month'], 11)
+        self.assertEqual(slips[0]['year'], 2026)
+
+    def test_manual_generation_carry_forward(self):
+        # Create a mock batch
+        batch = SalaryImportBatch.objects.create(
+            month=1,
+            year=2026,
+            file_name="test.xlsx",
+            uploaded_by=self.admin_user,
+            status='success'
+        )
+        # Create a slip in January 2026
+        prior_slip = SalarySlip.objects.create(
+            bitrix_user_id=self.employee.bitrix_id,
+            month=1,
+            year=2026,
+            month_days=Decimal('31.00'),
+            worked_days=Decimal('20.00'),
+            weekend=Decimal('8.00'),
+            cl=Decimal('2.00'),
+            extra=Decimal('1.00'),
+            month_salary=Decimal('62000.00'),
+            extra_days_working=Decimal('2000.00'),
+            fine_advance=Decimal('1000.00'),
+            status='published',
+            uploaded_batch=batch
+        )
+        
+        # Authenticate as admin
+        self.client.force_authenticate(user=self.admin_user)
+        
+        # Manually generate for February 2026
+        url = reverse('salary_generate_individual')
+        data = {
+            'employee_id': self.employee.bitrix_id,
+            'month': 2,
+            'year': 2026
+        }
+        res = self.client.post(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        
+        # Verify the new slip is created and has correct copied values for Feb 2026 (28 days)
+        slip = SalarySlip.objects.get(bitrix_user_id=self.employee.bitrix_id, month=2, year=2026)
+        self.assertEqual(slip.month_days, Decimal('28.00'))
+        self.assertEqual(slip.worked_days, Decimal('20.00'))
+        # payable_days = 20 + 8 + 2 + 1 = 31
+        self.assertEqual(slip.payable_days, Decimal('31.00'))
+        # payable_salary is copied exactly from January: 62000.00
+        self.assertEqual(slip.payable_salary, Decimal('62000.00'))
+        # net_payable is copied exactly from January: 63000.00
+        self.assertEqual(slip.net_payable, Decimal('63000.00'))
+        self.assertTrue(bool(slip.pdf_file))
+        
+        # Generate again: should reuse and regenerate without failing
+        res2 = self.client.post(url, data, format='json')
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+
 
 

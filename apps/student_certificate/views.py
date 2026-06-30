@@ -1184,13 +1184,17 @@ class BitrixActiveStudentsView(APIView):
     # Stages that mean the student is NO LONGER active (completed / failed only)
     # Only EXCLUDE completed and failed stages
     EXCLUDED_STAGES = {
-        'DT1044_14:FAIL',        # Dropped out / failed
-        'DT1044_14:SUCCESS',   # Course completed
+        'DT1044_20:FAIL',        # Dropped out / failed
+        'DT1044_20:UC_69T3IT',   # Course completed
     }
     
     # ONGOING stages (students we WANT to show):
     INCLUDED_STAGES = {
-        'DT1044_10:UC_JAU772',   # Active learning/enrolled stage
+        'DT1044_20:CLIENT',
+        'DT1044_20:UC_8CP2UP',
+        'DT1044_20:UC_QXBN3E',
+        'DT1044_20:UC_10M2QN',
+        'DT1044_20:UC_26OISW',
     }
 
     def _is_currently_enrolled(self, item):
@@ -1246,6 +1250,7 @@ class BitrixActiveStudentsView(APIView):
                 'start': bitrix_start,
                 'limit': 50, # Bitrix default/max limit
                 'filter': {
+                    'categoryId': 20,
                     'stageId': list(self.INCLUDED_STAGES)
                 },
                 'select': ['*', 'uf_*']

@@ -228,7 +228,7 @@ def format_bitrix_student_data(bitrix_student_dict):
 
     return {
         'bitrix_id': bitrix_student_dict.get('ID') or bitrix_student_dict.get('id'),
-        'name': (bitrix_student_dict.get('NAME') or bitrix_student_dict.get('title') or '').strip(),
+        'name': (bitrix_student_dict.get('ufCrm6_1761817180597') or bitrix_student_dict.get('NAME') or bitrix_student_dict.get('title') or '').strip(),
         'email': bitrix_student_dict.get('EMAIL') or bitrix_student_dict.get('UF_EMAIL') or bitrix_student_dict.get('ufCrm6_1761731565702') or '',
         'phone': bitrix_student_dict.get('PHONE') or bitrix_student_dict.get('UF_PHONE') or bitrix_student_dict.get('ufCrm6_1761731546152') or '',
         'status': bitrix_student_dict.get('STATUS') or bitrix_student_dict.get('UF_STATUS') or 'ACTIVE',
