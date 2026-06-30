@@ -13,6 +13,7 @@ def get_latest_prior_slip(bitrix_user_id, month, year):
     """
     Returns the most recently imported SalarySlip for the given employee
     that is strictly BEFORE the specified month/year, in reverse chrono order.
+    Skips slips with month_salary = 0.00 to ensure valid salary data is carried forward.
 
     Returns None if no prior slip exists (new employee / no imports yet).
 
@@ -22,13 +23,18 @@ def get_latest_prior_slip(bitrix_user_id, month, year):
     Selected = April 2026, imported = Jan 2026 only         → returns Jan 2026
     Selected = April 2026, no prior imports                 → returns None
     """
-    return (
+    from decimal import Decimal
+    slips = (
         SalarySlip.objects
         .filter(bitrix_user_id=str(bitrix_user_id), uploaded_batch__isnull=False)
         .filter(Q(year__lt=year) | Q(year=year, month__lt=month))
         .order_by('-year', '-month')
-        .first()
     )
+    # Find the first slip with non-zero month_salary
+    for slip in slips:
+        if slip.month_salary and slip.month_salary > Decimal('0.00'):
+            return slip
+    return None
 
 
 def calculate_carry_forward_slip(employee_id, month, year, prior_slip):
@@ -186,6 +192,7 @@ def generate_payslip_pdf(salary_slip):
             salary_slip.bank_account_no = bank_detail.bank_account_no
         if bank_detail.bank_name:
             salary_slip.bank_name = bank_detail.bank_name
+        salary_slip._skip_recalculation = True
         salary_slip.save(update_fields=['bank_account_no', 'bank_name'])
     
     bank_acc = salary_slip.bank_account_no or (employee.bank_account if employee else "")
@@ -195,6 +202,8 @@ def generate_payslip_pdf(salary_slip):
     
     context = {
         'slip': salary_slip,
+        'display_month': salary_slip.month,
+        'display_year': salary_slip.year,
         'employee': employee,
         'bank_account_masked': bank_account_masked,
         'net_pay_words': net_pay_words,
@@ -269,6 +278,8 @@ def generate_payslips_zip(slips, zip_type='employee'):
             
             context = {
                 'slip': slip,
+                'display_month': slip.month,
+                'display_year': slip.year,
                 'employee': employee,
                 'bank_account_masked': bank_account_masked,
                 'net_pay_words': net_pay_words,
