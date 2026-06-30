@@ -80,9 +80,17 @@ class SyncedEmployee(models.Model):
     joining_date = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=50, blank=True, null=True)
     onboarding_complete = models.BooleanField(default=False)
+    bitrix_sync_status = models.CharField(
+        max_length=20,
+        choices=[('Synced', 'Synced'), ('Pending', 'Pending'), ('Failed', 'Failed')],
+        default='Pending'
+    )
+    bitrix_sync_error = models.TextField(blank=True, null=True)
+    extra_data = models.JSONField(default=dict, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name or ''} (Bitrix ID: {self.bitrix_user_id})"
+
 

@@ -26,4 +26,9 @@ urlpatterns = [
     path('exits/<int:exit_id>/generate-relieving/', hybrid_view(ExitRequestViewSet, {'post': 'generate_relieving_api'}), name='exits_generate_relieving'),
     path('exits/<int:exit_id>/generate-experience/', hybrid_view(ExitRequestViewSet, {'post': 'generate_experience_api'}), name='exits_generate_experience'),
     path('exits/<int:exit_id>/generate-notice/', hybrid_view(ExitRequestViewSet, {'post': 'generate_notice_api'}), name='exits_generate_notice'),
+
+    # Tab paths for browser refresh support — all serve the main app shell
+    path('exits/<int:pk>/clearances/', hybrid_view(ExitRequestViewSet, {'get': 'retrieve'}), name='exits_tab_clearances'),
+    path('exits/<int:pk>/documents/', hybrid_view(ExitRequestViewSet, {'get': 'retrieve'}), name='exits_tab_documents'),
+    path('exits/<int:pk>/form/', hybrid_view(ExitRequestViewSet, {'get': 'retrieve'}), name='exits_tab_form'),
 ]

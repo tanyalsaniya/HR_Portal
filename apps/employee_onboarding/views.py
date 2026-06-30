@@ -17,6 +17,66 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
+def sync_employee_to_dict(synced_emp):
+    """
+    Converts a local SyncedEmployee model instance to a normalized dictionary
+    matching the structure returned by BitrixClient._normalize_user.
+    """
+    dob_str = str(synced_emp.dob) if synced_emp.dob else ''
+    joining_date_str = str(synced_emp.joining_date) if synced_emp.joining_date else ''
+    
+    dept_id = 1
+    if synced_emp.department_name:
+        try:
+            from .models import Department
+            dept = Department.objects.filter(name=synced_emp.department_name).first()
+            if dept:
+                dept_id = dept.id
+        except Exception:
+            pass
+
+    extra = synced_emp.extra_data or {}
+
+    return {
+        'id': str(synced_emp.bitrix_user_id),
+        'emp_id': f"LOCAL-{synced_emp.pk}",
+        'first_name': synced_emp.first_name,
+        'last_name': synced_emp.last_name or '',
+        'name': f"{synced_emp.first_name} {synced_emp.last_name or ''}".strip(),
+        'email': synced_emp.email or '',
+        'work_email': synced_emp.email or '',
+        'personal_email': extra.get('personal_email', ''),
+        'phone': synced_emp.phone or '',
+        'alternate_phone': extra.get('alternate_phone', ''),
+        'designation': synced_emp.designation or '',
+        'department': dept_id,
+        'department_name': synced_emp.department_name or 'Engineering',
+        'dob': dob_str,
+        'joining_date': joining_date_str,
+        'gender': synced_emp.gender or 'Male',
+        'address_line1': extra.get('address_line1', ''),
+        'address_line2': extra.get('address_line2', ''),
+        'city': extra.get('city', ''),
+        'state': extra.get('state', ''),
+        'pin_code': extra.get('pin_code', ''),
+        'employment_type': extra.get('employment_type', 'Full Time'),
+        'emergency_contact_name': extra.get('emergency_contact_name', ''),
+        'emergency_relationship': extra.get('emergency_relationship', ''),
+        'emergency_phone': extra.get('emergency_phone', ''),
+        'profile_photo': extra.get('profile_photo', ''),
+        'status': synced_emp.status or 'Active',
+        'bond_period_months': int(extra.get('bond_period_months', 0)),
+        'notice_period_days': int(extra.get('notice_period_days', 30)),
+        'bitrix_contact_id': '',
+        'bank_account': extra.get('bank_account', ''),
+        'bank_name': extra.get('bank_name', ''),
+        'aadhaar_masked': extra.get('aadhaar_masked', ''),
+        'pan_masked': extra.get('pan_masked', ''),
+        'pan_no': extra.get('pan_no', ''),
+        'onboarding_complete': synced_emp.onboarding_complete,
+        'bitrix_sync_status': getattr(synced_emp, 'bitrix_sync_status', 'Pending'),
+        'bitrix_sync_error': getattr(synced_emp, 'bitrix_sync_error', ''),
+    }
 
 class QueryParamJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
@@ -85,13 +145,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = BitrixClient.get_all_users()
         mocks = [BitrixEmployeeMock(u) for u in users]
         
+        # Load local-only employees from SyncedEmployee
+        try:
+            from .models import SyncedEmployee
+            local_employees = SyncedEmployee.objects.filter(bitrix_user_id__startswith='LOCAL-')
+            for local_emp in local_employees:
+                local_dict = sync_employee_to_dict(local_emp)
+                mocks.append(BitrixEmployeeMock(local_dict))
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error loading local employees in get_queryset: {e}")
+        
         # Decorate mock users with local exit_request_id if an exit request exists
         try:
             from exit_formality.models import ExitRequest
             exit_requests = ExitRequest.objects.all().order_by('initiated_at')
             exit_requests_map = {str(er.bitrix_user_id): er for er in exit_requests}
             for u in mocks:
-                bitrix_id_str = str(u.id)
+                bitrix_id_str = str(u.bitrix_id)
                 if bitrix_id_str in exit_requests_map:
                     er = exit_requests_map[bitrix_id_str]
                     u.exit_request_id = er.id
@@ -105,15 +176,32 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def get_object(self):
         pk = self.kwargs.get('pk')
+        
+        # Check if local employee exists first
+        try:
+            from .models import SyncedEmployee
+            lookup_id = pk
+            synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=lookup_id).first()
+            if not synced_emp and not str(lookup_id).startswith('LOCAL-'):
+                synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=f"LOCAL-{lookup_id}").first()
+            if synced_emp:
+                mock = BitrixEmployeeMock(sync_employee_to_dict(synced_emp))
+                self.decorate_mock_with_exit_request(mock)
+                return mock
+        except Exception:
+            pass
+
         user = BitrixClient.get_user_detail(pk)
         if not user:
             raise Http404("Employee not found in Bitrix24.")
         mock = BitrixEmployeeMock(user)
-        
-        # Decorate mock user with local exit_request_id if an exit request exists
+        self.decorate_mock_with_exit_request(mock)
+        return mock
+
+    def decorate_mock_with_exit_request(self, mock):
         try:
             from exit_formality.models import ExitRequest
-            exit_req = ExitRequest.objects.filter(bitrix_user_id=str(mock.id)).order_by('-initiated_at').first()
+            exit_req = ExitRequest.objects.filter(bitrix_user_id=str(mock.bitrix_id)).order_by('-initiated_at').first()
             if exit_req:
                 mock.exit_request_id = exit_req.id
                 mock._data['exit_request_id'] = exit_req.id
@@ -121,8 +209,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 mock._data['exit_request_status'] = exit_req.status
         except Exception:
             pass
-            
-        return mock
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -156,27 +242,34 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         from_date = request.query_params.get('from_date')
         to_date = request.query_params.get('to_date')
         if from_date:
-            queryset = [u for u in queryset if str(u.joining_date) >= str(from_date)]
+            queryset = [u for u in queryset if u.joining_date and str(u.joining_date) >= str(from_date)]
         if to_date:
-            queryset = [u for u in queryset if str(u.joining_date) <= str(to_date)]
+            queryset = [u for u in queryset if u.joining_date and str(u.joining_date) <= str(to_date)]
             
         # 5. List type split logic
         list_type = request.query_params.get('type')
         import datetime
         today = datetime.date.today()
-        day_14_ago = today - datetime.timedelta(days=14)
         
         filtered_users = []
         for u in queryset:
+            # Set a new joiner flag (e.g. joined within the last 15 days)
+            if u.joining_date and (today - datetime.timedelta(days=15)) <= u.joining_date <= today:
+                u._data['is_new_joiner'] = True
+            else:
+                u._data['is_new_joiner'] = False
+                
             if list_type == 'onboarding':
-                if u.joining_date > day_14_ago:
+                # Employee stays in onboarding on their exact joining date and any day before it
+                if not u.joining_date or u.joining_date >= today:
                     # Filter out exited users from onboarding list
                     if u.status != 'Exited':
                         filtered_users.append(u)
             elif list_type == 'all':
-                # Filter out exited users from active directory
+                # Active directory only shows people whose joining date is in the past (joining_date < today)
                 if u.status != 'Exited':
-                    filtered_users.append(u)
+                    if u.joining_date and u.joining_date < today:
+                        filtered_users.append(u)
             elif list_type == 'offboarding':
                 is_exited = u.status == 'Exited'
                 has_pending_exit = getattr(u, 'exit_request_status', None) == 'PENDING'
@@ -194,7 +287,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if sort_by == 'name':
             filtered_users.sort(key=lambda u: u.name.lower())
         elif sort_by == 'date':
-            filtered_users.sort(key=lambda u: str(u.joining_date))
+            filtered_users.sort(key=lambda u: str(u.joining_date) if u.joining_date else '')
         elif sort_by == 'id':
             filtered_users.sort(key=lambda u: u.emp_id.lower())
                  
@@ -215,155 +308,219 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     def create(self, request, *args, **kwargs):
         data = request.data
-        webhook = BitrixClient.get_webhook_url()
         
-        gender_code = 'M'
-        if data.get('gender') == 'FEMALE':
-            gender_code = 'F'
-        elif data.get('gender') == 'OTHER':
-            gender_code = 'O'
-
-        dept_list = [1]
+        # 1. Create a local SyncedEmployee
+        import uuid
+        from .models import SyncedEmployee
+        
+        dob_val = data.get('dob') or None
+        joining_date_val = data.get('joining_date') or None
+        if not dob_val:
+            dob_val = None
+        if not joining_date_val:
+            joining_date_val = None
+            
+        dept_name = 'Engineering'
         if data.get('department'):
             try:
-                dept_list = [int(data.get('department'))]
-            except (ValueError, TypeError):
+                from .models import Department
+                dept = Department.objects.filter(id=int(data.get('department'))).first()
+                if dept:
+                    dept_name = dept.name
+            except Exception:
                 pass
 
-        user_payload = {
-            'EMAIL': data.get('work_email') or data.get('email'),
-            'NAME': data.get('first_name'),
-            'LAST_NAME': data.get('last_name'),
-            'PERSONAL_MOBILE': data.get('phone'),
-            'WORK_POSITION': data.get('designation'),
-            'UF_DEPARTMENT': dept_list,
-            'PERSONAL_BIRTHDAY': data.get('dob') or '',
-            'PERSONAL_GENDER': gender_code,
-            'UF_PERSONAL_EMAIL': data.get('personal_email'),
-            'PERSONAL_MAILBOX': data.get('personal_email')
-        }
+        # Masking Aadhaar & PAN
+        aadhaar_val = data.get('aadhaar') or ''
+        pan_val = data.get('pan') or ''
         
-        try:
-            import requests
-            # Attempt to create as user profile first
-            res = requests.post(f"{webhook}/user.add.json", json=user_payload, timeout=10)
-            
-            # Fallback to CRM contact creation if user scope fails or fails otherwise
-            if not res.ok:
-                emails = []
-                email_val = data.get('work_email') or data.get('email')
-                if email_val:
-                    emails.append({'VALUE': email_val, 'VALUE_TYPE': 'WORK'})
-                if data.get('personal_email'):
-                    emails.append({'VALUE': data.get('personal_email'), 'VALUE_TYPE': 'HOME'})
-                    
-                crm_payload = {
-                    'fields': {
-                        'NAME': data.get('first_name'),
-                        'LAST_NAME': data.get('last_name'),
-                        'EMAIL': emails,
-                        'PHONE': [{'VALUE': data.get('phone'), 'VALUE_TYPE': 'WORK'}],
-                        'POST': data.get('designation'),
-                        'UF_ONBOARDING_STATUS': 'Pending',
-                        'UF_CRM_ONBOARDING_STATUS': 'Pending',
-                        'UF_PERSONAL_EMAIL': data.get('personal_email'),
-                        'PERSONAL_MAILBOX': data.get('personal_email')
-                    }
-                }
-                res = requests.post(f"{webhook}/crm.contact.add", json=crm_payload, timeout=10)
-                
-            if res.ok:
-                contact_id = str(res.json().get('result'))
-                BitrixClient.get_all_users(force_refresh=True)
-                mock_user = BitrixClient.get_user_detail(contact_id)
-                
-                # Log success in BitrixSyncLog
-                try:
-                    from notifications.models import BitrixSyncLog
-                    BitrixSyncLog.objects.create(
-                        employee_id=contact_id,
-                        employee_name=mock_user.get('name') if mock_user else f"{data.get('first_name')} {data.get('last_name')}".strip(),
-                        action_type='Contact Create',
-                        status='SUCCESS',
-                        retry_count=0
-                    )
-                except Exception:
-                    pass
+        def mask_value(val, show_len=4):
+            if not val:
+                return ""
+            val_str = str(val).strip()
+            if len(val_str) > show_len:
+                return "X" * (len(val_str) - show_len) + val_str[-show_len:]
+            return val_str
 
-                # Trigger welcome email task asynchronously
+        extra_data_dict = {
+            'personal_email': data.get('personal_email') or '',
+            'alternate_phone': data.get('alternate_phone') or '',
+            'address_line1': data.get('address_line1') or '',
+            'address_line2': data.get('address_line2') or '',
+            'city': data.get('city') or '',
+            'state': data.get('state') or '',
+            'pin_code': data.get('pin_code') or '',
+            'employment_type': data.get('employment_type') or 'Full Time',
+            'emergency_contact_name': data.get('emergency_contact_name') or '',
+            'emergency_relationship': data.get('emergency_relationship') or '',
+            'emergency_phone': data.get('emergency_phone') or '',
+            'bond_period_months': int(data.get('bond_period_months') or 0),
+            'notice_period_days': int(data.get('notice_period_days') or 30),
+            'aadhaar_masked': mask_value(aadhaar_val, 4),
+            'pan_masked': mask_value(pan_val, 4),
+            'pan_no': mask_value(pan_val, 4),
+        }
+
+        try:
+            synced_emp = SyncedEmployee.objects.create(
+                bitrix_user_id=f"LOCAL-{uuid.uuid4().hex[:12]}",
+                first_name=data.get('first_name'),
+                last_name=data.get('last_name') or '',
+                email=data.get('work_email') or data.get('email') or '',
+                phone=data.get('phone') or '',
+                designation=data.get('designation') or '',
+                department_name=dept_name,
+                gender=data.get('gender') or '',
+                dob=dob_val,
+                joining_date=joining_date_val,
+                status='Active',
+                onboarding_complete=False,
+                bitrix_sync_status='Pending',
+                extra_data=extra_data_dict
+            )
+            synced_emp.bitrix_user_id = f"LOCAL-{synced_emp.pk}"
+            synced_emp.save()
+
+            from audit_logs.signals import log_action
+            if request.user.is_authenticated:
+                log_action(request.user, "CREATE", None, f"Created local onboarding employee profile {synced_emp.first_name} {synced_emp.last_name} (Local ID: {synced_emp.pk}).")
+
+            mock_user = sync_employee_to_dict(synced_emp)
+
+            # Trigger welcome email task automatically on creation ONLY IF both joining date and email are present
+            if synced_emp.email and synced_emp.joining_date:
                 try:
-                    import logging
-                    logger = logging.getLogger(__name__)
                     from .tasks import send_onboarding_welcome_email
                     send_onboarding_welcome_email.delay(mock_user)
-                except Exception as mail_err:
-                    import logging
-                    logging.getLogger(__name__).error(f"Failed to queue welcome email task: {mail_err}")
-                
-                # Trigger Admin Notification (Trigger 1)
-                try:
-                    from notifications.models import Notification
-                    from django.contrib.auth import get_user_model
-                    User = get_user_model()
-                    admins = User.objects.filter(role__code='ADMIN')
-                    
-                    hr_name = request.user.username
-                    if request.user.first_name or request.user.last_name:
-                        hr_name = f"{request.user.first_name} {request.user.last_name}".strip()
-                    
-                    notif_msg = f"New employee added – {mock_user.get('name')} ({mock_user.get('emp_id')}) by HR {hr_name}"
-                    for admin in admins:
-                        if admin != request.user:
-                            Notification.objects.create(
-                                recipient=admin,
-                                notif_type='INFO',
-                                message=notif_msg,
-                                link=f"/employees/{mock_user.get('id')}/"
-                            )
-                except Exception as notif_err:
-                    logging.getLogger(__name__).error(f"Failed to trigger Trigger 1 notification: {notif_err}")
-
-                # Write to audit logs
-                from audit_logs.signals import log_action
-                if request.user.is_authenticated:
-                    log_action(request.user, "CREATE", None, f"Created Bitrix24 employee contact {data.get('first_name')} {data.get('last_name')} (ID: {contact_id}).")
-                return Response(mock_user, status=status.HTTP_201_CREATED)
-            else:
-                # Log failure in BitrixSyncLog (Trigger 24)
-                emp_name = f"{data.get('first_name')} {data.get('last_name')}".strip()
-                try:
-                    from notifications.models import BitrixSyncLog, Notification
-                    from django.contrib.auth import get_user_model
-                    User = get_user_model()
-                    
-                    BitrixSyncLog.objects.create(
-                        employee_name=emp_name,
-                        action_type='Contact Create',
-                        status='FAILED',
-                        retry_count=0,
-                        error_message=res.text
-                    )
-                    
-                    # Notify Admin (Trigger 24)
-                    admins = User.objects.filter(role__code='ADMIN')
-                    notif_msg = f"Bitrix24 sync failed for {emp_name} (Contact Create). Retry available."
-                    for admin in admins:
-                        Notification.objects.create(
-                            recipient=admin,
-                            notif_type='ERROR',
-                            message=notif_msg,
-                            link="/admin/bitrix/sync-log/"
-                        )
                 except Exception:
                     pass
 
-                return Response({'error': f"Bitrix24 API Error: {res.text}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(mock_user, status=status.HTTP_201_CREATED)
+            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     def update(self, request, pk=None, *args, **kwargs):
         data = request.data
-        webhook = BitrixClient.get_webhook_url()
         
+        # Check if local-only
+        is_local = False
+        synced_emp = None
+        try:
+            from .models import SyncedEmployee
+            lookup_id = pk
+            synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=lookup_id).first()
+            if not synced_emp and not str(lookup_id).startswith('LOCAL-'):
+                synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=f"LOCAL-{lookup_id}").first()
+            if synced_emp:
+                is_local = True
+        except Exception:
+            pass
+
+        if is_local:
+            dob_val = data.get('dob') or None
+            joining_date_val = data.get('joining_date') or None
+            if not dob_val:
+                dob_val = None
+            if not joining_date_val:
+                joining_date_val = None
+
+            dept_name = synced_emp.department_name
+            if data.get('department'):
+                try:
+                    from .models import Department
+                    dept = Department.objects.filter(id=int(data.get('department'))).first()
+                    if dept:
+                        dept_name = dept.name
+                except Exception:
+                    pass
+
+            try:
+                synced_emp.first_name = data.get('first_name', synced_emp.first_name)
+                synced_emp.last_name = data.get('last_name', synced_emp.last_name)
+                synced_emp.email = data.get('work_email') or data.get('email') or synced_emp.email
+                synced_emp.phone = data.get('phone', synced_emp.phone)
+                synced_emp.designation = data.get('designation', synced_emp.designation)
+                synced_emp.department_name = dept_name
+                synced_emp.gender = data.get('gender', synced_emp.gender)
+                if dob_val:
+                    synced_emp.dob = dob_val
+                if joining_date_val:
+                    synced_emp.joining_date = joining_date_val
+                
+                # Update extra_data
+                extra = synced_emp.extra_data or {}
+                if 'personal_email' in data:
+                    extra['personal_email'] = data.get('personal_email')
+                if 'alternate_phone' in data:
+                    extra['alternate_phone'] = data.get('alternate_phone')
+                if 'address_line1' in data:
+                    extra['address_line1'] = data.get('address_line1')
+                if 'address_line2' in data:
+                    extra['address_line2'] = data.get('address_line2')
+                if 'city' in data:
+                    extra['city'] = data.get('city')
+                if 'state' in data:
+                    extra['state'] = data.get('state')
+                if 'pin_code' in data:
+                    extra['pin_code'] = data.get('pin_code')
+                if 'employment_type' in data:
+                    extra['employment_type'] = data.get('employment_type')
+                if 'emergency_contact_name' in data:
+                    extra['emergency_contact_name'] = data.get('emergency_contact_name')
+                if 'emergency_relationship' in data:
+                    extra['emergency_relationship'] = data.get('emergency_relationship')
+                if 'emergency_phone' in data:
+                    extra['emergency_phone'] = data.get('emergency_phone')
+                if 'bond_period_months' in data:
+                    extra['bond_period_months'] = int(data.get('bond_period_months') or 0)
+                if 'notice_period_days' in data:
+                    extra['notice_period_days'] = int(data.get('notice_period_days') or 30)
+
+                def mask_value(val, show_len=4):
+                    if not val:
+                        return ""
+                    val_str = str(val).strip()
+                    if len(val_str) > show_len:
+                        return "X" * (len(val_str) - show_len) + val_str[-show_len:]
+                    return val_str
+                
+                if 'aadhaar' in data:
+                    extra['aadhaar_masked'] = mask_value(data.get('aadhaar'), 4)
+                if 'pan' in data:
+                    extra['pan_masked'] = mask_value(data.get('pan'), 4)
+                    extra['pan_no'] = mask_value(data.get('pan'), 4)
+                
+                # Bank details
+                bank_account = data.get('bank_account')
+                bank_name = data.get('bank_name')
+                if bank_account is not None:
+                    extra['bank_account'] = bank_account
+                if bank_name is not None:
+                    extra['bank_name'] = bank_name
+
+                synced_emp.extra_data = extra
+                synced_emp.save()
+
+                if bank_account is not None or bank_name is not None:
+                    from salary.models import EmployeeBankDetail
+                    detail, _ = EmployeeBankDetail.objects.get_or_create(bitrix_user_id=synced_emp.bitrix_user_id)
+                    if bank_account is not None:
+                        detail.bank_account_no = bank_account
+                    if bank_name is not None:
+                        detail.bank_name = bank_name
+                    detail.save()
+
+                from audit_logs.signals import log_action
+                if request.user.is_authenticated:
+                    log_action(request.user, "UPDATE", None, f"Updated local employee details (Local ID: {pk}).")
+
+                mock_user = sync_employee_to_dict(synced_emp)
+                return Response(mock_user)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fallback to Bitrix update
+        webhook = BitrixClient.get_webhook_url()
         gender_code = 'M'
         if data.get('gender') == 'FEMALE':
             gender_code = 'F'
@@ -390,7 +547,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             import requests
             res = requests.post(f"{webhook}/user.update.json", json=payload, timeout=10)
             
-            # If the token lacks scope for user.update or fails, fallback to CRM contact update
             if not res.ok:
                 update_url_crm = f"{webhook}/crm.contact.update"
                 emails_crm = []
@@ -415,7 +571,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 res = requests.post(update_url_crm, json=payload_crm, timeout=10)
                 
             if res.ok:
-                # Update local bank details if provided
                 bank_account = data.get('bank_account')
                 bank_name = data.get('bank_name')
                 if bank_account is not None or bank_name is not None:
@@ -430,7 +585,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 BitrixClient.get_all_users(force_refresh=True)
                 user = BitrixClient.get_user_detail(pk)
                 
-                # Log success in BitrixSyncLog
                 try:
                     from notifications.models import BitrixSyncLog
                     BitrixSyncLog.objects.create(
@@ -443,13 +597,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 except Exception:
                     pass
 
-                # Log action
                 from audit_logs.signals import log_action
                 if request.user.is_authenticated:
                     log_action(request.user, "UPDATE", None, f"Updated Bitrix24 employee details (ID: {pk}).")
                 return Response(user)
             else:
-                # Log failure in BitrixSyncLog (Trigger 24)
                 emp_name = f"{data.get('first_name')} {data.get('last_name')}".strip()
                 try:
                     from notifications.models import BitrixSyncLog, Notification
@@ -465,7 +617,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                         error_message=res.text
                     )
                     
-                    # Notify Admin (Trigger 24)
                     admins = User.objects.filter(role__code='ADMIN')
                     notif_msg = f"Bitrix24 sync failed for {emp_name} (Contact Update). Retry available."
                     for admin in admins:
@@ -486,6 +637,37 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return self.update(request, pk, *args, **kwargs)
 
     def destroy(self, request, pk=None, *args, **kwargs):
+        # Check if local-only
+        is_local = False
+        synced_emp = None
+        try:
+            from .models import SyncedEmployee
+            lookup_id = pk
+            synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=lookup_id).first()
+            if not synced_emp and not str(lookup_id).startswith('LOCAL-'):
+                synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=f"LOCAL-{lookup_id}").first()
+            if synced_emp:
+                is_local = True
+        except Exception:
+            pass
+
+        if is_local:
+            try:
+                local_id = synced_emp.bitrix_user_id
+                synced_emp.delete()
+                # Delete related local documents/salary structures/bank details
+                from employee_onboarding.models import EmployeeDocument
+                EmployeeDocument.objects.filter(bitrix_user_id=local_id).delete()
+                
+                from salary.models import SalaryStructure, EmployeeBankDetail
+                SalaryStructure.objects.filter(bitrix_user_id=local_id).delete()
+                EmployeeBankDetail.objects.filter(bitrix_user_id=local_id).delete()
+                
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fallback to Bitrix delete
         webhook = BitrixClient.get_webhook_url()
         delete_url = f"{webhook}/crm.contact.delete"
         try:
@@ -496,24 +678,255 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         BitrixClient.get_all_users(force_refresh=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['POST'], url_path='manual-graduate')
-    def manual_graduate(self, request, pk=None):
+    @action(detail=True, methods=['POST'], url_path='invite-to-bitrix')
+    def invite_to_bitrix(self, request, pk=None):
+        from .models import SyncedEmployee
+        lookup_id = pk
+        synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=lookup_id).first()
+        if not synced_emp and not str(lookup_id).startswith('LOCAL-'):
+            synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=f"LOCAL-{lookup_id}").first()
+            
+        if not synced_emp:
+            return Response({'error': 'Local employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if synced_emp.bitrix_sync_status == 'Synced':
+            return Response({'error': 'Employee is already synced to Bitrix.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if email is present
+        if not synced_emp.email:
+            return Response({'error': 'Cannot invite to Bitrix: Email is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+            
         webhook = BitrixClient.get_webhook_url()
-        update_url = f"{webhook}/crm.contact.update"
-        payload = {
-            'id': pk,
-            'fields': {
-                'UF_ONBOARDING_STATUS': 'Completed',
-                'UF_CRM_ONBOARDING_STATUS': 'Completed'
-            }
+        
+        # Map gender
+        gender_code = 'M'
+        if synced_emp.gender == 'Female':
+            gender_code = 'F'
+        elif synced_emp.gender == 'Other':
+            gender_code = 'O'
+            
+        # Map department
+        dept_list = [1]
+        if synced_emp.department_name:
+            try:
+                from .models import Department
+                dept = Department.objects.filter(name=synced_emp.department_name).first()
+                if dept:
+                    dept_list = [dept.id]
+            except Exception:
+                pass
+                
+        user_payload = {
+            'EMAIL': synced_emp.email,
+            'NAME': synced_emp.first_name,
+            'LAST_NAME': synced_emp.last_name or '',
+            'PERSONAL_MOBILE': synced_emp.phone or '',
+            'WORK_POSITION': synced_emp.designation or '',
+            'UF_DEPARTMENT': dept_list,
+            'PERSONAL_BIRTHDAY': str(synced_emp.dob) if synced_emp.dob else '',
+            'PERSONAL_GENDER': gender_code,
         }
+        
         try:
             import requests
-            requests.post(update_url, json=payload, timeout=10)
-        except Exception:
-            pass
+            res = requests.post(f"{webhook}/user.add.json", json=user_payload, timeout=10)
+            
+            if not res.ok:
+                emails = [{'VALUE': synced_emp.email, 'VALUE_TYPE': 'WORK'}]
+                crm_payload = {
+                    'fields': {
+                        'NAME': synced_emp.first_name,
+                        'LAST_NAME': synced_emp.last_name or '',
+                        'EMAIL': emails,
+                        'PHONE': [{'VALUE': synced_emp.phone or '', 'VALUE_TYPE': 'WORK'}],
+                        'POST': synced_emp.designation or '',
+                        'UF_ONBOARDING_STATUS': 'Pending',
+                        'UF_CRM_ONBOARDING_STATUS': 'Pending',
+                    }
+                }
+                res = requests.post(f"{webhook}/crm.contact.add", json=crm_payload, timeout=10)
+                
+            if res.ok:
+                contact_id = str(res.json().get('result'))
+                
+                # Update references in all tables
+                old_local_id = synced_emp.bitrix_user_id
+                
+                from employee_onboarding.models import EmployeeDocument
+                EmployeeDocument.objects.filter(bitrix_user_id=old_local_id).update(bitrix_user_id=contact_id)
+                
+                from salary.models import SalaryStructure
+                SalaryStructure.objects.filter(bitrix_user_id=old_local_id).update(bitrix_user_id=contact_id)
+                
+                from salary.models import EmployeeBankDetail
+                EmployeeBankDetail.objects.filter(bitrix_user_id=old_local_id).update(bitrix_user_id=contact_id)
+                
+                synced_emp.bitrix_user_id = contact_id
+                synced_emp.bitrix_sync_status = 'Synced'
+                synced_emp.bitrix_sync_error = None
+                synced_emp.save()
+                
+                # Force refresh cache
+                BitrixClient.get_all_users(force_refresh=True)
+                
+                # Log success in BitrixSyncLog
+                try:
+                    from notifications.models import BitrixSyncLog
+                    BitrixSyncLog.objects.create(
+                        employee_id=contact_id,
+                        employee_name=f"{synced_emp.first_name} {synced_emp.last_name}".strip(),
+                        action_type='Contact Sync',
+                        status='SUCCESS',
+                        retry_count=0
+                    )
+                except Exception:
+                    pass
+                    
+                # Trigger welcome email task automatically now that they are synced and details are complete!
+                try:
+                    mock_user = BitrixClient.get_user_detail(contact_id)
+                    from .tasks import send_onboarding_welcome_email
+                    send_onboarding_welcome_email.delay(mock_user)
+                except Exception:
+                    pass
+                    
+                return Response({
+                    'success': True,
+                    'message': 'Employee invited to Bitrix successfully.',
+                    'new_id': contact_id
+                })
+            else:
+                error_msg = res.text
+                synced_emp.bitrix_sync_status = 'Failed'
+                synced_emp.bitrix_sync_error = error_msg
+                synced_emp.save()
+                
+                return Response({
+                    'success': False,
+                    'error': f"Bitrix24 API Error: {error_msg}"
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['POST'], url_path='send-welcome-email')
+    def send_welcome_email(self, request, pk=None):
+        employee = self.get_object()
+        
+        email_val = employee.get('email') or employee.get('work_email') or employee.get('personal_email')
+        joining_date_val = employee.get('joining_date')
+        
+        if not email_val or not joining_date_val:
+            return Response({
+                'error': 'Cannot send welcome email. Joining date and email must both be provided.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        from .tasks import send_onboarding_welcome_email
+        emp_data = employee._data if hasattr(employee, '_data') else dict(employee)
+        send_onboarding_welcome_email.delay(emp_data)
+        
+        return Response({'message': 'Welcome email sent successfully.'})
+
+    @action(detail=True, methods=['POST'], url_path='manual-graduate')
+    def manual_graduate(self, request, pk=None):
+        from .models import SyncedEmployee
+        lookup_id = pk
+        synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=lookup_id).first()
+        if not synced_emp and not str(lookup_id).startswith('LOCAL-'):
+            synced_emp = SyncedEmployee.objects.filter(bitrix_user_id=f"LOCAL-{lookup_id}").first()
+            
+        if synced_emp:
+            synced_emp.onboarding_complete = True
+            synced_emp.save()
+        else:
+            webhook = BitrixClient.get_webhook_url()
+            update_url = f"{webhook}/crm.contact.update"
+            payload = {
+                'id': pk,
+                'fields': {
+                    'UF_ONBOARDING_STATUS': 'Completed',
+                    'UF_CRM_ONBOARDING_STATUS': 'Completed'
+                }
+            }
+            try:
+                import requests
+                requests.post(update_url, json=payload, timeout=10)
+            except Exception:
+                pass
         BitrixClient.get_all_users(force_refresh=True)
         return Response({'message': 'Employee onboarding completed successfully.'})
+
+    @action(detail=False, methods=['POST'], url_path='bitrix-webhook', authentication_classes=[], permission_classes=[])
+    def bitrix_webhook(self, request):
+        from .models import SyncedEmployee
+        data = request.data
+        
+        # Determine the payload structure
+        emp_data = data
+        
+        # If it's a standard Bitrix webhook payload with event
+        if 'event' in data and data['event'] in ['ONCRMCONTACTADD', 'ONCRMCONTACTUPDATE', 'ONUSERADD', 'ONUSERUPDATE']:
+            contact_id = data.get('data', {}).get('FIELDS', {}).get('ID')
+            if contact_id:
+                user_detail = BitrixClient.get_user_detail(contact_id)
+                if user_detail:
+                    emp_data = user_detail
+                else:
+                    return Response({'status': 'Contact not found'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response({'status': 'No ID provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract data from the payload or the fetched user details
+        bitrix_id = str(emp_data.get('ID') or emp_data.get('id') or emp_data.get('bitrix_id') or data.get('id') or '')
+        
+        if not bitrix_id:
+            import uuid
+            bitrix_id = f"LOCAL-{uuid.uuid4().hex[:12]}"
+            
+        full_name = emp_data.get('NAME') or emp_data.get('name') or data.get('name') or ''
+        first_name = emp_data.get('first_name') or data.get('first_name') or ''
+        last_name = emp_data.get('LAST_NAME') or emp_data.get('last_name') or data.get('last_name') or ''
+        
+        # If full name is provided but no first/last name, split it
+        if full_name and not first_name:
+            parts = full_name.split(' ', 1)
+            first_name = parts[0]
+            if len(parts) > 1:
+                last_name = parts[1]
+                
+        if not first_name:
+            first_name = "Unknown"
+
+        email = emp_data.get('EMAIL') or emp_data.get('email') or emp_data.get('work_email') or data.get('email') or ''
+        phone = emp_data.get('PERSONAL_MOBILE') or emp_data.get('phone') or data.get('phone', '')
+        designation = emp_data.get('WORK_POSITION') or emp_data.get('designation') or data.get('designation', '')
+        department_name = emp_data.get('department_name') or data.get('department_name', '')
+        
+        synced_emp, created = SyncedEmployee.objects.get_or_create(
+            bitrix_user_id=bitrix_id,
+            defaults={
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': email,
+                'phone': phone,
+                'designation': designation,
+                'department_name': department_name,
+                'bitrix_sync_status': 'Synced',
+            }
+        )
+        
+        if not created:
+            synced_emp.first_name = first_name or synced_emp.first_name
+            synced_emp.last_name = last_name or synced_emp.last_name
+            synced_emp.email = email or synced_emp.email
+            synced_emp.phone = phone or synced_emp.phone
+            synced_emp.designation = designation or synced_emp.designation
+            if department_name:
+                synced_emp.department_name = department_name
+            synced_emp.bitrix_sync_status = 'Synced'
+            synced_emp.save()
+            
+        return Response({'status': 'success', 'message': 'Employee data received and stored in local DB. Sync to Bitrix skipped.'})
 
     @action(detail=True, methods=['POST'], url_path='retry-bitrix-sync')
     def retry_bitrix_sync(self, request, pk=None):
@@ -1141,8 +1554,18 @@ def employees_hybrid_view(request, *args, **kwargs):
                 response.render()
             return response
         else:
-            return render(request, 'base/layout.html')
-            
+            path = request.path.rstrip('/')
+            initial_tab = 'onboarding'
+            if path.endswith('active'):
+                initial_tab = 'all'
+            elif path.endswith('offboarding'):
+                initial_tab = 'offboarding'
+            elif path.endswith('dismissed'):
+                initial_tab = 'dismissed'
+                
+            return render(request, 'base/layout.html', {
+                'initial_onboarding_tab': initial_tab
+            })
     elif request.method == 'POST':
         is_ajax_post = (
             'application/json' in request.META.get('HTTP_ACCEPT', '') or
@@ -1171,4 +1594,78 @@ def employees_hybrid_view(request, *args, **kwargs):
             response.render()
         return response
 
+class BitrixDataReceiveAPIView(APIView):
+    """
+    Standalone API specifically to receive Bitrix employee data 
+    and save it locally without syncing back to Bitrix.
+    """
+    authentication_classes = []
+    permission_classes = []
 
+    def post(self, request, *args, **kwargs):
+        from .models import SyncedEmployee
+        data = request.data
+        
+        emp_data = data
+        
+        # Check if it's an event payload
+        if 'event' in data and data['event'] in ['ONCRMCONTACTADD', 'ONCRMCONTACTUPDATE', 'ONUSERADD', 'ONUSERUPDATE']:
+            contact_id = data.get('data', {}).get('FIELDS', {}).get('ID')
+            if contact_id:
+                user_detail = BitrixClient.get_user_detail(contact_id)
+                if user_detail:
+                    emp_data = user_detail
+                else:
+                    return Response({'status': 'Contact not found'}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response({'status': 'No ID provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        bitrix_id = str(emp_data.get('ID') or emp_data.get('id') or emp_data.get('bitrix_id') or data.get('id') or '')
+        if not bitrix_id:
+            import uuid
+            bitrix_id = f"LOCAL-{uuid.uuid4().hex[:12]}"
+            
+        full_name = emp_data.get('NAME') or emp_data.get('name') or data.get('name') or ''
+        first_name = emp_data.get('first_name') or data.get('first_name') or ''
+        last_name = emp_data.get('LAST_NAME') or emp_data.get('last_name') or data.get('last_name') or ''
+        
+        # If full name is provided but no first/last name, split it
+        if full_name and not first_name:
+            parts = full_name.split(' ', 1)
+            first_name = parts[0]
+            if len(parts) > 1:
+                last_name = parts[1]
+                
+        if not first_name:
+            first_name = "Unknown"
+
+        email = emp_data.get('EMAIL') or emp_data.get('email') or emp_data.get('work_email') or data.get('email') or ''
+        phone = emp_data.get('PERSONAL_MOBILE') or emp_data.get('phone') or data.get('phone', '')
+        designation = emp_data.get('WORK_POSITION') or emp_data.get('designation') or data.get('designation', '')
+        department_name = emp_data.get('department_name') or data.get('department_name', '')
+        
+        synced_emp, created = SyncedEmployee.objects.get_or_create(
+            bitrix_user_id=bitrix_id,
+            defaults={
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': email,
+                'phone': phone,
+                'designation': designation,
+                'department_name': department_name,
+                'bitrix_sync_status': 'Synced',
+            }
+        )
+        
+        if not created:
+            synced_emp.first_name = first_name or synced_emp.first_name
+            synced_emp.last_name = last_name or synced_emp.last_name
+            synced_emp.email = email or synced_emp.email
+            synced_emp.phone = phone or synced_emp.phone
+            synced_emp.designation = designation or synced_emp.designation
+            if department_name:
+                synced_emp.department_name = department_name
+            synced_emp.bitrix_sync_status = 'Synced'
+            synced_emp.save()
+            
+        return Response({'status': 'success', 'message': 'Standalone API: Employee data received and stored in local DB. Sync to Bitrix skipped.'})

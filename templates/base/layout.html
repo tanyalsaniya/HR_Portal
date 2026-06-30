@@ -42,6 +42,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Devex Hub Pvt Ltd. | HR Portal</title>
+    <link rel="icon" type="image/png" href="{% static 'images/DevEx Hub logo.png' %}">
     <!-- Google Fonts Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -206,172 +207,331 @@
             display: block;
         }
 
+        /* ─── Notification Bell Badge ──────────────────── */
         .badge {
             position: absolute;
-            top: 3px;
-            right: 3px;
-            background-color: #ef4444;
+            top: 2px;
+            right: 2px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
             border-radius: 50%;
             padding: 2px 5px;
-            font-size: 7pt;
-            font-weight: 700;
+            font-size: 6.5pt;
+            font-weight: 800;
             line-height: 1;
             min-width: 16px;
             text-align: center;
+            box-shadow: 0 0 0 2px var(--bg-card);
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 2px var(--bg-card); }
+            50% { transform: scale(1.1); box-shadow: 0 0 0 2px var(--bg-card), 0 0 8px rgba(239,68,68,0.5); }
         }
 
         /* ─── Notification Slideover ──────────────────── */
         .slideover {
             position: fixed;
-            top: 0;
-            right: -380px;
-            width: 340px;
-            height: 100vh;
-            background-color: var(--bg-card);
-            border-left: 1px solid var(--border-color);
+            top: 20px;
+            right: -420px;
+            width: 390px;
+            max-height: 520px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
             z-index: 200;
-            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
+            transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: -12px 12px 40px rgba(0, 0, 0, 0.15);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .slideover.open {
-            right: 0;
+            right: 20px;
         }
 
+        /* ─── Slideover Header ────────────────────────── */
         .slideover-header {
-            padding: 1.25rem 1.5rem;
+            padding: 0;
             border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slideover-header::before {
+            content: '';
+            position: absolute;
+            top: -30px; right: -30px;
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.07);
+        }
+
+        .slideover-header::after {
+            content: '';
+            position: absolute;
+            bottom: -20px; left: -20px;
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .notif-header-inner {
+            padding: 1.25rem 1.5rem 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .notif-header-top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
         }
 
-        .slideover-body {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 0.75rem;
-        }
-
-        /* ─── Notification Items ──────────────────────── */
-        .notif-item {
-            padding: 0.875rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.15s ease;
-            margin-bottom: 4px;
-            border-left: 3px solid transparent;
-        }
-
-        .notif-item:hover {
-            background-color: var(--bg-main);
-        }
-
-        .notif-item.unread {
-            border-left-color: var(--primary-color);
-            background-color: var(--primary-light);
-        }
-
-        .notif-item.notif-info.unread {
-            border-left-color: #3b82f6;
-            background-color: rgba(59, 130, 246, 0.06);
-        }
-
-        .notif-item.notif-success.unread {
-            border-left-color: #10b981;
-            background-color: rgba(16, 185, 129, 0.06);
-        }
-
-        .notif-item.notif-warning.unread {
-            border-left-color: #f59e0b;
-            background-color: rgba(245, 158, 11, 0.06);
-        }
-
-        .notif-item.notif-urgent.unread {
-            border-left-color: #ef4444;
-            background-color: rgba(239, 68, 68, 0.06);
-        }
-
-        .notif-item.notif-error.unread {
-            border-left-color: #b91c1c;
-            background-color: rgba(185, 28, 28, 0.06);
-        }
-
-        .notif-text {
-            font-size: 0.8125rem;
-            font-weight: 500;
-            color: var(--text-main);
-            line-height: 1.4;
-        }
-
-        .notif-time {
-            font-size: 0.7rem;
-            color: var(--text-light);
-            margin-top: 4px;
-        }
-
-        /* ─── Toast ───────────────────────────────────── */
-        .toast-container {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            z-index: 1000;
+        .notif-header-title {
             display: flex;
-            flex-direction: column;
+            align-items: center;
             gap: 10px;
         }
 
-        .toast {
-            background-color: var(--bg-card);
-            color: var(--text-main);
-            border-left: 4px solid var(--primary-color);
-            padding: 0.875rem 1.25rem;
+        .notif-bell-icon {
+            width: 36px; height: 36px;
+            background: rgba(255,255,255,0.15);
             border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .notif-header-text h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 800;
+            color: white;
+            letter-spacing: -0.01em;
+        }
+
+        .notif-header-text p {
+            margin: 2px 0 0;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.65);
+            font-weight: 500;
+        }
+
+        .notif-header-actions {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            min-width: 280px;
-            max-width: 380px;
-            transform: translateX(100%);
-            opacity: 0;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            gap: 8px;
         }
 
-        .toast.show {
-            transform: translateX(0);
-            opacity: 1;
-        }
-
-        .toast-success {
-            border-left-color: #10b981;
-        }
-
-        .toast-warning {
-            border-left-color: #f59e0b;
-        }
-
-        .toast-error {
-            border-left-color: #ef4444;
-        }
-
-        .toast-close {
-            background: none;
-            border: none;
+        .notif-mark-all-btn {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
             cursor: pointer;
-            color: var(--text-light);
-            font-size: 1.1rem;
-            padding: 0;
-            margin-left: 12px;
-            line-height: 1;
-            transition: color 0.15s;
+            font-family: inherit;
+            padding: 5px 10px;
+            border-radius: 6px;
+            transition: all 0.15s;
+            letter-spacing: 0.01em;
         }
 
-        .toast-close:hover {
+        .notif-mark-all-btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .notif-close-btn {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 30px; height: 30px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            transition: all 0.15s;
+            line-height: 1; padding: 0;
+        }
+
+        .notif-close-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* ─── Slideover Body ──────────────────────────── */
+        .slideover-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1rem 0.875rem 0.5rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        .slideover-body::-webkit-scrollbar { width: 4px; }
+        .slideover-body::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        /* ─── Notification Items ──────────────────────── */
+        .notif-item {
+            padding: 0.65rem 0.85rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .notif-item::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+            background: transparent;
+            transition: all 0.18s;
+        }
+
+        .notif-item:hover {
+            background: var(--bg-main);
+            border-color: var(--border-color);
+            transform: translateX(2px);
+        }
+
+        .notif-item:active {
+            transform: scale(0.99) translateX(2px);
+        }
+
+        /* Type-specific colors for unread */
+        .notif-item.unread {
+            background: rgba(109, 40, 217, 0.05);
+            border-color: rgba(109, 40, 217, 0.15);
+        }
+        .notif-item.unread::before { background: #7c3aed; }
+
+        .notif-item.notif-info.unread {
+            background: rgba(59, 130, 246, 0.05);
+            border-color: rgba(59, 130, 246, 0.15);
+        }
+        .notif-item.notif-info.unread::before { background: #3b82f6; }
+
+        .notif-item.notif-success.unread {
+            background: rgba(16, 185, 129, 0.05);
+            border-color: rgba(16, 185, 129, 0.15);
+        }
+        .notif-item.notif-success.unread::before { background: #10b981; }
+
+        .notif-item.notif-warning.unread {
+            background: rgba(245, 158, 11, 0.05);
+            border-color: rgba(245, 158, 11, 0.15);
+        }
+        .notif-item.notif-warning.unread::before { background: #f59e0b; }
+
+        .notif-item.notif-urgent.unread,
+        .notif-item.notif-error.unread {
+            background: rgba(239, 68, 68, 0.05);
+            border-color: rgba(239, 68, 68, 0.15);
+        }
+        .notif-item.notif-urgent.unread::before,
+        .notif-item.notif-error.unread::before { background: #ef4444; }
+
+        /* Icon badge per type */
+        .notif-icon-wrap {
+            flex-shrink: 0;
+            width: 30px; height: 30px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px;
+        }
+
+        .notif-info    .notif-icon-wrap { background: rgba(59,130,246,0.12); color: #3b82f6; }
+        .notif-success .notif-icon-wrap { background: rgba(16,185,129,0.12); color: #10b981; }
+        .notif-warning .notif-icon-wrap { background: rgba(245,158,11,0.12); color: #f59e0b; }
+        .notif-urgent  .notif-icon-wrap,
+        .notif-error   .notif-icon-wrap { background: rgba(239,68,68,0.12); color: #ef4444; }
+        /* default / untyped */
+        .notif-item:not(.notif-info):not(.notif-success):not(.notif-warning):not(.notif-urgent):not(.notif-error) .notif-icon-wrap {
+            background: rgba(109,40,217,0.12); color: #7c3aed;
+        }
+
+        .notif-content { flex: 1; min-width: 0; }
+
+        .notif-text {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-main);
+            line-height: 1.4;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .notif-time {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.65rem;
+            color: var(--text-light);
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
+        /* ─── Empty State ─────────────────────────────── */
+        .notif-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1.5rem;
+            text-align: center;
+        }
+
+        .notif-empty-icon {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(109,40,217,0.12) 0%, rgba(79,70,229,0.08) 100%);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.75rem;
+        }
+
+        .notif-empty h4 {
+            margin: 0 0 6px;
+            font-size: 0.9rem;
+            font-weight: 700;
             color: var(--text-main);
         }
+
+        .notif-empty p {
+            margin: 0;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        /* ─── Slideover Footer ────────────────────────── */
+        .notif-footer {
+            padding: 0.875rem 1rem;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .notif-footer-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* ─── Toast ───────────────────────────────────── */
+        /* Handled by alerts.js centralized system — styles injected automatically */
 
         /* ─── Utility Classes ─────────────────────────── */
         .flex-row-header {
@@ -784,15 +944,13 @@
         <div class="sidebar"
             style="width: 250px; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100;">
             <div class="sidebar-brand"
-                style="padding: 24px 20px; display: flex; align-items: center; gap: 8px; border-bottom: none;">
-                <!-- SVG logo for Devex Hub -->
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="8" fill="#7c3aed" />
-                    <path d="M8 22V10H12.5L16 16L19.5 10H24V22H20V15L16 20L12 15V22H8Z" fill="white" />
-                </svg>
-                <span class="sidebar-brand-text"
-                    style="font-size: 16pt; font-weight: 800; color: var(--text-color); letter-spacing: -0.04em;">Devex
-                    Hub</span>
+                style="padding: 16px 20px; display: flex; align-items: center; gap: 10px; border-bottom: none;">
+                <!-- Devex Hub Real Logo -->
+                <img src="{% static 'images/DevEx Hub logo.png' %}" alt="Devex Hub" style="height: 42px; width: auto; object-fit: contain;">
+                <div style="display: flex; flex-direction: column; line-height: 1.2;">
+                    <span style="font-size: 13pt; font-weight: 800; color: var(--text-color); letter-spacing: -0.03em;">Devex Hub</span>
+                    <span style="font-size: 8pt; font-weight: 500; color: var(--text-secondary); letter-spacing: 0.05em;">HR Portal</span>
+                </div>
             </div>
             <ul class="sidebar-menu"
                 style="list-style: none; padding: 10px 0; margin: 0; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
@@ -877,13 +1035,25 @@
                         Roles & Permissions
                     </a>
                 </li>
+                <li class="sidebar-item" id="probationLink" style="display: none;">
+                    <a class="sidebar-link" data-view="probationView" onclick="switchView('probationView')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        Probation & AI Analysis
+                    </a>
+                </li>
             </ul>
 
             <div
                 style="padding: 14px 16px; border-top: 1px solid var(--sidebar-border); background: var(--sidebar-bg); display: flex; align-items: center; gap: 10px;">
-                <!-- Avatar -->
-                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #7c3aed; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10pt; flex-shrink: 0;"
-                    id="avatarInitials">HR</div>
+                <!-- Avatar with logo -->
+                <div style="width: 36px; height: 36px; border-radius: 50%; background-color: white; border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10pt; flex-shrink: 0; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.12);"
+                    id="avatarInitials">
+                    <img src="{% static 'images/DevEx Hub logo.png' %}" alt="DH" style="width: 28px; height: 28px; object-fit: contain;">
+                </div>
                 <!-- Name & Email -->
                 <div style="display: flex; flex-direction: column; overflow: hidden; flex-grow: 1; min-width: 0;">
                     <span id="usernameLabel"
@@ -969,6 +1139,7 @@
             {% include "student/student_detail_panel.html" %}
             {% include "audit/audit_panel.html" %}
             {% include "roles/roles_panel.html" %}
+            {% include "probation/probation_panel.html" %}
 
         </div>
     </div>
@@ -979,36 +1150,57 @@
     <!-- NOTIFICATIONS OVERLAY PANEL -->
     <div class="slideover" id="notifPanel">
         <div class="slideover-header">
-            <h3 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--text-main);">Notifications</h3>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <button onclick="markAllNotifsRead()"
-                    style="background:none; border:none; font-size:0.75rem; color:var(--primary-color); font-weight:600; cursor:pointer; font-family:inherit;">Mark
-                    all read</button>
-                <button onclick="toggleNotifPanel()"
-                    style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:var(--text-secondary); line-height:1; padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:6px; transition:background 0.15s;"
-                    onmouseover="this.style.background='var(--bg-main)'"
-                    onmouseout="this.style.background='none'">&times;</button>
+            <div class="notif-header-inner">
+                <div class="notif-header-top">
+                    <div class="notif-header-title">
+                        <div class="notif-bell-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                            </svg>
+                        </div>
+                        <div class="notif-header-text">
+                            <h3>Notifications</h3>
+                            <p id="notifSubtitle">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="notif-header-actions">
+                        <button class="notif-mark-all-btn" onclick="markAllNotifsRead()">Mark all read</button>
+                        <button class="notif-close-btn" onclick="toggleNotifPanel()">&times;</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="slideover-body" id="notifList">
             <!-- Populated dynamically -->
         </div>
+        <div class="notif-footer">
+            <span class="notif-footer-text">Showing latest unread notifications</span>
+        </div>
     </div>
 
 
+    <!-- LOAD ALERT SYSTEM FIRST (must precede app.js & all feature scripts) -->
+    <script src="{% static 'js/features/alerts.js' %}?v=5.1"></script>
+
     <!-- LOAD CENTRAL APP JS -->
-    <script src="{% static 'js/app.js' %}?v=4.2"></script>
+    <!-- <script src="{% static 'js/app.js' %}?v=5.0"></script> -->
+    <script src="/static/js/app.js"></script>
+    
 
     <!-- LOAD FEATURES JS SCRIPTS -->
-    <script src="{% static 'js/features/common_utils.js' %}?v=4.0"></script>
+    <script src="{% static 'js/features/common_utils.js' %}?v=4.2"></script>
     <script src="{% static 'js/features/dashboard.js' %}?v=4.1"></script>
-    <script src="{% static 'js/features/onboarding.js' %}?v=4.0"></script>
-    <script src="{% static 'js/features/salary.js' %}?v=3.8"></script>
-    <script src="{% static 'js/features/exit.js' %}?v=3.2"></script>
-    <script src="{% static 'js/features/student.js' %}?v=4.1"></script>
-    <script src="{% static 'js/features/audit.js' %}?v=3.1"></script>
-    <script src="{% static 'js/features/roles.js' %}?v=3.1"></script>
+    <script src="{% static 'js/features/onboarding.js' %}?v=4.4"></script>
+    <script src="{% static 'js/features/salary.js' %}?v=3.9"></script>
+    <script src="{% static 'js/features/exit.js' %}?v=3.7"></script>
+    <script src="{% static 'js/features/student.js' %}?v=4.2"></script>
+    <!-- <script src="{% static 'js/features/audit.js' %}?v=3.1"></script> -->
+    <script src="/static/js/features/audit.js"></script>
+    <script src="{% static 'js/features/roles.js' %}?v=3.2"></script>
     <script src="{% static 'js/features/users.js' %}?v=3.1"></script>
+    <script src="{% static 'js/features/probation.js' %}?v=1.2"></script>
+
 
     <script>
         // Check Auth on page load and boot the application
@@ -1030,12 +1222,7 @@
                     const userEmailLabel = document.getElementById('userEmailLabel');
                     if (userEmailLabel) userEmailLabel.textContent = currentUser.email || currentUser.username;
 
-                    const avatarInitials = document.getElementById('avatarInitials');
-                    if (avatarInitials && currentUser.username) {
-                        const nameParts = currentUser.username.split('@')[0].split(/[._-]/);
-                        const initials = nameParts.map(p => p.charAt(0)).join('').substring(0, 2).toUpperCase();
-                        avatarInitials.textContent = initials || 'HR';
-                    }
+                    // avatarInitials now shows the Devex Hub logo — do not overwrite with text initials
 
                     // Apply dynamic permissions on sidebar and dashboard items
                     applyPermissionsToUI();
@@ -1046,6 +1233,10 @@
                     const initialParams = {};
                     if (window.location.pathname.match(/\/salaries\/employee\/\d+\/?/)) {
                         initialView = 'salaryHistoryView';
+                    } else if (typeof getExitIdFromUrl === 'function' && getExitIdFromUrl()) {
+                        // Must be checked BEFORE getEmployeeDetailIdFromUrl since exits also have numeric IDs
+                        initialView = 'exitDetailView';
+                        initialParams.exitId = getExitIdFromUrl();
                     } else if (typeof getEmployeeDetailIdFromUrl === 'function' && getEmployeeDetailIdFromUrl()) {
                         initialView = 'employeeDetailView';
                         initialParams.employeeId = getEmployeeDetailIdFromUrl();
@@ -1066,11 +1257,19 @@
                         checkNotifications();
                         setInterval(checkNotifications, 30000);
                     }
+                    
+                    // Hide loader overlay once initialization completes
+                    if (typeof hideGlobalLoader === 'function') {
+                        hideGlobalLoader();
+                    }
                 } else {
                     logout();
                 }
             } catch (e) {
                 console.error(e);
+                if (typeof hideGlobalLoader === 'function') {
+                    hideGlobalLoader();
+                }
                 logout();
             }
         });

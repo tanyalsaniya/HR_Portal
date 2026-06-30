@@ -1,6 +1,6 @@
 // static/js/features/audit.js
 // Central controller for Admin Audit Logs & Activity Trails (Simplified V2)
-
+console.log('audit js loaded ');
 let logsCurrentPage = 1;
 let logsPageSize = 12;
 let currentLogsList = [];
@@ -40,8 +40,8 @@ async function fetchLogsWithParams() {
                     return `
                         <tr>
                             <td style="padding-left: 20px;">${formatDate(l.timestamp)}</td>
-                            <td><strong>${l.user_name || 'System'}</strong></td>
-                            <td>${l.user_role || 'N/A'}</td>
+                            <td><strong>${l.actor_username || l.user_name || 'System'}</strong></td>
+                            <td>${l.actor_role || l.user_role || 'N/A'}</td>
                             <td><code>${l.ip_address || 'N/A'}</code></td>
                             <td><strong>${l.action}</strong></td>
                             <td style="padding-right: 20px;">${l.description}</td>

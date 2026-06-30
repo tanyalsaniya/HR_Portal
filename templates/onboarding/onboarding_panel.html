@@ -19,10 +19,10 @@
 
     <!-- Premium People Sub-Tabs -->
     <div class="people-tabs-container" style="margin-top: 25px;">
-        <button class="people-tab-btn" id="tabActiveBtn" onclick="switchOnboardingSubTab('all')">Active</button>
-        <button class="people-tab-btn active" id="tabOnboardingBtn" onclick="switchOnboardingSubTab('onboarding')">Onboarding</button>
-        <button class="people-tab-btn" id="tabOffboardingBtn" onclick="switchOnboardingSubTab('offboarding')">Offboarding</button>
-        <button class="people-tab-btn" id="tabDismissedBtn" onclick="switchOnboardingSubTab('dismissed')">Dismissed</button>
+        <button class="people-tab-btn {% if initial_onboarding_tab == 'all' %}active{% endif %}" id="tabActiveBtn" onclick="switchOnboardingSubTab('all')">Active</button>
+        <button class="people-tab-btn {% if initial_onboarding_tab == 'onboarding' or not initial_onboarding_tab %}active{% endif %}" id="tabOnboardingBtn" onclick="switchOnboardingSubTab('onboarding')">Onboarding</button>
+        <button class="people-tab-btn {% if initial_onboarding_tab == 'offboarding' %}active{% endif %}" id="tabOffboardingBtn" onclick="switchOnboardingSubTab('offboarding')">Offboarding</button>
+        <button class="people-tab-btn {% if initial_onboarding_tab == 'dismissed' %}active{% endif %}" id="tabDismissedBtn" onclick="switchOnboardingSubTab('dismissed')">Dismissed</button>
     </div>
 
     <!-- Search & Filter Controls Row -->
@@ -82,7 +82,7 @@
     </div>
 
     <!-- SUB-TAB 1: ONBOARDING TRACKER -->
-    <div id="subTabOnboarding" style="background: #ffffff; border: 1px solid var(--border-accent); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; margin-top: 15px;">
+    <div id="subTabOnboarding" style="display: {% if initial_onboarding_tab == 'onboarding' or not initial_onboarding_tab %}block{% else %}none{% endif %}; background: #ffffff; border: 1px solid var(--border-accent); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; margin-top: 15px;">
         <div class="table-responsive">
             <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
@@ -116,7 +116,7 @@
     </div>
 
     <!-- SUB-TAB 2: ACTIVE DIRECTORY -->
-    <div id="subTabAllEmployees" style="display: none; background: #ffffff; border: 1px solid var(--border-accent); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; margin-top: 15px;">
+    <div id="subTabAllEmployees" style="display: {% if initial_onboarding_tab and initial_onboarding_tab != 'onboarding' %}block{% else %}none{% endif %}; background: #ffffff; border: 1px solid var(--border-accent); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; margin-top: 15px;">
         <div class="table-responsive">
             <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>

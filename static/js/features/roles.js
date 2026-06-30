@@ -6,12 +6,18 @@ let allPermissions = [];
 let allRoles = [];
 
 async function loadRolesData() {
+    console.log('loadinasjdfAFBUID')
     document.getElementById('pageTitle').textContent = 'Roles & Permissions Control';
+    
+    const urlTab = getUrlParam('tab');
+    if (urlTab) switchRolesTab(urlTab, false);
+
     try {
         // Fetch Permissions
         const permRes = await apiFetch('/roles/permissions/');
         if (permRes.ok) {
             const data = await permRes.json();
+            console.log('Fetched permissions:', data);
             allPermissions = data.results || data;
         }
 
@@ -30,7 +36,8 @@ async function loadRolesData() {
     }
 }
 
-function switchRolesTab(tabId) {
+function switchRolesTab(tabId, updateUrl = true) {
+    if (updateUrl) setUrlParam('tab', tabId);
     const categoriesTab = document.getElementById('rolesCategoriesTab');
     const permissionsTab = document.getElementById('rolesPermissionsTab');
     const usersTab = document.getElementById('rolesPortalUsersTab');
@@ -244,7 +251,13 @@ async function saveRoleChanges(roleId, isSystem) {
 }
 
 async function deleteRole(roleId) {
-    if (!confirm('Are you sure you want to delete this custom role? Any users assigned to this role will be unassigned.')) return;
+    const _roleDelConf = await showDangerConfirm({
+        title: 'Delete Custom Role?',
+        body: 'All users currently assigned to this role will be unassigned. This action is permanent and cannot be reversed.',
+        confirmText: 'Yes, Delete Role',
+        cancelText: 'Cancel',
+    });
+    if (!_roleDelConf || !_roleDelConf.confirmed) return;
 
     showToast('Deleting custom role...');
     try {

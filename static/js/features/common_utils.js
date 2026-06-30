@@ -66,6 +66,12 @@ function applyPermissionsToUI() {
     const adminRolesLink = document.getElementById('adminRolesLink');
     if (adminRolesLink) adminRolesLink.style.display = hasPermission('roles.manage') ? 'block' : 'none';
 
+    const probationLink = document.getElementById('probationLink');
+    if (probationLink) {
+        probationLink.style.display = (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR')) ? 'block' : 'none';
+    }
+
+
     // Dashboard items
     const incrementWidget = document.getElementById('adminWidgetIncrements');
     if (incrementWidget) {
@@ -140,4 +146,19 @@ function applyPermissionsToUI() {
             subTabTemplateBtn.style.display = (isAdmin || hasTemplatePerm) ? 'inline-block' : 'none';
         }
     }
+}
+
+// ---------- URL State Helpers ----------
+function setUrlParam(key, value) {
+    const url = new URL(window.location);
+    url.searchParams.set(key, value);
+    // Merge with existing history state so we don't clobber it
+    const currentState = history.state || {};
+    currentState[key] = value;
+    history.replaceState(currentState, '', url);
+}
+
+function getUrlParam(key) {
+    const url = new URL(window.location);
+    return url.searchParams.get(key);
 }

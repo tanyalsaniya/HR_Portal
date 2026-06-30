@@ -15,7 +15,14 @@ let bitrixStudentTotalCount = 0;
 const STUDENT_PAGE_SIZE = 10;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
-async function loadStudentData() {
+async function loadStudentData(forceLoad = false) {
+    if (!forceLoad) {
+        const urlTab = getUrlParam('tab');
+        if (urlTab && urlTab !== 'directory') {
+            switchStudentTab(urlTab, null, false);
+            return;
+        }
+    }
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
     // Load ongoing students from Bitrix24 API with pagination
     try {
@@ -269,7 +276,8 @@ async function triggerWarningEmail(instId) {
 }
 
 // ---------- TABS CONTROLLERS & DROPDOWNS ----------
-function switchStudentTab(tab, selectedStudentId = null) {
+function switchStudentTab(tab, selectedStudentId = null, updateUrl = true) {
+    if (updateUrl) setUrlParam('tab', tab);
     const dirTab = document.getElementById('studentTabDirectory');
     const certTab = document.getElementById('studentTabCertGen');
     const bitrixTab = document.getElementById('studentTabBitrix');
@@ -291,7 +299,7 @@ function switchStudentTab(tab, selectedStudentId = null) {
         if (dirTab) dirTab.style.display = 'block';
         if (dirBtn) dirBtn.classList.add('active');
         studentCurrentPage = 1;
-        loadStudentData(); // Load Bitrix ongoing students
+        loadStudentData(true); // Load Bitrix ongoing students
     } else if (tab === 'bitrix') {
         if (bitrixTab) bitrixTab.style.display = 'block';
         if (bitrixBtn) bitrixBtn.classList.add('active');
@@ -430,7 +438,7 @@ async function loadStudentsSelect(selectedStudentId = null) {
 
         if (selectedStudentId) {
             el.value = selectedStudentId;
-            await loadStudentCertPrefills();
+            switchStudentProfileTab(defaultTab, false);
         }
     } catch (e) {
         console.error(e);
@@ -809,6 +817,16 @@ async function generateAndSaveCertificate() {
         cert_content: document.getElementById('certParagraphTextarea').value
     };
 
+    // Confirm before generating
+    const _certConf = await showConfirm({
+        title: 'Generate Certificate?',
+        body: 'This will generate and save a PDF certificate for the selected student. The certificate will be auto-downloaded.',
+        confirmText: 'Yes, Generate',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_certConf || !_certConf.confirmed) return;
+
     showToast('Generating and saving certificate PDF...');
 
     try {
@@ -819,42 +837,41 @@ async function generateAndSaveCertificate() {
 
         if (res.ok) {
             const result = await res.json();
-            showToast('Certificate saved & PDF generated successfully!');
-
             generatedPdfUrl = result.pdf_file;
             document.getElementById('btnDownloadPDF').disabled = false;
-
             document.getElementById('prevSerialNo').textContent = `Sr.no ${result.serial_no}`;
             loadStudentData();
+            showSuccessModal({
+                title: 'Certificate Generated!',
+                subtitle: `Certificate Sr. No. ${result.serial_no} has been saved and automatically downloaded.`,
+                btnText: 'Done',
+            });
         } else {
             const err = await res.json();
             if (err.requires_override) {
-                const resultConf = await Swal.fire({
+                const _earlyConf = await showConfirm({
                     title: 'Early Generation Warning',
-                    text: err.warning,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Yes, Generate Early',
-                    cancelButtonText: 'Cancel'
+                    body: err.warning || 'This certificate is being generated before the course completion date.',
+                    confirmText: 'Yes, Generate Early',
+                    cancelText: 'Cancel',
+                    icon: 'modalWarning',
                 });
 
-                if (resultConf.isConfirmed) {
-                    const reasonResult = await Swal.fire({
+                if (_earlyConf && _earlyConf.confirmed) {
+                    const _reasonResult = await showPromptDialog({
                         title: 'Reason for Early Generation',
-                        input: 'textarea',
-                        inputLabel: 'Please provide the reason for generating this certificate before the course completion date.',
-                        inputPlaceholder: 'Enter your reason here...',
-                        showCancelButton: true,
-                        inputValidator: (value) => {
-                            if (!value || !value.trim()) {
-                                return 'A valid reason is required to generate the certificate early.';
-                            }
-                        }
+                        body: 'Please provide the reason for generating this certificate before the course completion date.',
+                        label: 'Reason',
+                        placeholder: 'Enter your reason here...',
+                        type: 'textarea',
+                        confirmText: 'Submit & Generate',
+                        required: true,
+                        requiredMsg: 'A valid reason is required to generate the certificate early.',
                     });
 
-                    if (reasonResult.isConfirmed && reasonResult.value) {
+                    if (_reasonResult && _reasonResult.confirmed && _reasonResult.value) {
                         data.confirm_override = true;
-                        data.early_generation_reason = reasonResult.value.trim();
+                        data.early_generation_reason = _reasonResult.value.trim();
                         showToast('Generating and saving certificate (with override)...');
                         const retryRes = await apiFetch('/api/student/certificates/', {
                             method: 'POST',
@@ -862,11 +879,15 @@ async function generateAndSaveCertificate() {
                         });
                         if (retryRes.ok) {
                             const retryResult = await retryRes.json();
-                            showToast('Certificate saved & PDF generated successfully!');
                             generatedPdfUrl = retryResult.pdf_file;
                             document.getElementById('btnDownloadPDF').disabled = false;
                             document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
                             loadStudentData();
+                            showSuccessModal({
+                                title: 'Certificate Generated!',
+                                subtitle: `Certificate Sr. No. ${retryResult.serial_no} has been saved with override approval and automatically downloaded.`,
+                                btnText: 'Done',
+                            });
                         } else {
                             const retryErr = await retryRes.json();
                             showToast(retryErr.error || JSON.stringify(retryErr), 'error');
@@ -1131,11 +1152,15 @@ async function handleStudentRowClick(event, index) {
     }
 }
 
-async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shouldSwitchView = true) {
-    if (shouldSwitchView) {
+async function openStudentProfileDetail(studentId, defaultTab = 'personal', updateUrl = true) {
+    const urlTab = getUrlParam('ptab');
+    if (urlTab) defaultTab = urlTab;
+    
+    currentStudentDetails = null;
+    if (updateUrl) {
         switchView('studentDetailView', true, {
             studentId: studentId,
-            studentTab: tabToFocus,
+            studentTab: defaultTab,
             skipStudentDetailLoad: true
         });
     }
@@ -1262,7 +1287,8 @@ async function loadStudentDetailSelects(enrolledCourseId, deptId) {
     }
 }
 
-function switchStudentProfileTab(tabId) {
+function switchStudentProfileTab(tabId, updateUrl = true) {
+    if (updateUrl) setUrlParam('ptab', tabId);
     activeStudentProfileTab = tabId;
     const tabs = ['personal', 'docs', 'installments', 'certificates'];
 
@@ -1410,7 +1436,13 @@ function renderStudentDocumentsChecklist(docList) {
 }
 
 async function deleteStudentDoc(docId) {
-    if (!confirm('Are you sure you want to delete this document?')) return;
+    const _docDelConf = await showDangerConfirm({
+        title: 'Delete Document?',
+        body: 'This will permanently remove the document from the student profile. This action cannot be undone.',
+        confirmText: 'Yes, Delete',
+        cancelText: 'Cancel',
+    });
+    if (!_docDelConf || !_docDelConf.confirmed) return;
 
     showToast('Deleting document...');
     try {

@@ -218,7 +218,13 @@ async function toggleUserStatus(userId, isCurrentlyActive) {
 }
 
 async function deletePortalUser(userId) {
-    if (!confirm('Are you sure you want to permanently delete this portal user account? This cannot be undone.')) return;
+    const _userDelConf = await showDangerConfirm({
+        title: 'Delete Portal User?',
+        body: 'This will permanently delete this portal user account including all associated access and credentials. This action cannot be undone.',
+        confirmText: 'Yes, Delete Account',
+        cancelText: 'Cancel',
+    });
+    if (!_userDelConf || !_userDelConf.confirmed) return;
 
     showToast('Deleting portal user account...');
     try {

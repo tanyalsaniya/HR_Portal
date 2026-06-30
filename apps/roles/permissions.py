@@ -38,7 +38,7 @@ class HasModelPermission(permissions.BasePermission):
                 return 'onboarding.read' in user_perms
             if action == 'create':
                 return 'onboarding.create' in user_perms
-            if action in ['update', 'partial_update']:
+            if action in ['update', 'partial_update', 'send_welcome_email', 'invite_to_bitrix', 'manual_graduate']:
                 return 'onboarding.update' in user_perms
             if action == 'destroy':
                 return 'onboarding.delete' in user_perms

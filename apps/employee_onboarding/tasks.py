@@ -85,7 +85,8 @@ def send_onboarding_welcome_email(employee_data):
     dept_name = employee_data.get('department_name') or 'N/A'
     manager_name = employee_data.get('manager_name') or 'Prince Parbhakar'
     joining_date = employee_data.get('joining_date') or 'N/A'
-    reporting_time = employee_data.get('reporting_time') or '10:00 AM'
+    designation = employee_data.get('designation') or 'Jr. Python Developer'
+    reporting_time = employee_data.get('reporting_time') or '9:30 AM'
     location = employee_data.get('location') or 'Mohali Office'
     
     recipient_email = employee_data.get('personal_email') or employee_data.get('work_email') or employee_data.get('email')
@@ -93,133 +94,142 @@ def send_onboarding_welcome_email(employee_data):
         logger.warning(f"No recipient email found for onboarding welcome email to {full_name}.")
         return "Failed: No recipient email."
         
-    company_name = getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.')
+    company_name = getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd')
     
-    subject = f"Welcome to {company_name}! - Onboarding Initiated Successfully"
+    subject = f"Congratulations..!! Selection at {company_name}"
     
+    # Format joining date to e.g. 22-June-2026 (Monday)
+    import datetime
+    joining_date_str = joining_date
+    try:
+        if isinstance(joining_date, (datetime.date, datetime.datetime)):
+            dt = joining_date
+        else:
+            dt = datetime.datetime.strptime(str(joining_date).strip(), '%Y-%m-%d')
+        joining_date_formatted = dt.strftime('%d-%B-%Y')
+        day_name = dt.strftime('%A')
+        joining_date_str = f"{joining_date_formatted} ({day_name})"
+    except Exception:
+        pass
+
     # HTML Email body
     html_content = f"""
     <html>
-      <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0;">
-        <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
-          <div style="text-align: center; background-color: #f8fafc; padding: 10px 0;">
-            <img src="cid:welcome_banner" alt="Welcome to the Team" style="max-width: 100%; height: auto; display: block;" />
-          </div>
-          <div style="padding: 30px;">
-            <p style="font-size: 16px; margin-top: 0;">Dear {full_name},</p>
-            <p style="font-size: 14px;">Welcome to {company_name}!</p>
-            <p style="font-size: 14px;">We are pleased to inform you that your onboarding process has been initiated successfully by the HR team. We are excited to have you join us.</p>
-            
-            <p style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; color: #1e293b;">Please find your joining details below:</p>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 25px;">
-              <tr>
-                <td style="padding: 6px 0; font-weight: 600; color: #475569; width: 180px;">Employee ID:</td>
-                <td style="padding: 6px 0; color: #0f172a;">{emp_id}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Department:</td>
-                <td style="padding: 6px 0; color: #0f172a;">{dept_name}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Reporting Manager:</td>
-                <td style="padding: 6px 0; color: #0f172a;">{manager_name}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Joining Date:</td>
-                <td style="padding: 6px 0; color: #0f172a;">{joining_date}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Reporting Time:</td>
-                <td style="padding: 6px 0; color: #0f172a;">{reporting_time}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; font-weight: 600; color: #475569;">Work Location:</td>
-                <td style="padding: 6px 0; color: #0f172a;">{location}</td>
-              </tr>
-            </table>
-
-            <p style="font-size: 14px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; color: #1e293b;">Please carry/submit the following documents on your joining date:</p>
-            <ul style="font-size: 14px; padding-left: 20px; color: #334155; margin-bottom: 25px;">
-              <li style="margin-bottom: 6px;">Government ID Proof (Aadhaar / Passport / Driving License)</li>
-              <li style="margin-bottom: 6px;">PAN Card</li>
-              <li style="margin-bottom: 6px;">Passport-size Photographs</li>
-              <li style="margin-bottom: 6px;">Educational Certificates</li>
-              <li style="margin-bottom: 6px;">Previous Employment Documents (if applicable)</li>
-              <li style="margin-bottom: 6px;">Address Proof</li>
-              <li style="margin-bottom: 6px;">Bank Account Details</li>
-              <li style="margin-bottom: 6px;">Signed Offer Letter (if required)</li>
-            </ul>
-
-            <p style="font-size: 14px; color: #dc2626; font-weight: 500;">Kindly ensure all documents are available to avoid delays in completing onboarding formalities.</p>
-            <p style="font-size: 14px;">If you have any questions, please contact the HR team.</p>
-            <p style="font-size: 14px;">We look forward to welcoming you and wish you success in your new role.</p>
-            
-            <p style="font-size: 14px; margin-top: 30px; margin-bottom: 0;">Best Regards,<br/><strong>HR Team</strong><br/>{company_name}</p>
-          </div>
-        </div>
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 40px 0;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); overflow: hidden;">
+          <tr>
+            <td align="center" style="padding: 30px 0 20px 0; background-color: #ffffff; border-bottom: 2px solid #f0f0f0;">
+              <img src="cid:company_logo" alt="Devex Hub Logo" style="display: block; max-width: 180px; height: auto;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; color: #333333; font-size: 15px; line-height: 1.6;">
+              <p style="margin-top: 0; font-size: 16px;">Dear {first_name},</p>
+              
+              <p style="color: #2c3e50; font-size: 18px; font-weight: bold; margin: 20px 0;">Congratulations..!!</p>
+              
+              <p style="margin-bottom: 20px;">We would like to inform you that you have been selected as the best candidate for the position of <strong>{designation}</strong> at Devex Hub Pvt Ltd. Your Joining date will be <strong>{joining_date_str}</strong> and you have to report at <strong>{reporting_time}</strong>. We believe that your knowledge, skills and experience would be an ideal fit for our company. We hope you will enjoy your role and make a significant contribution to the overall success of Devex Hub Pvt Ltd.</p>
+              
+              <div style="background-color: #f8fbfa; border-left: 4px solid #2980b9; padding: 15px 20px; margin: 25px 0;">
+                  <p style="margin-top: 0; font-weight: 600; color: #2c3e50;">Kindly carry original + Photo copies of below mentioned documents that we need at the time of your joining and please share soft copies as well.</p>
+                  
+                  <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #444444;">
+                      <li style="margin-bottom: 5px;">Aadhar Card.</li>
+                      <li style="margin-bottom: 5px;">Pan Card.</li>
+                      <li style="margin-bottom: 5px;">Two Passport Size Photos.</li>
+                      <li style="margin-bottom: 5px;">Higher Qualification Certificate.</li>
+                      <li style="margin-bottom: 5px;">Bank Account Details.</li>
+                      <li style="margin-bottom: 0;">Previous Experience Letters and salary slips.</li>
+                  </ul>
+              </div>
+              
+              <p style="margin-bottom: 20px;">Please accept this letter and send us your acknowledgement.</p>
+              
+              <p style="margin-bottom: 30px;">If you have any questions and concerns then feel free to contact us back. Looking forward to working with you at Devex Hub Pvt Ltd.</p>
+              
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="color: #555555; font-size: 14px; line-height: 1.5;">
+                    <p style="margin: 0 0 10px 0;">Regards,</p>
+                    <p style="margin: 0; font-weight: bold; color: #333333; font-size: 15px;">NEHA ARYA</p>
+                    <p style="margin: 2px 0; color: #777777;">Sr. HR</p>
+                    <p style="margin: 2px 0;">Devex Hub Pvt Ltd</p>
+                    <p style="margin: 2px 0;">#254, GR Square, Fourth Floor</p>
+                    <p style="margin: 2px 0;">Phase 8A, Industrial Area, Mohali</p>
+                    <p style="margin: 2px 0;">India, 160055</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="background-color: #2c3e50; padding: 15px; color: #ffffff; font-size: 13px;">
+              Website: <a href="http://www.devexhub.com" style="color: #3498db; text-decoration: none; font-weight: bold;">www.devexhub.com</a>
+            </td>
+          </tr>
+        </table>
       </body>
     </html>
     """
     
     # Text fallback
     text_content = f"""
-Dear {full_name},
+Dear {first_name},
 
-Welcome to {company_name}!
+Congratulations..!!
 
-We are pleased to inform you that your onboarding process has been initiated successfully by the HR team. We are excited to have you join us.
+We would like to inform you that you have been selected as the best candidate for the position of {designation} at Devex Hub Pvt Ltd. Your Joining date will be {joining_date_str} and you have to report at {reporting_time}. We believe that your knowledge, skills and experience would be an ideal fit for our company. We hope you will enjoy your role and make a significant contribution to the overall success of Devex Hub Pvt Ltd.
 
-Please find your joining details below:
+Kindly carry original + Photo copies of below mentioned documents that we need at the time of your joining and please share soft copies as well.
 
-* Employee ID: {emp_id}
-* Department: {dept_name}
-* Reporting Manager: {manager_name}
-* Joining Date: {joining_date}
-* Reporting Time: {reporting_time}
-* Work Location: {location}
+• Aadhar Card.
+• Pan Card.
+• Two Passport Size Photos.
+• Higher Qualification Certificate.
+• Bank Account Details.
+• Previous Experience Letters and salary slips.
 
-Please carry/submit the following documents on your joining date:
+Please accept this letter and send us your acknowledgement.
 
-* Government ID Proof (Aadhaar / Passport / Driving License)
-* PAN Card
-* Passport-size Photographs
-* Educational Certificates
-* Previous Employment Documents (if applicable)
-* Address Proof
-* Bank Account Details
-* Signed Offer Letter (if required)
+If you have any questions and concerns then feel free to contact us back. Looking forward to working with you at Devex Hub Pvt Ltd.
 
-Kindly ensure all documents are available to avoid delays in completing onboarding formalities.
 
-If you have any questions, please contact the HR team.
+Regards,
 
-We look forward to welcoming you and wish you success in your new role.
+NEHA ARYA
+Sr. HR
+Devex Hub Pvt Ltd
+#254, GR Square, Fourth Floor
+Phase 8A, Industrial Area, Mohali
+India, 160055
 
-Best Regards,
-HR Team
-{company_name}
+Website: www.devexhub.com
     """.strip()
-    
     try:
+        from_name = "Devex Hub HR"
+        from_email_addr = settings.DEFAULT_FROM_EMAIL or 'hr@mtlv.com'
+        formatted_from = f"{from_name} <{from_email_addr}>"
+        
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text_content,
-            from_email=settings.DEFAULT_FROM_EMAIL or 'hr@mtlv.com',
+            from_email=formatted_from,
             to=[recipient_email]
         )
+        msg.mixed_subtype = 'related'  # Required for inline CID images to work in Gmail
         msg.attach_alternative(html_content, "text/html")
         
-        # Attach the welcome banner image as inline
-        banner_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'welcome_onboarding.png')
-        if os.path.exists(banner_path):
-            with open(banner_path, 'rb') as f:
+        # Attach the company logo image as inline
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'DevEx Hub logo.png')
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
                 img_data = f.read()
             mime_img = MIMEImage(img_data)
-            mime_img.add_header('Content-ID', '<welcome_banner>')
-            mime_img.add_header('Content-Disposition', 'inline', filename='welcome_onboarding.png')
+            mime_img.add_header('Content-ID', '<company_logo>')
+            mime_img.add_header('Content-Disposition', 'inline', filename='DevEx Hub logo.png')
             msg.attach(mime_img)
         else:
-            logger.warning(f"Welcome banner image not found at {banner_path}, sending without image.")
+            logger.warning(f"Company logo image not found at {logo_path}, sending without image.")
             
         msg.send(fail_silently=False)
         return f"Welcome email sent successfully to {recipient_email}."
@@ -397,11 +407,16 @@ def process_bitrix_webhook_task(data):
                 # Save to database
                 save_synced_employee_to_db(mock_user)
 
-                # Trigger welcome email task
-                try:
-                    send_onboarding_welcome_email.delay(mock_user)
-                except Exception as mail_err:
-                    logger.error(f"Failed to queue welcome email task: {mail_err}")
+                # Trigger welcome email task only if joining date and email are present
+                emp_joining_date = mock_user.get('joining_date')
+                emp_email = mock_user.get('email') or mock_user.get('work_email') or mock_user.get('personal_email')
+                if emp_joining_date and emp_email:
+                    try:
+                        send_onboarding_welcome_email.delay(mock_user)
+                    except Exception as mail_err:
+                        logger.error(f"Failed to queue welcome email task: {mail_err}")
+                else:
+                    logger.info(f"Skipping automatic welcome email for employee {bitrix_id} because details (joining date or email) are missing.")
 
                 # Trigger Admin Notification
                 try:
@@ -527,6 +542,40 @@ def process_bitrix_webhook_task(data):
                 contact_id = str(res.json().get('result'))
                 BitrixClient.get_all_users(force_refresh=True)
                 mock_user = BitrixClient.get_user_detail(contact_id)
+                
+                # Try to link to a local employee if we have a match
+                from .models import SyncedEmployee
+                from employee_onboarding.models import EmployeeDocument
+                from salary.models import SalaryStructure, EmployeeBankDetail
+                
+                local_emp = None
+                local_id = data.get('local_id') or data.get('crmID') or data.get('crmId')
+                if local_id:
+                    if not str(local_id).startswith('LOCAL-'):
+                        local_emp = SyncedEmployee.objects.filter(bitrix_user_id=f"LOCAL-{local_id}").first()
+                    if not local_emp:
+                        local_emp = SyncedEmployee.objects.filter(bitrix_user_id=str(local_id)).first()
+                        
+                if not local_emp and email:
+                    local_emp = SyncedEmployee.objects.filter(email__iexact=email, bitrix_user_id__startswith='LOCAL-').first()
+                    if not local_emp:
+                        local_emp = SyncedEmployee.objects.filter(email__iexact=email).first()
+
+                if local_emp and local_emp.bitrix_user_id != contact_id:
+                    old_local_id = local_emp.bitrix_user_id
+                    
+                    # Update references in all tables
+                    EmployeeDocument.objects.filter(bitrix_user_id=old_local_id).update(bitrix_user_id=contact_id)
+                    SalaryStructure.objects.filter(bitrix_user_id=old_local_id).update(bitrix_user_id=contact_id)
+                    EmployeeBankDetail.objects.filter(bitrix_user_id=old_local_id).update(bitrix_user_id=contact_id)
+                    
+                    # Update local employee
+                    local_emp.bitrix_user_id = contact_id
+                    local_emp.bitrix_sync_status = 'Synced'
+                    local_emp.bitrix_sync_error = None
+                    local_emp.save()
+                    
+                    logger.info(f"Linked local employee {old_local_id} to new Bitrix ID {contact_id}")
                 
                 # Log success in BitrixSyncLog
                 try:

@@ -15,7 +15,14 @@ let bitrixStudentTotalCount = 0;
 const STUDENT_PAGE_SIZE = 10;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
-async function loadStudentData() {
+async function loadStudentData(forceLoad = false) {
+    if (!forceLoad) {
+        const urlTab = getUrlParam('tab');
+        if (urlTab && urlTab !== 'directory') {
+            switchStudentTab(urlTab, null, false);
+            return;
+        }
+    }
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
     // Load ongoing students from Bitrix24 API with pagination
     try {
@@ -77,7 +84,6 @@ function updateStudentPaginationControls() {
     if (prevBtn) prevBtn.disabled = studentCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = pageEnd >= studentTotalCount;
 }
-
 
 
 function openStudentModal() {
@@ -270,7 +276,8 @@ async function triggerWarningEmail(instId) {
 }
 
 // ---------- TABS CONTROLLERS & DROPDOWNS ----------
-function switchStudentTab(tab, selectedStudentId = null) {
+function switchStudentTab(tab, selectedStudentId = null, updateUrl = true) {
+    if (updateUrl) setUrlParam('tab', tab);
     const dirTab = document.getElementById('studentTabDirectory');
     const certTab = document.getElementById('studentTabCertGen');
     const bitrixTab = document.getElementById('studentTabBitrix');
@@ -292,7 +299,7 @@ function switchStudentTab(tab, selectedStudentId = null) {
         if (dirTab) dirTab.style.display = 'block';
         if (dirBtn) dirBtn.classList.add('active');
         studentCurrentPage = 1;
-        loadStudentData(); // Load Bitrix ongoing students
+        loadStudentData(true); // Load Bitrix ongoing students
     } else if (tab === 'bitrix') {
         if (bitrixTab) bitrixTab.style.display = 'block';
         if (bitrixBtn) bitrixBtn.classList.add('active');
@@ -409,9 +416,9 @@ async function loadStudentsSelect(selectedStudentId = null) {
 
         // Combine. Match by email to avoid duplicates.
         const dbEmails = new Set(dbStudents.map(s => (s.email || '').toLowerCase()));
-
+        
         let html = '<option value="">-- Select Student --</option>';
-
+        
         // Add database students first
         dbStudents.forEach(s => {
             html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
@@ -431,7 +438,7 @@ async function loadStudentsSelect(selectedStudentId = null) {
 
         if (selectedStudentId) {
             el.value = selectedStudentId;
-            await loadStudentCertPrefills();
+            switchStudentProfileTab(defaultTab, false);
         }
     } catch (e) {
         console.error(e);
@@ -453,7 +460,7 @@ async function loadStudentCertPrefills() {
     if (!select || !select.value) return;
 
     let studentId = select.value;
-
+    
     // If it's a Bitrix-only student, dynamically sync them first
     if (String(studentId).startsWith('bitrix_')) {
         const option = select.options[select.selectedIndex];
@@ -531,7 +538,11 @@ async function loadStudentCertPrefills() {
             // Set Duration input
             const durationInput = document.getElementById('certDurationInput');
             if (durationInput) {
-                durationInput.value = data.duration || '';
+                let dur = data.duration || '6 Months';
+                dur = dur.toLowerCase();
+                if (dur.includes('45')) durationInput.value = '45 Days';
+                else if (dur.includes('3')) durationInput.value = '3 Months';
+                else durationInput.value = '6 Months';
             }
 
             // Set Place and Issue Date (today)
@@ -547,8 +558,8 @@ async function loadStudentCertPrefills() {
             const showDates = document.getElementById('certShowDatesToggle').checked;
             document.getElementById('certParagraphTextarea').value = showDates ? data.default_paragraph_with_dates : data.default_paragraph;
 
-            // Update preview
-            updateLivePreview();
+            // Update preview and recalculate dates
+            onCertDurationChange();
         }
     } catch (e) {
         console.error(e);
@@ -627,43 +638,55 @@ function onCertCourseChange() {
 
     if (select.selectedIndex > 0) {
         const option = select.options[select.selectedIndex];
-        const duration = option.getAttribute('data-duration') || '6 months';
         const skills = JSON.parse(option.getAttribute('data-skills') || '[]');
 
-        document.getElementById('certDurationInput').value = duration;
         certEditorSkills = skills.map(s => ({ name: s, rating: 'Excellent' }));
         renderEditorSkills();
 
         if (currentStudentDetails) {
             currentStudentDetails.course_name = option.text;
-            currentStudentDetails.duration = duration;
             currentStudentDetails.skills = skills;
-
-            const s_o_d_o = currentStudentDetails.s_o_d_o;
-            const father_name = currentStudentDetails.father_name;
-            const address = currentStudentDetails.address;
-            const student_name = currentStudentDetails.student_name;
-            const completion_month = currentStudentDetails.completion_month;
-
-            currentStudentDetails.default_paragraph = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed ${duration} \"**${option.text}**\" course .`;
-            currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed \"**${option.text}**\" course in the month of **${completion_month}**.`;
-
-            const showDates = document.getElementById('certShowDatesToggle').checked;
-            document.getElementById('certParagraphTextarea').value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
+            onCertDurationChange(); // This will recalculate the text and dates
         }
     }
     updateLivePreview();
 }
 
 function onCertDurationChange() {
-    const duration = document.getElementById('certDurationInput').value;
+    const durationSelect = document.getElementById('certDurationInput');
+    if (!durationSelect) return;
+    
+    const duration = durationSelect.value;
     const textarea = document.getElementById('certParagraphTextarea');
-    if (textarea && currentStudentDetails) {
-        let text = textarea.value;
-        const oldDuration = currentStudentDetails.duration;
-        if (text.includes(oldDuration)) {
-            textarea.value = text.replace(oldDuration, duration);
-            currentStudentDetails.duration = duration;
+    
+    if (currentStudentDetails && currentStudentDetails.joining_date) {
+        let joiningDate = new Date(currentStudentDetails.joining_date);
+        let daysToAdd = 180; // default 6 Months
+        if (duration.includes("3 Month")) daysToAdd = 90;
+        if (duration.includes("45 Day")) daysToAdd = 45;
+        
+        let newComp = new Date(joiningDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+        currentStudentDetails.completion_date = newComp.toISOString().split('T')[0];
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        currentStudentDetails.completion_month = monthNames[newComp.getMonth()] + " " + newComp.getFullYear();
+        
+        currentStudentDetails.duration = duration;
+        
+        // Update paragraphs
+        const s_name = currentStudentDetails.student_name;
+        const sodo = currentStudentDetails.s_o_d_o;
+        const fname = currentStudentDetails.father_name;
+        const addr = currentStudentDetails.address;
+        const cname = currentStudentDetails.course_name;
+        const cmonth = currentStudentDetails.completion_month;
+        
+        currentStudentDetails.default_paragraph = `This is to certify that **${s_name}** **${sodo} ${fname}**, ${addr}. Has successfully Completed ${duration} \"**${cname}**\" course .`;
+        currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${s_name}** **${sodo} ${fname}**, ${addr}. Has successfully Completed \"**${cname}**\" course in the month of **${cmonth}**.`;
+        
+        if (textarea) {
+            const showDates = document.getElementById('certShowDatesToggle').checked;
+            textarea.value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
         }
     }
     updateLivePreview();
@@ -786,13 +809,23 @@ async function generateAndSaveCertificate() {
     const data = {
         student: parseInt(select.value),
         course: parseInt(courseSelect.value),
-        duration: document.getElementById('certDurationInput').value,   // ← was missing in v2
+        duration: document.getElementById('certDurationInput').value,
         skill_ratings: skillRatings,
         show_dates: document.getElementById('certShowDatesToggle').checked,
         issue_date: document.getElementById('certIssueDate').value,
         place: document.getElementById('certPlace').value,
         cert_content: document.getElementById('certParagraphTextarea').value
     };
+
+    // Confirm before generating
+    const _certConf = await showConfirm({
+        title: 'Generate Certificate?',
+        body: 'This will generate and save a PDF certificate for the selected student. The certificate will be auto-downloaded.',
+        confirmText: 'Yes, Generate',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_certConf || !_certConf.confirmed) return;
 
     showToast('Generating and saving certificate PDF...');
 
@@ -804,72 +837,63 @@ async function generateAndSaveCertificate() {
 
         if (res.ok) {
             const result = await res.json();
-            showToast('Certificate saved & PDF generated successfully!');
             generatedPdfUrl = result.pdf_file;
             document.getElementById('btnDownloadPDF').disabled = false;
             document.getElementById('prevSerialNo').textContent = `Sr.no ${result.serial_no}`;
             loadStudentData();
-
+            showSuccessModal({
+                title: 'Certificate Generated!',
+                subtitle: `Certificate Sr. No. ${result.serial_no} has been saved and automatically downloaded.`,
+                btnText: 'Done',
+            });
         } else {
             const err = await res.json();
-
             if (err.requires_override) {
-                // Step 1: Confirm early generation
-                const confirmResult = await Swal.fire({
+                const _earlyConf = await showConfirm({
                     title: 'Early Generation Warning',
-                    text: err.warning,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#f59e0b',
-                    cancelButtonColor: '#6b7280',
-                    confirmButtonText: 'Yes, Generate Early',
-                    cancelButtonText: 'Cancel'
+                    body: err.warning || 'This certificate is being generated before the course completion date.',
+                    confirmText: 'Yes, Generate Early',
+                    cancelText: 'Cancel',
+                    icon: 'modalWarning',
                 });
 
-                if (!confirmResult.isConfirmed) return;
+                if (_earlyConf && _earlyConf.confirmed) {
+                    const _reasonResult = await showPromptDialog({
+                        title: 'Reason for Early Generation',
+                        body: 'Please provide the reason for generating this certificate before the course completion date.',
+                        label: 'Reason',
+                        placeholder: 'Enter your reason here...',
+                        type: 'textarea',
+                        confirmText: 'Submit & Generate',
+                        required: true,
+                        requiredMsg: 'A valid reason is required to generate the certificate early.',
+                    });
 
-                // Step 2: Collect reason
-                const reasonResult = await Swal.fire({
-                    title: 'Reason for Early Generation',
-                    input: 'textarea',
-                    inputLabel: 'Please provide the reason for generating this certificate before the course completion date.',
-                    inputPlaceholder: 'Enter your reason here...',
-                    showCancelButton: true,
-                    confirmButtonText: 'Submit & Generate',
-                    cancelButtonText: 'Cancel',
-                    inputValidator: (value) => {
-                        if (!value || !value.trim()) {
-                            return 'A valid reason is required.';
+                    if (_reasonResult && _reasonResult.confirmed && _reasonResult.value) {
+                        data.confirm_override = true;
+                        data.early_generation_reason = _reasonResult.value.trim();
+                        showToast('Generating and saving certificate (with override)...');
+                        const retryRes = await apiFetch('/api/student/certificates/', {
+                            method: 'POST',
+                            body: JSON.stringify(data)
+                        });
+                        if (retryRes.ok) {
+                            const retryResult = await retryRes.json();
+                            generatedPdfUrl = retryResult.pdf_file;
+                            document.getElementById('btnDownloadPDF').disabled = false;
+                            document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
+                            loadStudentData();
+                            showSuccessModal({
+                                title: 'Certificate Generated!',
+                                subtitle: `Certificate Sr. No. ${retryResult.serial_no} has been saved with override approval and automatically downloaded.`,
+                                btnText: 'Done',
+                            });
+                        } else {
+                            const retryErr = await retryRes.json();
+                            showToast(retryErr.error || JSON.stringify(retryErr), 'error');
                         }
                     }
-                });
-
-                if (!reasonResult.isConfirmed || !reasonResult.value) return;
-
-                // Step 3: Retry with override
-                data.confirm_override = true;
-                data.early_generation_reason = reasonResult.value.trim();
-
-                showToast('Generating certificate with early override...');
-                const retryRes = await apiFetch('/api/student/certificates/', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
-
-                if (retryRes.ok) {
-                    const retryResult = await retryRes.json();
-                    showToast('Certificate saved & PDF generated successfully!');
-                    generatedPdfUrl = retryResult.pdf_file;
-                    document.getElementById('btnDownloadPDF').disabled = false;
-                    document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
-                    loadStudentData();
-                } else {
-                    const retryErr = await retryRes.json();
-                    showToast(retryErr.error || JSON.stringify(retryErr), 'error');
                 }
-
-            } else if (err.requires_reason) {
-                showToast('A reason is required for early generation.', 'error');
             } else {
                 showToast(err.error || JSON.stringify(err), 'error');
             }
@@ -1128,11 +1152,15 @@ async function handleStudentRowClick(event, index) {
     }
 }
 
-async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shouldSwitchView = true) {
-    if (shouldSwitchView) {
+async function openStudentProfileDetail(studentId, defaultTab = 'personal', updateUrl = true) {
+    const urlTab = getUrlParam('ptab');
+    if (urlTab) defaultTab = urlTab;
+    
+    currentStudentDetails = null;
+    if (updateUrl) {
         switchView('studentDetailView', true, {
             studentId: studentId,
-            studentTab: tabToFocus,
+            studentTab: defaultTab,
             skipStudentDetailLoad: true
         });
     }
@@ -1259,7 +1287,8 @@ async function loadStudentDetailSelects(enrolledCourseId, deptId) {
     }
 }
 
-function switchStudentProfileTab(tabId) {
+function switchStudentProfileTab(tabId, updateUrl = true) {
+    if (updateUrl) setUrlParam('ptab', tabId);
     activeStudentProfileTab = tabId;
     const tabs = ['personal', 'docs', 'installments', 'certificates'];
 
@@ -1407,7 +1436,13 @@ function renderStudentDocumentsChecklist(docList) {
 }
 
 async function deleteStudentDoc(docId) {
-    if (!confirm('Are you sure you want to delete this document?')) return;
+    const _docDelConf = await showDangerConfirm({
+        title: 'Delete Document?',
+        body: 'This will permanently remove the document from the student profile. This action cannot be undone.',
+        confirmText: 'Yes, Delete',
+        cancelText: 'Cancel',
+    });
+    if (!_docDelConf || !_docDelConf.confirmed) return;
 
     showToast('Deleting document...');
     try {

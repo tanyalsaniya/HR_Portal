@@ -10,6 +10,11 @@ async function loadSalaryData() {
     salaryCurrentPage = 1;
     document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
     
+    const urlTab = getUrlParam('tab');
+    if (urlTab) activeSalaryTab = urlTab;
+    // Don't update URL here, just set UI
+    switchSalaryTab(activeSalaryTab, false);
+    
     // Adjust visual panel options based on role
     const role = currentUser.role;
     const adminPanel = document.getElementById('payrollAdminPanel');
@@ -38,8 +43,9 @@ async function loadSalaryData() {
     }
 }
 
-function switchSalaryTab(tab) {
+function switchSalaryTab(tab, updateUrl = true) {
     activeSalaryTab = tab;
+    if (updateUrl) setUrlParam('tab', tab);
     
     // Toggle active classes on tab headers
     const headers = ['tabSlips', 'tabStructures', 'tabBatches'];
@@ -116,9 +122,16 @@ async function publishSlipsMonth() {
     const month = document.getElementById('payrollMonth').value;
     const year = document.getElementById('payrollYear').value;
     
-    if (!confirm(`Are you sure you want to publish all draft salary slips for ${month}/${year}?`)) {
+    const _publishConf = await showConfirm({
+        title: 'Publish Salary Slips?',
+        body: `All draft salary slips for <strong>${month}/${year}</strong> will be published and made visible to employees. This action cannot be reversed.`,
+        confirmText: 'Yes, Publish',
+        cancelText: 'Cancel',
+    });
+    if (!_publishConf || !_publishConf.confirmed) {
         return;
     }
+
     
     showToast('Publishing slips...');
     try {
@@ -128,8 +141,12 @@ async function publishSlipsMonth() {
         });
         if (res.ok) {
             const data = await res.json();
-            showToast(data.message || 'Slips published successfully.');
             await loadSlipsRegistry();
+            showSuccessModal({
+                title: 'Salary Slips Published!',
+                subtitle: data.message || `All salary slips for ${month}/${year} are now live and visible to employees.`,
+                btnText: 'View Registry',
+            });
         } else {
             const err = await res.json();
             showToast(err.error || 'Failed to publish slips.', 'error');
@@ -585,6 +602,28 @@ async function loadActiveEmployeesSelect(selectId) {
     }
 }
 
+// Dynamic calculation of modal salary fields
+function calculateModalSalary() {
+    const ctc = parseFloat(document.getElementById('structCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('structPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('structEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('structGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
+    const pf = parseFloat(document.getElementById('structPfContribution').value || 0);
+    const esi = parseFloat(document.getElementById('structEsi').value || 0);
+    const lwf = parseFloat(document.getElementById('structLabourWelfareFund').value || 0);
+    const pt = parseFloat(document.getElementById('structProfessionalTax').value || 0);
+
+    const totalDeductions = pf + esi + lwf + pt;
+    const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('structInHandSalary');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
+}
+
 // Event Listeners for Forms
 document.addEventListener('DOMContentLoaded', () => {
     // Structure Form
@@ -595,12 +634,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = {
                 bitrix_user_id: document.getElementById('structEmployeeSelect').value,
                 effective_from: document.getElementById('structEffectiveFrom').value,
-                gross_salary: document.getElementById('structGrossSalary').value,
-                pf_contribution: document.getElementById('structPfContribution').value,
-                esi: document.getElementById('structEsi').value,
-                labour_welfare_fund: document.getElementById('structLabourWelfareFund').value,
-                professional_tax: document.getElementById('structProfessionalTax').value,
-                other_deductions: document.getElementById('structOtherDeductions').value
+                gross_salary: parseFloat(document.getElementById('structGrossSalary').value || 0),
+                pf_contribution: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi: parseFloat(document.getElementById('structEsi').value || 0),
+                labour_welfare_fund: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                professional_tax: parseFloat(document.getElementById('structProfessionalTax').value || 0),
+                other_deductions: 0,
+                
+                ctc: parseFloat(document.getElementById('structCTC').value || 0),
+                basic_salary: 0,
+                hra: 0,
+                conveyance: 0,
+                medical_allowance: 0,
+                special_allowance: 0,
+                monthly_bonus: 0,
+                esi_employer: parseFloat(document.getElementById('structEsiEmployer').value || 0),
+                pf_employer: parseFloat(document.getElementById('structPfEmployer').value || 0),
+                pf_employee: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi_employee: parseFloat(document.getElementById('structEsi').value || 0),
+                lwf: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                in_hand_salary: parseFloat(document.getElementById('structInHandSalary').value || 0)
             };
             
             try {
