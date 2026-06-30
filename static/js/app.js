@@ -278,6 +278,13 @@ function getStudentIdFromUrl() {
 function switchView(viewId, pushState = true, extraParams = {}) {
     showGlobalLoader(false);
 
+    // Prevent HR users from accessing Roles & Permissions view
+    if (viewId === 'rolesView' && currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR')) {
+        showToast('You do not have permission to access this page.', 'error');
+        hideGlobalLoader();
+        return;
+    }
+
     const targetView = document.getElementById(viewId);
     if (!targetView) {
         console.warn(`View "${viewId}" was not found in the page.`);

@@ -64,7 +64,27 @@ function applyPermissionsToUI() {
     if (adminLogsLink) adminLogsLink.style.display = hasPermission('audit.read') ? 'block' : 'none';
 
     const adminRolesLink = document.getElementById('adminRolesLink');
-    if (adminRolesLink) adminRolesLink.style.display = hasPermission('roles.manage') ? 'block' : 'none';
+    if (adminRolesLink) {
+        const isHr = currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR');
+        const hasRolesManage = hasPermission('roles.manage');
+        adminRolesLink.style.display = (hasRolesManage && !isHr) ? 'block' : 'none';
+    }
+
+    // Hide settings icon for HR role
+    const settingsIconBtn = document.querySelector('button[title="Settings"]');
+    if (settingsIconBtn) {
+        const isHr = currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR');
+        settingsIconBtn.style.display = isHr ? 'none' : 'flex';
+    }
+
+    // Hide Roles & Permissions view panel for HR role
+    const rolesView = document.getElementById('rolesView');
+    if (rolesView) {
+        const isHr = currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR');
+        if (isHr) {
+            rolesView.style.display = 'none';
+        }
+    }
 
     const probationLink = document.getElementById('probationLink');
     if (probationLink) {
