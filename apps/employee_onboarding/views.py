@@ -1621,9 +1621,13 @@ class BitrixDataReceiveAPIView(APIView):
                 return Response({'status': 'No ID provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         bitrix_id = str(emp_data.get('ID') or emp_data.get('id') or emp_data.get('bitrix_id') or data.get('id') or '')
-        if not bitrix_id:
+        # Always prefix with LOCAL- to ensure it shows up in employee list
+        if not bitrix_id or not bitrix_id.startswith('LOCAL-'):
             import uuid
-            bitrix_id = f"LOCAL-{uuid.uuid4().hex[:12]}"
+            if bitrix_id:
+                bitrix_id = f"LOCAL-{bitrix_id}"
+            else:
+                bitrix_id = f"LOCAL-{uuid.uuid4().hex[:12]}"
             
         full_name = emp_data.get('NAME') or emp_data.get('name') or data.get('name') or ''
         first_name = emp_data.get('first_name') or data.get('first_name') or ''
