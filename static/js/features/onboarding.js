@@ -688,7 +688,8 @@ async function openEmployeeProfileDetail(empId, defaultTab = 'personal', updateU
             const inviteToBitrixBtn = document.getElementById('inviteToBitrixBtn');
             if (inviteToBitrixBtn) {
                 const isLocal = emp.id && emp.id.toString().startsWith('LOCAL-');
-                const today = new Date().toISOString().split('T')[0];
+                const d = new Date();
+                const today = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
                 const isJoiningDateReached = emp.joining_date && today >= emp.joining_date;
                 
                 if (isLocal && isJoiningDateReached) {
