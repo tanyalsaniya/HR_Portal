@@ -1657,6 +1657,8 @@ class BitrixDataReceiveAPIView(APIView):
                 'phone': phone,
                 'designation': designation,
                 'department_name': department_name,
+                'status': 'Active',
+                'onboarding_complete': False,
                 'bitrix_sync_status': 'Synced',
             }
         )
