@@ -251,7 +251,7 @@ async function loadSlipsRegistry() {
     } else {
         // Admin or HR: Consolidated list of employees (one row per employee)
         try {
-            const res = await apiFetch('/employees/?type=all&no_pagination=true');
+            const res = await apiFetch('/employees/?type=salary_list&no_pagination=true');
             if (res.ok) {
                 const empsData = await res.json();
                 salaryFilteredList = empsData.results || empsData;
@@ -278,7 +278,9 @@ async function loadSlipsRegistry() {
                         currentSalaryHtml = `<strong>Rs. ${sorted[0].net_salary}</strong>`;
                     }
                     
-                    const statusColor = emp.status === 'Active' ? '#16a34a' : '#ef4444';
+                    const isExited = emp.status === 'Exited';
+                    const statusColor = emp.status === 'Active' ? '#16a34a' : (isExited ? '#64748b' : '#ef4444');
+                    const statusDisplay = isExited ? `<span style="font-weight:bold; color:${statusColor};" title="Exited Employee (Retained for Final Settlement)">Exited</span> <span style="font-size: 0.8em; color: #dc2626; border: 1px solid #fca5a5; background: #fee2e2; padding: 2px 4px; border-radius: 4px; margin-left: 5px; display: inline-block;">Final Settlement</span>` : `<span style="font-weight:bold; color:${statusColor};">${emp.status}</span>`;
                     
                     const actions = `
                         <div style="display:flex; gap:5px;">
@@ -287,12 +289,12 @@ async function loadSlipsRegistry() {
                     `;
 
                     return `
-                        <tr>
+                        <tr ${isExited ? 'style="background-color: #f8fafc;"' : ''}>
                             <td><strong>${emp.emp_id}</strong></td>
                             <td><strong>${emp.name}</strong></td>
                             <td>${emp.department_name || 'N/A'}${emp.department ? ` (ID: ${emp.department})` : ''}</td>
                             <td>${currentSalaryHtml}</td>
-                            <td><span style="font-weight:bold; color:${statusColor};">${emp.status}</span></td>
+                            <td>${statusDisplay}</td>
                             <td>${actions}</td>
                         </tr>
                     `;

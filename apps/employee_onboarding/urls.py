@@ -14,6 +14,7 @@ router.register('api/onboarding/templates', LetterTemplateViewSet, basename='let
 urlpatterns = [
     # New standalone API for Bitrix
     path('api/onboarding/bitrix-receive/', BitrixDataReceiveAPIView.as_view(), name='bitrix_data_receive'),
+    path('api/onboarding/bitrix-receive', BitrixDataReceiveAPIView.as_view()),
     
     # Router endpoints
     path('', include(router.urls)),

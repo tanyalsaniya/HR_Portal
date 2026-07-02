@@ -250,11 +250,20 @@ class SalaryExportView(APIView):
                 if emp.status != 'Exited':
                     employees.append(emp)
                 else:
-                    # Include exited employees if they have a pending/active exit request
-                    has_pending_exit = ExitRequest.objects.filter(
-                        bitrix_user_id=emp.bitrix_id
-                    ).exclude(status__in=['CANCELLED', 'FULLY_EXITED']).exists()
-                    if has_pending_exit:
+                    has_recent_exit = False
+                    try:
+                        exit_req = ExitRequest.objects.filter(bitrix_user_id=emp.bitrix_id).exclude(status='CANCELLED').order_by('-last_working_day').first()
+                        if exit_req:
+                            if exit_req.status != 'FULLY_EXITED':
+                                has_recent_exit = True
+                            elif exit_req.last_working_day:
+                                import datetime
+                                cutoff_date = datetime.date.today() - datetime.timedelta(days=60)
+                                if exit_req.last_working_day >= cutoff_date:
+                                    has_recent_exit = True
+                    except Exception:
+                        pass
+                    if has_recent_exit:
                         employees.append(emp)
             
             for emp in employees:

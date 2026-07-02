@@ -145,13 +145,16 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = BitrixClient.get_all_users()
         mocks = [BitrixEmployeeMock(u) for u in users]
         
+        bitrix_ids = {str(u.get('ID') or u.get('id') or '') for u in users}
+        
         # Load local-only employees from SyncedEmployee
         try:
             from .models import SyncedEmployee
-            local_employees = SyncedEmployee.objects.filter(bitrix_user_id__startswith='LOCAL-')
+            local_employees = SyncedEmployee.objects.all()
             for local_emp in local_employees:
-                local_dict = sync_employee_to_dict(local_emp)
-                mocks.append(BitrixEmployeeMock(local_dict))
+                if str(local_emp.bitrix_user_id) not in bitrix_ids:
+                    local_dict = sync_employee_to_dict(local_emp)
+                    mocks.append(BitrixEmployeeMock(local_dict))
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error loading local employees in get_queryset: {e}")
@@ -269,6 +272,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 # Active directory only shows people whose joining date is in the past (joining_date < today)
                 if u.status != 'Exited':
                     if u.joining_date and u.joining_date < today:
+                        filtered_users.append(u)
+            elif list_type == 'salary_list':
+                if u.status != 'Exited':
+                    if u.joining_date and u.joining_date < today:
+                        filtered_users.append(u)
+                else:
+                    has_recent_exit = False
+                    try:
+                        from exit_formality.models import ExitRequest
+                        exit_req = ExitRequest.objects.filter(bitrix_user_id=str(u.bitrix_id)).exclude(status='CANCELLED').order_by('-last_working_day').first()
+                        if exit_req and exit_req.last_working_day:
+                            cutoff_date = today - datetime.timedelta(days=60)
+                            if exit_req.last_working_day >= cutoff_date:
+                                has_recent_exit = True
+                    except Exception:
+                        pass
+                    if has_recent_exit:
+                        u._data['is_recently_exited'] = True
                         filtered_users.append(u)
             elif list_type == 'offboarding':
                 is_exited = u.status == 'Exited'
