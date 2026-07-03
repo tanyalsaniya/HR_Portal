@@ -182,8 +182,8 @@ class SalaryExportView(APIView):
         locked_style = Protection(locked=True)
         unlocked_style = Protection(locked=False)
 
-        # Check if salary slips already exist
         slips = SalarySlip.objects.filter(month=month, year=year)
+        slips_map = {str(slip.bitrix_user_id): slip for slip in slips}
         
         # Resolve employees for all slips
         user_map = {}
@@ -192,17 +192,36 @@ class SalaryExportView(APIView):
             
         row_idx = 2
         from salary.models import EmployeeBankDetail
+        import calendar
+        from exit_formality.models import ExitRequest
+        month_days_val = calendar.monthrange(year, month)[1]
 
-        if slips.exists():
-            # Create a mapping of bitrix_user_id to slip for accurate employee matching
-            slips_map = {str(slip.bitrix_user_id): slip for slip in slips}
+        # Use the same user_map for consistent employee ordering
+        employees = []
+        for emp in user_map.values():
+            if emp.status != 'Exited':
+                employees.append(emp)
+            else:
+                has_recent_exit = False
+                try:
+                    exit_req = ExitRequest.objects.filter(bitrix_user_id=emp.bitrix_id).exclude(status='CANCELLED').order_by('-last_working_day').first()
+                    if exit_req:
+                        if exit_req.status != 'FULLY_EXITED':
+                            has_recent_exit = True
+                        elif exit_req.last_working_day:
+                            import datetime
+                            cutoff_date = datetime.date.today() - datetime.timedelta(days=60)
+                            if exit_req.last_working_day >= cutoff_date:
+                                has_recent_exit = True
+                except Exception:
+                    pass
+                if has_recent_exit:
+                    employees.append(emp)
+        
+        for emp in employees:
+            slip = slips_map.get(str(emp.bitrix_id))
             
-            # Iterate through employees in consistent order to ensure correct mapping
-            for emp in user_map.values():
-                slip = slips_map.get(str(emp.bitrix_id))
-                if not slip:
-                    continue
-                    
+            if slip:
                 emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
                 designation = emp.designation if emp else ""
                 
@@ -238,41 +257,12 @@ class SalaryExportView(APIView):
                     else:
                         cell.protection = unlocked_style
                 row_idx += 1
-        else:
-            # Export with carry-forward logic: use latest prior imported salary if available
-            import calendar
-            from exit_formality.models import ExitRequest
-            month_days_val = calendar.monthrange(year, month)[1]
-            
-            # Use the same user_map for consistent employee ordering
-            employees = []
-            for emp in user_map.values():
-                if emp.status != 'Exited':
-                    employees.append(emp)
-                else:
-                    has_recent_exit = False
-                    try:
-                        exit_req = ExitRequest.objects.filter(bitrix_user_id=emp.bitrix_id).exclude(status='CANCELLED').order_by('-last_working_day').first()
-                        if exit_req:
-                            if exit_req.status != 'FULLY_EXITED':
-                                has_recent_exit = True
-                            elif exit_req.last_working_day:
-                                import datetime
-                                cutoff_date = datetime.date.today() - datetime.timedelta(days=60)
-                                if exit_req.last_working_day >= cutoff_date:
-                                    has_recent_exit = True
-                    except Exception:
-                        pass
-                    if has_recent_exit:
-                        employees.append(emp)
-            
-            for emp in employees:
-                # Try to get latest prior imported salary for carry-forward
+            else:
                 prior_slip = get_latest_prior_slip(emp.bitrix_id, month, year)
                 
-                # Get salary structure for new employees (no prior imports)
                 struct = None
                 if not prior_slip:
+                    import datetime
                     struct = SalaryStructure.objects.filter(
                         bitrix_user_id=emp.bitrix_id,
                         effective_from__lte=datetime.date(year, month, 28)
@@ -1319,3 +1309,267 @@ class SalaryIndividualGenerateView(APIView):
 
         generate_payslip_pdf(slip)
         return Response({'message': 'Payslip generated successfully.', 'id': slip.id}, status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED)
+
+class SalaryGridView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can access salary grid.")
+
+        month_param = request.query_params.get('month')
+        year_param = request.query_params.get('year')
+
+        if not month_param or not year_param:
+            return Response({'error': 'month and year parameters are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month_param)
+            year = int(year_param)
+        except ValueError:
+            return Response({'error': 'Invalid month or year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        slips = SalarySlip.objects.filter(month=month, year=year)
+        slips_map = {str(slip.bitrix_user_id): slip for slip in slips}
+        
+        user_map = {}
+        for u in BitrixClient.get_all_users():
+            user_map[str(u['id'])] = BitrixEmployeeMock(u)
+            
+        from salary.models import EmployeeBankDetail
+        import calendar
+        from exit_formality.models import ExitRequest
+
+        grid_data = []
+
+        month_days_val = calendar.monthrange(year, month)[1]
+        
+        employees = []
+        for emp in user_map.values():
+            if emp.status != 'Exited':
+                employees.append(emp)
+            else:
+                has_recent_exit = False
+                try:
+                    exit_req = ExitRequest.objects.filter(bitrix_user_id=emp.bitrix_id).exclude(status='CANCELLED').order_by('-last_working_day').first()
+                    if exit_req:
+                        if exit_req.status != 'FULLY_EXITED':
+                            has_recent_exit = True
+                        elif exit_req.last_working_day:
+                            import datetime
+                            cutoff_date = datetime.date.today() - datetime.timedelta(days=60)
+                            if exit_req.last_working_day >= cutoff_date:
+                                has_recent_exit = True
+                except Exception:
+                    pass
+                if has_recent_exit:
+                    employees.append(emp)
+        
+        for emp in employees:
+            slip = slips_map.get(str(emp.bitrix_id))
+            
+            if slip:
+                emp_name = emp.name if emp else f"User {slip.bitrix_user_id}"
+                designation = emp.designation if emp else ""
+                
+                detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+                bank_acc = detail.bank_account_no if (detail and detail.bank_account_no) else (slip.bank_account_no or "")
+                bank_nm = detail.bank_name if (detail and detail.bank_name) else (slip.bank_name or "")
+
+                grid_data.append({
+                    "id": slip.id,
+                    "bitrix_id": emp.bitrix_id,
+                    "name": emp_name,
+                    "designation": designation,
+                    "month_days": float(slip.month_days),
+                    "worked_days": float(slip.worked_days),
+                    "weekend": float(slip.weekend),
+                    "cl": float(slip.cl),
+                    "extra": float(slip.extra),
+                    "payable_days": float(slip.payable_days),
+                    "month_salary": float(slip.month_salary),
+                    "payable_salary": float(slip.payable_salary),
+                    "extra_days_working": float(slip.extra_days_working),
+                    "fine_advance": float(slip.fine_advance),
+                    "net_payable": float(slip.net_payable),
+                    "bank_account_no": bank_acc,
+                    "bank_name": bank_nm
+                })
+            else:
+                prior_slip = get_latest_prior_slip(emp.bitrix_id, month, year)
+                
+                struct = None
+                if not prior_slip:
+                    import datetime
+                    struct = SalaryStructure.objects.filter(
+                        bitrix_user_id=emp.bitrix_id,
+                        effective_from__lte=datetime.date(year, month, 28)
+                    ).order_by('-effective_from').first()
+                    if not struct:
+                        struct = SalaryStructure.objects.filter(
+                            bitrix_user_id=emp.bitrix_id
+                        ).order_by('-effective_from').first()
+
+                detail = EmployeeBankDetail.objects.filter(bitrix_user_id=emp.bitrix_id).first()
+                bank_acc = (detail.bank_account_no if detail and detail.bank_account_no else None) or \
+                           (prior_slip.bank_account_no if prior_slip else None) or \
+                           getattr(emp, 'bank_account', '') or ""
+                bank_nm = (detail.bank_name if detail and detail.bank_name else None) or \
+                          (prior_slip.bank_name if prior_slip else None) or ""
+
+                if prior_slip:
+                    temp_slip = calculate_carry_forward_slip(emp.bitrix_id, month, year, prior_slip)
+                    grid_data.append({
+                        "id": None,
+                        "bitrix_id": emp.bitrix_id,
+                        "name": emp.name,
+                        "designation": emp.designation,
+                        "month_days": float(temp_slip.month_days),
+                        "worked_days": float(temp_slip.worked_days),
+                        "weekend": float(temp_slip.weekend),
+                        "cl": float(temp_slip.cl),
+                        "extra": float(temp_slip.extra),
+                        "payable_days": float(temp_slip.payable_days),
+                        "month_salary": float(temp_slip.month_salary),
+                        "payable_salary": float(temp_slip.payable_salary),
+                        "extra_days_working": float(temp_slip.extra_days_working),
+                        "fine_advance": float(temp_slip.fine_advance),
+                        "net_payable": float(temp_slip.net_payable),
+                        "bank_account_no": bank_acc,
+                        "bank_name": bank_nm
+                    })
+                else:
+                    grid_data.append({
+                        "id": None,
+                        "bitrix_id": emp.bitrix_id,
+                        "name": emp.name,
+                        "designation": emp.designation,
+                        "month_days": float(month_days_val),
+                        "worked_days": 0.0,
+                        "weekend": 0.0,
+                        "cl": 0.0,
+                        "extra": 0.0,
+                        "payable_days": 0.0,
+                        "month_salary": float(struct.monthly_gross) if struct else 0.0,
+                        "payable_salary": 0.0,
+                        "extra_days_working": 0.0,
+                        "fine_advance": 0.0,
+                        "net_payable": 0.0,
+                        "bank_account_no": bank_acc,
+                        "bank_name": bank_nm
+                    })
+
+        return Response(grid_data)
+
+    def post(self, request):
+        if check_role(request.user) != 'admin':
+            raise PermissionDenied("Only Admin can save salary grid.")
+
+        month_str = request.data.get('month')
+        year_str = request.data.get('year')
+        rows = request.data.get('rows', [])
+
+        if not month_str or not year_str:
+            return Response({'error': 'month and year are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month_str)
+            year = int(year_str)
+        except ValueError:
+            return Response({'error': 'Invalid month or year.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        def parse_decimal(val):
+            if val is None or str(val).strip() == "":
+                return Decimal("0.00")
+            try:
+                cleaned = str(val).strip().replace("$", "").replace(",", "")
+                d = Decimal(cleaned)
+                if d < 0:
+                    raise ValueError()
+                return d
+            except Exception:
+                return Decimal("0.00")
+
+        total_records = 0
+        saved_slips = []
+        with transaction.atomic():
+            for row in rows:
+                bitrix_id = str(row.get('bitrix_id', ''))
+                if not bitrix_id:
+                    continue
+
+                total_records += 1
+
+                month_days = parse_decimal(row.get('month_days'))
+                worked_days = parse_decimal(row.get('worked_days'))
+                weekend = parse_decimal(row.get('weekend'))
+                cl = parse_decimal(row.get('cl'))
+                extra = parse_decimal(row.get('extra'))
+                payable_days = parse_decimal(row.get('payable_days'))
+                month_salary = parse_decimal(row.get('month_salary'))
+                payable_salary = parse_decimal(row.get('payable_salary'))
+                extra_days_working = parse_decimal(row.get('extra_days_working'))
+                fine_advance = parse_decimal(row.get('fine_advance'))
+                net_payable = parse_decimal(row.get('net_payable'))
+                bank_acc = row.get('bank_account_no', '')
+                bank_nm = row.get('bank_name', '')
+
+                slip = SalarySlip.objects.filter(bitrix_user_id=bitrix_id, month=month, year=year).first()
+                if slip:
+                    slip.month_days = month_days
+                    slip.worked_days = worked_days
+                    slip.weekend = weekend
+                    slip.cl = cl
+                    slip.extra = extra
+                    slip.payable_days = payable_days
+                    slip.month_salary = month_salary
+                    slip.payable_salary = payable_salary
+                    slip.extra_days_working = extra_days_working
+                    slip.fine_advance = fine_advance
+                    slip.net_payable = net_payable
+                    if bank_acc: slip.bank_account_no = bank_acc
+                    if bank_nm: slip.bank_name = bank_nm
+                    slip.status = 'draft'
+                    slip._skip_recalculation = True
+                    slip.save()
+                    saved_slips.append(slip.id)
+                else:
+                    slip = SalarySlip(
+                        bitrix_user_id=bitrix_id,
+                        month=month,
+                        year=year,
+                        month_days=month_days,
+                        worked_days=worked_days,
+                        weekend=weekend,
+                        cl=cl,
+                        extra=extra,
+                        payable_days=payable_days,
+                        month_salary=month_salary,
+                        payable_salary=payable_salary,
+                        extra_days_working=extra_days_working,
+                        fine_advance=fine_advance,
+                        net_payable=net_payable,
+                        bank_account_no=bank_acc,
+                        bank_name=bank_nm,
+                        payment_status='pending',
+                        status='draft'
+                    )
+                    slip._skip_recalculation = True
+                    slip.save()
+                    saved_slips.append(slip.id)
+
+        # Generate PDFs in the background to prevent blocking the UI
+        import threading
+        def generate_pdfs_in_background(slip_ids):
+            from salary.models import SalarySlip
+            for sid in slip_ids:
+                s = SalarySlip.objects.filter(id=sid).first()
+                if s:
+                    try:
+                        generate_payslip_pdf(s)
+                    except Exception:
+                        pass
+                        
+        threading.Thread(target=generate_pdfs_in_background, args=(saved_slips,)).start()
+
+        return Response({'message': f'Successfully saved {total_records} records for {month}/{year}.'}, status=status.HTTP_200_OK)

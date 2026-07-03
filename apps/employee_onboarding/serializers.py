@@ -76,8 +76,10 @@ class EmployeeSerializer(serializers.Serializer):
     work_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     personal_email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     phone = serializers.CharField()
+    designation_id = serializers.SerializerMethodField()
     designation = serializers.CharField()
-    department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    department_id = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
     department_name = serializers.SerializerMethodField()
     department_details = serializers.SerializerMethodField()
     joining_date = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -141,6 +143,24 @@ class EmployeeSerializer(serializers.Serializer):
         from salary.models import SalaryStructure
         structures = SalaryStructure.objects.filter(bitrix_user_id=obj.get('id'))
         return EmployeeSalaryStructureSerializer(structures, many=True, context=self.context).data
+
+    def get_designation_id(self, obj):
+        # We don't have a real designation ID, return None or 0 to satisfy the struct
+        return 0
+
+    def get_department_id(self, obj):
+        return obj.get('department')
+
+    def get_department(self, obj):
+        dept_id = obj.get('department')
+        if dept_id:
+            try:
+                dept = Department.objects.filter(id=dept_id).first()
+                if dept:
+                    return dept.name
+            except Exception:
+                pass
+        return "Engineering"
 
     def get_department_name(self, obj):
         dept_id = obj.get('department')

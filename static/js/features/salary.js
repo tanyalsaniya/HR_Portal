@@ -292,7 +292,7 @@ async function loadSlipsRegistry() {
                         <tr ${isExited ? 'style="background-color: #f8fafc;"' : ''}>
                             <td><strong>${emp.emp_id}</strong></td>
                             <td><strong>${emp.name}</strong></td>
-                            <td>${emp.department_name || 'N/A'}${emp.department ? ` (ID: ${emp.department})` : ''}</td>
+                            <td>${emp.department || 'N/A'}</td>
                             <td>${currentSalaryHtml}</td>
                             <td>${statusDisplay}</td>
                             <td>${actions}</td>
@@ -918,9 +918,7 @@ async function loadDedicatedEmployeeSalaryHistory(employeeId) {
                 if (idEl) idEl.textContent = emp.emp_id || "--";
                 
                 const deptEl = document.getElementById('historyEmployeeDept');
-                if (deptEl) {
-                    deptEl.textContent = emp.department_name ? `${emp.department_name} (ID: ${emp.department || 'N/A'})` : (emp.department || 'N/A');
-                }
+                if (deptEl) deptEl.textContent = emp.department || 'N/A';
                 
                 const desgEl = document.getElementById('historyEmployeeDesg');
                 if (desgEl) desgEl.textContent = emp.designation || 'N/A';
@@ -1266,4 +1264,194 @@ function openManualGenerateModal() {
 function closeManualGenerateModal() {
     const modal = document.getElementById('salaryManualGenerateModal');
     if (modal) modal.style.display = 'none';
+}
+
+// EDITABLE PAYROLL GRID LOGIC
+async function loadPayrollGrid() {
+    const month = document.getElementById('payrollMonth').value;
+    const year = document.getElementById('payrollYear').value;
+    if (!month || !year) {
+        showToast('Please select Target Month and Year.', 'error');
+        return;
+    }
+
+    try {
+        const res = await apiFetch(`/admin/salary/grid?month=${month}&year=${year}`);
+        
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to fetch payroll grid.');
+        }
+        
+        const data = await res.json();
+        
+        // Show container and update month/year text
+        const monthText = document.getElementById('payrollMonth').options[document.getElementById('payrollMonth').selectedIndex].text;
+        document.getElementById('payrollGridMonthYear').textContent = `${monthText} ${year}`;
+        document.getElementById('payrollGridContainer').style.display = 'block';
+
+        renderPayrollGrid(data);
+    } catch (err) {
+        showToast(err.message || 'Failed to load payroll grid.', 'error');
+    }
+}
+
+function renderPayrollGrid(data) {
+    const tbody = document.getElementById('payrollGridBody');
+    tbody.innerHTML = '';
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 20px;">No employees found.</td></tr>';
+        return;
+    }
+
+    data.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.dataset.bitrix_id = row.bitrix_id;
+        tr.dataset.id = row.id || '';
+        tr.dataset.bank_account_no = row.bank_account_no || '';
+        tr.dataset.bank_name = row.bank_name || '';
+
+        const cols = [
+            { key: 'name', value: row.name, readOnly: true },
+            { key: 'designation', value: row.designation, readOnly: true },
+            { key: 'month_days', value: row.month_days, type: 'number' },
+            { key: 'worked_days', value: row.worked_days, type: 'number' },
+            { key: 'weekend', value: row.weekend, type: 'number' },
+            { key: 'cl', value: row.cl, type: 'number' },
+            { key: 'extra', value: row.extra, type: 'number' },
+            { key: 'payable_days', value: row.payable_days, type: 'number' },
+            { key: 'month_salary', value: row.month_salary, type: 'number' },
+            { key: 'payable_salary', value: row.payable_salary, type: 'number' },
+            { key: 'extra_days_working', value: row.extra_days_working, type: 'number' },
+            { key: 'fine_advance', value: row.fine_advance, type: 'number' },
+            { key: 'net_payable', value: row.net_payable, type: 'number' }
+        ];
+
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.padding = '5px';
+            td.style.border = '1px solid #e5e7eb';
+            
+            if (c.readOnly) {
+                td.textContent = c.value;
+                td.style.backgroundColor = '#f9fafb';
+                td.style.color = '#6b7280';
+            } else {
+                const input = document.createElement('input');
+                input.type = c.type === 'number' ? 'text' : 'text'; // Use text to allow empty/decimals easily
+                input.value = c.value;
+                input.dataset.key = c.key;
+                input.className = 'grid-input';
+                input.style.width = '100%';
+                input.style.border = '1px solid transparent';
+                input.style.padding = '5px';
+                input.style.boxSizing = 'border-box';
+                
+                // Highlight on focus
+                input.addEventListener('focus', function() {
+                    this.style.border = '1px solid var(--primary-color)';
+                    this.style.outline = 'none';
+                    this.style.backgroundColor = '#f0f9ff';
+                });
+                input.addEventListener('blur', function() {
+                    this.style.border = '1px solid transparent';
+                    this.style.backgroundColor = 'transparent';
+                });
+                
+                // Support keyboard navigation (arrows)
+                input.addEventListener('keydown', function(e) {
+                    const currentTd = this.closest('td');
+                    const currentTr = this.closest('tr');
+                    const tdIndex = Array.from(currentTr.children).indexOf(currentTd);
+                    
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const prevTr = currentTr.previousElementSibling;
+                        if (prevTr) {
+                            const targetInput = prevTr.children[tdIndex].querySelector('input');
+                            if (targetInput) targetInput.focus();
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const nextTr = currentTr.nextElementSibling;
+                        if (nextTr) {
+                            const targetInput = nextTr.children[tdIndex].querySelector('input');
+                            if (targetInput) targetInput.focus();
+                        }
+                    }
+                });
+
+                td.appendChild(input);
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+function cancelPayrollGrid() {
+    document.getElementById('payrollGridContainer').style.display = 'none';
+}
+
+async function savePayrollGrid() {
+    const month = document.getElementById('payrollMonth').value;
+    const year = document.getElementById('payrollYear').value;
+    
+    const tbody = document.getElementById('payrollGridBody');
+    const rows = tbody.querySelectorAll('tr');
+    
+    if (rows.length === 0 || rows[0].querySelector('td[colspan]')) {
+        showToast('No data to save.', 'error');
+        return;
+    }
+
+    const payload = [];
+    rows.forEach(tr => {
+        const rowData = {
+            bitrix_id: tr.dataset.bitrix_id,
+            id: tr.dataset.id || null,
+            bank_account_no: tr.dataset.bank_account_no,
+            bank_name: tr.dataset.bank_name
+        };
+        
+        tr.querySelectorAll('input').forEach(input => {
+            rowData[input.dataset.key] = input.value;
+        });
+        
+        payload.push(rowData);
+    });
+
+    const btn = document.querySelector('#payrollGridContainer button.btn-primary');
+    const originalText = btn.textContent;
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
+    try {
+        const res = await apiFetch('/admin/salary/grid', {
+            method: 'POST',
+            body: JSON.stringify({
+                month: month,
+                year: year,
+                rows: payload
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+            throw new Error(data.error || 'Failed to save payroll grid.');
+        }
+        
+        showToast(data.message || 'Saved successfully.', 'success');
+        document.getElementById('payrollGridContainer').style.display = 'none';
+        
+        // Refresh salary data table
+        loadSalaryData();
+    } catch (err) {
+        showToast(err.message || 'Failed to save grid.', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
 }

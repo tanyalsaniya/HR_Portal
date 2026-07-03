@@ -439,6 +439,9 @@ function renderActiveDirectoryTable(list) {
                             ${e.status === 'Active' && hasPermission('exit.create') ? `
                                 <button class="premium-dropdown-item" onclick="triggerExitFormality('${e.id}')" style="color:#ef4444;">Initiate Exit</button>
                             ` : ''}
+                            ${activeOnboardingSubTab === 'dismissed' ? `
+                                <button class="premium-dropdown-item" onclick="openDownloadExitedSalaryModal('${e.id}', '${e.first_name} ${e.last_name}')">Download Salary Slip</button>
+                            ` : ''}
                         </div>
                     </div>
                 </td>
@@ -646,6 +649,10 @@ async function openEmployeeProfileDetail(empId, defaultTab = 'personal', updateU
             document.getElementById('detailProfileName').textContent = `${emp.first_name} ${emp.last_name}`;
             document.getElementById('detailProfileDesignation').textContent = emp.designation;
             document.getElementById('detailProfileEmpId').textContent = emp.emp_id;
+            const editEmpDept = document.getElementById('editEmpDept');
+            if (editEmpDept) {
+                editEmpDept.value = emp.department_id || '';
+            }
             document.getElementById('detailProfileDept').textContent = emp.department;
             
             const statusBadge = document.getElementById('detailProfileStatusBadge');
@@ -776,17 +783,17 @@ async function openEmployeeProfileDetail(empId, defaultTab = 'personal', updateU
             
             // Normalize Department Select (append if missing)
             const selectDept = document.getElementById('editEmpDept');
-            if (selectDept && emp.department) {
-                let deptFound = Array.from(selectDept.options).some(o => o.value === String(emp.department));
+            if (selectDept && emp.department_id) {
+                let deptFound = Array.from(selectDept.options).some(o => o.value === String(emp.department_id));
                 if (!deptFound) {
-                    const newOpt = document.createElement('option');
-                    newOpt.value = emp.department;
+                    let newOpt = document.createElement('option');
+                    newOpt.value = emp.department_id;
                     newOpt.text = emp.department;
                     selectDept.appendChild(newOpt);
                 }
             }
             if (selectDept) {
-                selectDept.value = emp.department || '';
+                selectDept.value = emp.department_id || '';
             }
 
             document.getElementById('editEmpDesignation').value = emp.designation || '';
@@ -2470,7 +2477,7 @@ async function inviteEmployeeToBitrix() {
             personal_email: emp.personal_email || '',
             phone: emp.phone || '',
             designation: emp.designation || '',
-            department: emp.department || '',
+            department: emp.department_id || '',
             dob: emp.dob || '',
             gender: emp.gender || '',
             crmID: emp.id,
@@ -2502,3 +2509,85 @@ async function inviteEmployeeToBitrix() {
     }
 }
 
+// Download Salary Slip Modal Logic
+function openDownloadExitedSalaryModal(empId, empName) {
+    const empIdInput = document.getElementById('downloadExitedSalaryEmpId');
+    const empNameSpan = document.getElementById('downloadExitedSalaryEmpName');
+    
+    if (empIdInput) empIdInput.value = empId;
+    if (empNameSpan) empNameSpan.textContent = empName;
+    
+    // Populate years
+    const yearSelect = document.getElementById('downloadExitedSalaryYear');
+    if (yearSelect) {
+        yearSelect.innerHTML = '';
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear; y >= currentYear - 5; y--) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.text = y;
+            yearSelect.appendChild(opt);
+        }
+    }
+    
+    // Set current month
+    const monthSelect = document.getElementById('downloadExitedSalaryMonth');
+    if (monthSelect) {
+        monthSelect.value = new Date().getMonth() + 1;
+    }
+    
+    const modal = document.getElementById('downloadExitedSalaryModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDownloadExitedSalaryModal() {
+    const modal = document.getElementById('downloadExitedSalaryModal');
+    if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('downloadExitedSalaryForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const empId = document.getElementById('downloadExitedSalaryEmpId').value;
+            const month = document.getElementById('downloadExitedSalaryMonth').value;
+            const year = document.getElementById('downloadExitedSalaryYear').value;
+            const empName = document.getElementById('downloadExitedSalaryEmpName').textContent;
+            
+            showToast('Checking salary slip...');
+            try {
+                const url = `/api/salary/slip/download?type=single&employee_id=${empId}&month=${month}&year=${year}`;
+                const res = await apiFetch(url, { method: 'GET' });
+                
+                if (res.ok) {
+                    const blob = await res.blob();
+                    if (blob.size === 0) {
+                        showToast('Salary slip not available for the selected period.', 'error');
+                        return;
+                    }
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `Payslip_${empName.replace(/ /g, '_')}_${month}_${year}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    showToast('Salary slip downloaded successfully.');
+                    closeDownloadExitedSalaryModal();
+                } else {
+                    const data = await res.json();
+                    if (res.status === 404 || data.error) {
+                        showToast('Salary slip not available for the selected period.', 'error');
+                    } else {
+                        showToast('Failed to download salary slip.', 'error');
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Salary slip not available for the selected period.', 'error');
+            }
+        });
+    }
+});

@@ -11,7 +11,7 @@ from .models import SalaryStructure, SalarySlip, SalaryIncrementApproval
 
 def get_latest_prior_slip(bitrix_user_id, month, year):
     """
-    Returns the most recently imported SalarySlip for the given employee
+    Returns the most recently saved SalarySlip for the given employee
     that is strictly BEFORE the specified month/year, in reverse chrono order.
     Skips slips with month_salary = 0.00 to ensure valid salary data is carried forward.
 
@@ -24,16 +24,18 @@ def get_latest_prior_slip(bitrix_user_id, month, year):
     Selected = April 2026, no prior imports                 → returns None
     """
     from decimal import Decimal
+    from django.db.models import Q
+    from salary.models import SalarySlip
+    
     slips = (
         SalarySlip.objects
-        .filter(bitrix_user_id=str(bitrix_user_id), uploaded_batch__isnull=False)
+        .filter(bitrix_user_id=str(bitrix_user_id))
         .filter(Q(year__lt=year) | Q(year=year, month__lt=month))
         .order_by('-year', '-month')
     )
-    # Find the first slip with non-zero month_salary
-    for slip in slips:
-        if slip.month_salary and slip.month_salary > Decimal('0.00'):
-            return slip
+    # Return the first (most recent) prior slip regardless of month_salary value
+    if slips.exists():
+        return slips.first()
     return None
 
 

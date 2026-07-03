@@ -65,6 +65,8 @@ async function apiFetch(endpoint, options = {}) {
     options.headers['Accept'] = 'application/json';
     options.headers['X-Requested-With'] = 'XMLHttpRequest';
     options.headers['ngrok-skip-browser-warning'] = '69420';
+    options.cache = 'no-store'; // Force browser to always fetch fresh data
+
     if (accessToken) {
         options.headers['Authorization'] = `Bearer ${accessToken}`;
     }

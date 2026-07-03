@@ -26,21 +26,31 @@ class BitrixClient:
         return url.rstrip('/')
 
 
+    import threading
+    _users_lock = threading.Lock()
+
     @classmethod
     def get_all_users(cls, force_refresh=False):
         """
         Fetches all users (active and inactive) from Bitrix24 using pagination.
-        Caches results to optimize performance.
+        Caches results to optimize performance. Uses thread lock to prevent stampede.
         """
         if not force_refresh:
             cached_data = cache.get(cls.CACHE_KEY_ALL_USERS)
             if cached_data is not None:
                 return cached_data
 
-        webhook = cls.get_webhook_url()
-        base_url = f"{webhook}/user.get.json"
-        
-        active_users = []
+        with cls._users_lock:
+            # Check again inside lock
+            if not force_refresh:
+                cached_data = cache.get(cls.CACHE_KEY_ALL_USERS)
+                if cached_data is not None:
+                    return cached_data
+
+            webhook = cls.get_webhook_url()
+            base_url = f"{webhook}/user.get.json"
+            
+            active_users = []
         start = 0
         try:
             logger.info("Fetching active users list from Bitrix24 API with pagination")

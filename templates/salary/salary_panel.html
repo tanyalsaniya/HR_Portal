@@ -2,9 +2,9 @@
 <div id="salaryView" class="view-panel">
     <div class="flex-row-header">
         <h2>Salary Structure &amp; Payroll Dashboard</h2>
-        <div style="display: flex; gap: 10px;">
+        <!-- <div style="display: flex; gap: 10px;">
             <button class="btn btn-primary" id="setupSalaryBtn" onclick="openSalaryStructureModal()">Setup Structure</button>
-        </div>
+        </div> -->
     </div>
 
     <!-- PAYROLL CONTROL PANEL CARD -->
@@ -33,10 +33,45 @@
                 <input type="number" id="payrollYear" value="2026" style="margin-top: 5px;">
             </div>
             <div style="display: flex; gap: 10px; grid-column: span 2; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="loadPayrollGrid()" style="flex: 1; background-color: #f59e0b; min-width: 120px;">Edit Payroll Sheet</button>
                 <button class="btn btn-primary" onclick="exportExcelTemplate()" style="flex: 1; background-color: #0f766e; min-width: 120px;">Export Template</button>
                 <button class="btn btn-primary" onclick="openImportModal()" style="flex: 1; background-color: #2563eb; min-width: 120px;">Import Excel</button>
-                <button class="btn btn-primary" onclick="publishSlipsMonth()" style="flex: 1; background-color: #16a34a; min-width: 120px;">Publish Month</button>
+                <!-- <button class="btn btn-primary" onclick="publishSlipsMonth()" style="flex: 1; background-color: #16a34a; min-width: 120px;">Publish Month</button> -->
                 <button class="btn btn-primary" onclick="openManualGenerateModal()" style="flex: 1; background-color: #7c3aed; min-width: 150px;">Generate Manually</button>
+            </div>
+        </div>
+
+        <!-- EDITABLE PAYROLL GRID CONTAINER -->
+        <div id="payrollGridContainer" style="display: none; margin-top: 20px; overflow-x: auto; background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: var(--primary-color);">Editable Payroll Grid (<span id="payrollGridMonthYear"></span>)</h4>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn" onclick="cancelPayrollGrid()" style="background-color: #6b7280; color: white;">Cancel</button>
+                    <button class="btn btn-primary" onclick="savePayrollGrid()" style="background-color: #16a34a;">Save Changes</button>
+                </div>
+            </div>
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table id="payrollGridTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead style="background-color: #f3f4f6; position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Name</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Designation</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Month Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Worked Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Weekend</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">CL</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Extra</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Payable Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Month Salary</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Payable Salary</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Extra days wrk</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Fine/Advance</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Net Payable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payrollGridBody">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

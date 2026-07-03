@@ -1236,7 +1236,7 @@ async function openStudentProfileDetail(studentId, defaultTab = 'personal', upda
             // Load enrolled course and departments dropdowns
             await loadStudentDetailSelects(student.enrolled_course, student.department);
 
-            switchStudentProfileTab(tabToFocus);
+            switchStudentProfileTab(defaultTab);
         } else {
             showToast('Failed to load student details.', 'error');
         }

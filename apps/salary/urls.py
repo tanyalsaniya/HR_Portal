@@ -6,7 +6,7 @@ from .views import (
     SalaryExportView, SalaryImportView, SalaryPublishView,
     SalaryEditView, SalaryHistoryView, SalarySlipDownloadView,
     SalaryImportBatchesView, SalaryEmployeeSummaryView, SalaryEmployeeHistoryExportView,
-    SalaryIndividualGenerateView
+    SalaryIndividualGenerateView, SalaryGridView
 )
 from accounts.views import hybrid_view
 
@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/admin/salary/export', SalaryExportView.as_view(), name='salary_export'),
     path('api/admin/salary/import', SalaryImportView.as_view(), name='salary_import'),
     path('api/admin/salary/publish', SalaryPublishView.as_view(), name='salary_publish'),
+    path('api/admin/salary/grid', SalaryGridView.as_view(), name='salary_grid'),
     path('api/admin/salary/edit/<int:pk>/', SalaryEditView.as_view(), name='salary_edit'),
     path('api/salary/history', SalaryHistoryView.as_view(), name='salary_history'),
     path('api/salary/slip/download', SalarySlipDownloadView.as_view(), name='salary_download'),
