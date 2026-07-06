@@ -303,6 +303,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             else:
                 filtered_users.append(u)
 
+        # 5.5 Deduplicate users to ensure no repeating records (especially for dismissed employees)
+        seen_identifiers = set()
+        deduped_users = []
+        for u in filtered_users:
+            identifier = getattr(u, 'emp_id', None) or getattr(u, 'email', None) or str(getattr(u, 'bitrix_id', ''))
+            if identifier and identifier not in seen_identifiers:
+                seen_identifiers.add(identifier)
+                deduped_users.append(u)
+            elif not identifier:
+                deduped_users.append(u)
+        filtered_users = deduped_users
+
         # 6. Sort ordering
         sort_by = request.query_params.get('sort')
         if sort_by == 'name':

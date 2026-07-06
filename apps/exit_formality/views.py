@@ -41,6 +41,16 @@ class ExitRequestViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        
+        # Deduplicate by bitrix_user_id, keeping the most recent exit request
+        seen_users = set()
+        deduped_queryset = []
+        for req in queryset:
+            if req.bitrix_user_id not in seen_users:
+                seen_users.add(req.bitrix_user_id)
+                deduped_queryset.append(req)
+        queryset = deduped_queryset
+
         no_pagination = request.query_params.get('no_pagination') == 'true'
         if not no_pagination:
             page = self.paginate_queryset(queryset)

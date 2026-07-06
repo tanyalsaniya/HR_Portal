@@ -472,6 +472,14 @@ CELERY_BEAT_SCHEDULE = {
 
     },
 
+    'daily-audit-log-cleanup': {
+
+        'task': 'audit_logs.tasks.cleanup_old_audit_logs',
+
+        'schedule': crontab(hour=2, minute=0),  # Daily at 02:00
+
+    },
+
 }
 
 

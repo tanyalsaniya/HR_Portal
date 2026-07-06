@@ -8,6 +8,12 @@ from .views import (
     SalaryImportBatchesView, SalaryEmployeeSummaryView, SalaryEmployeeHistoryExportView,
     SalaryIndividualGenerateView, SalaryGridView
 )
+from .dismissed_views import (
+    DismissedSalaryExportView, DismissedSalaryImportView, DismissedSalaryPublishView,
+    DismissedSalaryEditView, DismissedSalaryHistoryView, DismissedSalarySlipDownloadView,
+    DismissedSalaryImportBatchesView, DismissedSalaryEmployeeSummaryView, DismissedSalaryEmployeeHistoryExportView,
+    DismissedSalaryIndividualGenerateView, DismissedSalaryGridView
+)
 from accounts.views import hybrid_view
 
 # API Router
@@ -36,4 +42,17 @@ urlpatterns = [
     path('api/salary/employee/<int:employee_id>/summary', SalaryEmployeeSummaryView.as_view(), name='salary_employee_summary'),
     path('api/salary/employee/<int:employee_id>/export', SalaryEmployeeHistoryExportView.as_view(), name='salary_employee_history_export'),
     path('api/admin/salary/generate-individual', SalaryIndividualGenerateView.as_view(), name='salary_generate_individual'),
+
+    # Dismissed payroll specific routes
+    path('api/admin/salary/dismissed/export', DismissedSalaryExportView.as_view(), name='dismissed_salary_export'),
+    path('api/admin/salary/dismissed/import', DismissedSalaryImportView.as_view(), name='dismissed_salary_import'),
+    path('api/admin/salary/dismissed/publish', DismissedSalaryPublishView.as_view(), name='dismissed_salary_publish'),
+    path('api/admin/salary/dismissed/grid', DismissedSalaryGridView.as_view(), name='dismissed_salary_grid'),
+    path('api/admin/salary/dismissed/edit/<int:pk>/', DismissedSalaryEditView.as_view(), name='dismissed_salary_edit'),
+    path('api/salary/dismissed/history', DismissedSalaryHistoryView.as_view(), name='dismissed_salary_history'),
+    path('api/salary/dismissed/slip/download', DismissedSalarySlipDownloadView.as_view(), name='dismissed_salary_download'),
+    path('api/admin/salary/dismissed/import-batches', DismissedSalaryImportBatchesView.as_view(), name='dismissed_salary_import_batches'),
+    path('api/salary/dismissed/employee/<int:employee_id>/summary', DismissedSalaryEmployeeSummaryView.as_view(), name='dismissed_salary_employee_summary'),
+    path('api/salary/dismissed/employee/<int:employee_id>/export', DismissedSalaryEmployeeHistoryExportView.as_view(), name='dismissed_salary_employee_history_export'),
+    path('api/admin/salary/dismissed/generate-individual', DismissedSalaryIndividualGenerateView.as_view(), name='dismissed_salary_generate_individual'),
 ]

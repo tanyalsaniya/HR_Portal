@@ -64,7 +64,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = AuditLogPagination
 
     def get_queryset(self):
-        return AuditLog.objects.filter(timestamp__date=timezone.localdate()).order_by('-timestamp')
+        return AuditLog.objects.all().order_by('-timestamp')
 
     # Export endpoints
     @action(detail=False, methods=['GET'], url_path='export')

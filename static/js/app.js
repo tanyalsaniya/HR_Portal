@@ -363,6 +363,9 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         let path = viewToPath[viewId] || '/';
         if (viewId === 'salaryHistoryView' && extraParams.employeeId) {
             path = `/salaries/employee/${extraParams.employeeId}/`;
+            if (extraParams.isDismissed) {
+                path += '?type=dismissed';
+            }
         } else if (viewId === 'employeeDetailView' && extraParams.employeeId) {
             path = `/employees/${extraParams.employeeId}/`;
         } else if (viewId === 'studentDetailView' && extraParams.studentId) {

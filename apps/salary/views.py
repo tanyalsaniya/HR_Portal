@@ -429,7 +429,7 @@ class SalaryImportView(APIView):
                                 bitrix_user_id=employee.bitrix_id
                             ).exclude(status__in=['CANCELLED', 'FULLY_EXITED']).exists()
                             if not has_pending_exit:
-                                raise ValueError("Employee is exited and has no pending exit request in the system")
+                                raise ValueError("Employee is exited and has no pending exit request. You are uploading to the Active tab. To import a dismissed employee, you MUST use the 'Import Excel' button inside the 'Dismissed Employees' tab.")
 
                         # Parse data
                         month_days = parse_decimal(ws.cell(row=r_idx, column=4).value, "Month days")
@@ -1019,7 +1019,8 @@ class SalarySlipDownloadView(APIView):
             if getattr(slip, 'id', None) is not None:
                 generate_payslip_pdf(slip)
                 response = HttpResponse(slip.pdf_file.read(), content_type='application/pdf')
-                response['Content-Disposition'] = f'attachment; filename="payslip_{slip.employee.emp_id}_{slip.month}_{slip.year}.pdf"'
+                emp_id_str = slip.employee.emp_id if slip.employee else slip.bitrix_user_id
+                response['Content-Disposition'] = f'attachment; filename="payslip_{emp_id_str}_{slip.month}_{slip.year}.pdf"'
                 return response
             else:
                 # Mock slip single download
