@@ -4,8 +4,8 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import AccessToken
 from employee_onboarding.models import Department
-from .models import Student, Course, StudentCertificate
-from .utils import calculate_completed_duration
+from student_certificate.models import Student, Course, StudentCertificate
+from student_certificate.utils import calculate_completed_duration
 
 User = get_user_model()
 

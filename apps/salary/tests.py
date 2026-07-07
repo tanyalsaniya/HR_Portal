@@ -476,6 +476,7 @@ class SalaryModuleTests(APITestCase):
 
         # Let's verify that if the ExitRequest is FULLY_EXITED or CANCELLED, it is NOT included and imports fail
         exit_request.status = 'FULLY_EXITED'
+        exit_request.last_working_day = datetime.date.today() - datetime.timedelta(days=90)
         exit_request.save()
 
         # Delete any created slips to test empty template export
