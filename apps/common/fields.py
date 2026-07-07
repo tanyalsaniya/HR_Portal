@@ -1,7 +1,12 @@
 # apps/common/fields.py
 from django.db import models
+from django.db.models.query_utils import DeferredAttribute
 from decimal import Decimal
 from common.encryption import encrypt_value, decrypt_value
+
+class EncryptedDecimalDescriptor(DeferredAttribute):
+    def __set__(self, instance, value):
+        instance.__dict__[self.field.name] = self.field.to_python(value)
 
 class EncryptedCharField(models.TextField):
     description = "Encrypted CharField"
@@ -49,3 +54,7 @@ class EncryptedDecimalField(models.TextField):
         if isinstance(value, Decimal):
             return encrypt_value(f"{value:.2f}")
         return encrypt_value(str(value))
+
+    def contribute_to_class(self, cls, name, **kwargs):
+        super().contribute_to_class(cls, name, **kwargs)
+        setattr(cls, self.name, EncryptedDecimalDescriptor(self))

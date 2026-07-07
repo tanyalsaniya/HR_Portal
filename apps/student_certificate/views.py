@@ -4,6 +4,7 @@ import zipfile
 import datetime
 import urllib.request
 import urllib.parse
+import re
 from decimal import Decimal
 from django.db import transaction
 from django.http import HttpResponse
@@ -39,9 +40,11 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
     queryset = StudentCertificate.objects.all().order_by('-created_at')
     serializer_class = StudentCertificateSerializer
     permission_classes = [HasModelPermission]
-
+ 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        from .utils import parse_duration_days, calculate_completed_duration
+        
         student_id = request.data.get('student')
         if not student_id:
             return Response({'error': 'student is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -50,20 +53,56 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
             student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
             return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # ----- Duration & Completion Date Calculation -----
+        # Use duration from the payload (from the fixed dropdown)
+        selected_duration = request.data.get('duration', '').strip()
+        if selected_duration:
+            days_to_add = parse_duration_days(selected_duration)
+            new_completion_date = student.joining_date + datetime.timedelta(days=days_to_add)
+            # Persist updated selected duration and completion_date on the student
+            student.selected_duration = selected_duration
+            student.completion_date = new_completion_date
+            student.save(update_fields=['selected_duration', 'completion_date'])
+        # ---------------------------------------------------
             
         confirm_override = request.data.get('confirm_override', False)
+        early_generation_reason = request.data.get('early_generation_reason', '').strip()
         today = datetime.date.today()
         
         # Check completion date warning rule
-        if student.completion_date > today and not confirm_override:
-            return Response({
-                'warning': f"Warning: The completion date ({student.completion_date}) is in the future. Generating this certificate will complete their profile early. Do you wish to override?",
-                'requires_override': True
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if student.completion_date > today:
+            if not confirm_override:
+                return Response({
+                    'warning': "This student's course duration has not been completed yet. Are you sure you want to generate the certificate before the completion date?",
+                    'requires_override': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif not early_generation_reason:
+                return Response({
+                    'error': "A valid reason must be provided for generating the certificate before the course completion date.",
+                    'requires_reason': True
+                }, status=status.HTTP_400_BAD_REQUEST)
             
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        
+        is_early = student.completion_date > today
+        
+        # Calculate completed duration & display date if early
+        completed_duration = None
+        display_completion_date = student.completion_date
+        if is_early:
+            completed_duration = calculate_completed_duration(student.joining_date, today)
+            display_completion_date = today  # Show today as completion date on the certificate
+
+        extra_args = {'display_completion_date': display_completion_date}
+        if is_early:
+            extra_args['early_generation_reason'] = early_generation_reason
+            extra_args['calculated_completed_duration'] = completed_duration
+        if request.user and request.user.is_authenticated:
+            extra_args['generated_by'] = request.user
+
+        self.perform_create(serializer, **extra_args)
         
         # Trigger Notification to Admins
         cert_instance = serializer.instance
@@ -85,8 +124,9 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+ 
     @transaction.atomic
-    def perform_create(self, serializer):
+    def perform_create(self, serializer, **kwargs):
         student = serializer.validated_data['student']
         course = serializer.validated_data['course']
         
@@ -115,7 +155,7 @@ class StudentCertificateViewSet(viewsets.ModelViewSet):
         serial_no = f"{batch_prefix}{next_seq}"
         
         # Save the certificate instance
-        instance = serializer.save(serial_no=serial_no)
+        instance = serializer.save(serial_no=serial_no, **kwargs)
         
         # Now trigger the PDF generation
         from .services import generate_student_certificate_pdf
@@ -147,6 +187,28 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['GET'], url_path='enrollment-details')
     def enrollment_details(self, request, pk=None):
         student = self.get_object()
+        
+        # Self-healing: try to fetch missing father's name or address from Bitrix24
+        if not student.father_name or not student.address:
+            try:
+                bitrix_students = fetch_active_students_from_bitrix()
+                for bs in bitrix_students:
+                    formatted = format_bitrix_student_data(bs)
+                    if formatted.get('email') == student.email:
+                        updated = False
+                        if not student.father_name and formatted.get('father_name'):
+                            student.father_name = formatted.get('father_name')
+                            updated = True
+                        if not student.address and formatted.get('address'):
+                            student.address = formatted.get('address')
+                            updated = True
+                        if updated:
+                            student.save()
+                        break
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Self-healing father_name fetch failed in enrollment_details: {e}")
+                
         course = student.enrolled_course
         
         # Gender pronoun resolution
@@ -165,9 +227,12 @@ class StudentViewSet(viewsets.ModelViewSet):
             his_her = "his/her"
             
         course_name = course.course_name if course else student.course_at_institute
-        duration = course.default_duration if course else student.training_duration
         
-        # Format completion month
+        # Always return the FULL assigned duration (not shortened).
+        # The frontend dropdown will handle display + early calculation.
+        duration = student.training_duration or (course.default_duration if course else '6 Months')
+        
+        # Format completion month based on stored completion_date
         try:
             completion_month = student.completion_date.strftime("%B %Y")
         except:
@@ -176,7 +241,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         address_str = student.address or ""
         father_name_str = student.father_name or ""
         
-        # Default paragraph layouts
+        # Default paragraph layouts (frontend recalculates when duration changes)
         default_paragraph = (
             f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
             f"Has successfully Completed {duration} \"**{course_name}**\" course ."
@@ -212,16 +277,56 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['POST'], url_path='generate-certificate')
     @transaction.atomic
     def generate_certificate(self, request, pk=None):
+        from .utils import parse_duration_days, calculate_completed_duration
         student = self.get_object()
+        
+        # Self-healing: try to fetch missing father's name or address from Bitrix24
+        if not student.father_name or not student.address:
+            try:
+                bitrix_students = fetch_active_students_from_bitrix()
+                for bs in bitrix_students:
+                    formatted = format_bitrix_student_data(bs)
+                    if formatted.get('email') == student.email:
+                        updated = False
+                        if not student.father_name and formatted.get('father_name'):
+                            student.father_name = formatted.get('father_name')
+                            updated = True
+                        if not student.address and formatted.get('address'):
+                            student.address = formatted.get('address')
+                            updated = True
+                        if updated:
+                            student.save()
+                        break
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Self-healing father_name fetch failed in generate_certificate: {e}")
+
         confirm_override = request.data.get('confirm_override', False)
+        early_generation_reason = request.data.get('early_generation_reason', '').strip()
+        today = datetime.date.today()
+        
+        # ----- Duration & Completion Date Calculation -----
+        selected_duration = request.data.get('duration', '').strip()
+        if selected_duration:
+            days_to_add = parse_duration_days(selected_duration)
+            new_completion_date = student.joining_date + datetime.timedelta(days=days_to_add)
+            student.selected_duration = selected_duration
+            student.completion_date = new_completion_date
+            student.save(update_fields=['selected_duration', 'completion_date'])
+        # ---------------------------------------------------
         
         # Check completion date warning rule
-        today = datetime.date.today()
-        if student.completion_date > today and not confirm_override:
-            return Response({
-                'warning': f"Warning: The completion date ({student.completion_date}) is in the future. Generating this certificate will complete their profile early. Do you wish to override?",
-                'requires_override': True
-            }, status=status.HTTP_200_OK) # return warning trigger payload
+        if student.completion_date > today:
+            if not confirm_override:
+                return Response({
+                    'warning': "This student's course duration has not been completed yet. Are you sure you want to generate the certificate before the completion date?",
+                    'requires_override': True
+                }, status=status.HTTP_200_OK) # return warning trigger payload
+            elif not early_generation_reason:
+                return Response({
+                    'error': "A valid reason must be provided for generating the certificate before the course completion date.",
+                    'requires_reason': True
+                }, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             course = student.enrolled_course
@@ -239,7 +344,18 @@ class StudentViewSet(viewsets.ModelViewSet):
             s_o_d_o = "D/O" if gender == 'FEMALE' else "S/O"
             father_name_str = student.father_name or ""
             address_str = student.address or ""
-            duration = course.default_duration
+            
+            completed_duration = None
+            is_early = student.completion_date > today
+            if is_early:
+                completed_duration = calculate_completed_duration(student.joining_date, today)
+                # Display shortened duration AND use today as the display completion date
+                duration = completed_duration
+                display_completion_date = today
+            else:
+                duration = student.training_duration or course.default_duration
+                display_completion_date = student.completion_date
+                
             course_name = course.course_name
             
             default_content = (
@@ -280,7 +396,11 @@ class StudentViewSet(viewsets.ModelViewSet):
                 issue_date=today,
                 serial_no=serial_no,
                 cert_content=default_content,
-                place="Mohali"
+                place="Mohali",
+                display_completion_date=display_completion_date,
+                early_generation_reason=early_generation_reason if is_early else None,
+                calculated_completed_duration=completed_duration if is_early else None,
+                generated_by=request.user if request.user and request.user.is_authenticated else None
             )
             
             # Generate PDF using WeasyPrint
@@ -386,9 +506,20 @@ class StudentViewSet(viewsets.ModelViewSet):
                         father_name_str = student.father_name or ""
                         address_str = student.address or ""
                         
+                        today = datetime.date.today()
+                        if student.completion_date > today:
+                            from .utils import calculate_completed_duration
+                            completed_duration = calculate_completed_duration(student.joining_date, today)
+                            duration_str = completed_duration
+                            early_gen_reason = "Bulk generated early"
+                        else:
+                            completed_duration = None
+                            duration_str = course.default_duration
+                            early_gen_reason = None
+                        
                         default_content = (
                             f"This is to certify that **{student.name}** **{s_o_d_o} {father_name_str}**, {address_str}. "
-                            f"Has successfully Completed {course.default_duration} \"**{course.course_name}**\" course ."
+                            f"Has successfully Completed {duration_str} \"**{course.course_name}**\" course ."
                         )
                         
                         completion_year = student.completion_date.year
@@ -419,10 +550,13 @@ class StudentViewSet(viewsets.ModelViewSet):
                                 course=course,
                                 skill_ratings={skill: 'Excellent' for skill in course.skills_list},
                                 show_dates=False,
-                                issue_date=datetime.date.today(),
+                                issue_date=today,
                                 serial_no=serial_no,
                                 cert_content=default_content,
-                                place="Mohali"
+                                place="Mohali",
+                                early_generation_reason=early_gen_reason,
+                                calculated_completed_duration=completed_duration,
+                                generated_by=request.user if request.user and request.user.is_authenticated else None
                             )
                         generate_student_certificate_pdf(cert)
                     else:
@@ -602,6 +736,13 @@ class StudentViewSet(viewsets.ModelViewSet):
                     formatted = format_bitrix_student_data(bitrix_student)
                     
                     # Check if student exists
+                    dob_val = None
+                    if formatted.get('dob'):
+                        try:
+                            dob_val = datetime.datetime.strptime(formatted.get('dob').split('T')[0], '%Y-%m-%d').date()
+                        except ValueError:
+                            pass
+
                     student, created = Student.objects.update_or_create(
                         email=email,
                         defaults={
@@ -620,11 +761,15 @@ class StudentViewSet(viewsets.ModelViewSet):
                             'mentor': formatted.get('mentor', ''),
                             'father_name': formatted.get('father_name', ''),
                             'status': 'ACTIVE',
-                            'student_type': 'TRAINEE',
+                            'student_type': formatted.get('student_type', 'TRAINEE'),
                             'program_name': formatted.get('course_name', 'General'),
-                            'cert_type': 'TRAINING_CERT',
+                            'cert_type': formatted.get('cert_type', 'TRAINING_CERT'),
                             'department_id': department_id,
                             'created_by_id': created_by_id if created else None,
+                            'gender': formatted.get('gender', 'MALE'),
+                            'address': formatted.get('address', ''),
+                            'dob': dob_val,
+                            'total_fees': Decimal(re.sub(r'[^\d.]', '', str(formatted.get('total_fees', '0'))) or '0') if formatted.get('total_fees') else Decimal('0.00'),
                         }
                     )
                     
@@ -828,6 +973,11 @@ class StudentViewSet(viewsets.ModelViewSet):
         completion_date_str = request.data.get('completion_date')
         father_name = request.data.get('father_name', '')
         total_fees = request.data.get('total_fees', '0')
+        dob_str = request.data.get('dob')
+        gender = request.data.get('gender', 'MALE')
+        address = request.data.get('address', '')
+        student_type = request.data.get('student_type', 'TRAINEE')
+        cert_type = request.data.get('cert_type', 'TRAINING_CERT')
         
         # Parse dates
         today = datetime.date.today()
@@ -843,6 +993,13 @@ class StudentViewSet(viewsets.ModelViewSet):
         if joining_date_str:
             try:
                 joining_date = datetime.datetime.strptime(joining_date_str.split('T')[0], '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        dob = None
+        if dob_str:
+            try:
+                dob = datetime.datetime.strptime(dob_str.split('T')[0], '%Y-%m-%d').date()
             except ValueError:
                 pass
 
@@ -874,6 +1031,39 @@ class StudentViewSet(viewsets.ModelViewSet):
                 skills_list=["Java", "Python", "Web Development"]
             )
 
+        # Determine days to add based on course duration
+        duration_str = course.default_duration.lower()
+        days_to_add = 180
+        if 'month' in duration_str:
+            try:
+                months = int(''.join(filter(str.isdigit, duration_str)) or '6')
+                days_to_add = months * 30
+            except ValueError:
+                pass
+        elif 'week' in duration_str:
+            try:
+                weeks = int(''.join(filter(str.isdigit, duration_str)) or '4')
+                days_to_add = weeks * 7
+            except ValueError:
+                pass
+        elif 'day' in duration_str:
+            try:
+                days_to_add = int(''.join(filter(str.isdigit, duration_str)) or '180')
+            except ValueError:
+                pass
+
+        # Handle missing dates logically
+        if joining_date and completion_date and joining_date >= completion_date:
+            completion_date = None
+
+        if not joining_date and not completion_date:
+            joining_date = today
+            completion_date = today + datetime.timedelta(days=days_to_add)
+        elif not joining_date:
+            joining_date = completion_date - datetime.timedelta(days=days_to_add)
+        elif not completion_date:
+            completion_date = joining_date + datetime.timedelta(days=days_to_add)
+
         # Parse total fees robustly (removing currency formatting like "Rs. 20,000", commas, etc.)
         parsed_fees = Decimal('0.00')
         if total_fees:
@@ -897,11 +1087,14 @@ class StudentViewSet(viewsets.ModelViewSet):
                 'completion_date': completion_date,
                 'father_name': father_name,
                 'status': 'ACTIVE',
-                'student_type': 'TRAINEE',
+                'student_type': student_type or 'TRAINEE',
                 'program_name': course_name,
-                'cert_type': 'TRAINING_CERT',
+                'cert_type': cert_type or 'TRAINING_CERT',
                 'department': dept,
                 'total_fees': parsed_fees,
+                'dob': dob,
+                'gender': gender or 'MALE',
+                'address': address,
                 'created_by': request.user if request.user.is_authenticated else None
             }
         )
@@ -996,13 +1189,12 @@ class BitrixActiveStudentsView(APIView):
     }
     
     # ONGOING stages (students we WANT to show):
-    # CLIENT, UC_8CP2UP, UC_QXBN3E, UC_10M2QN, UC_26OISW
     INCLUDED_STAGES = {
-        'DT1044_20:CLIENT',      # Inquiry/Lead stage
-        'DT1044_20:UC_8CP2UP',   # Application Submitted
-        'DT1044_20:UC_QXBN3E',   # Under Review
-        'DT1044_20:UC_10M2QN',   # Enrollment Started
-        'DT1044_20:UC_26OISW',   # Course Starting Soon
+        'DT1044_20:CLIENT',
+        'DT1044_20:UC_8CP2UP',
+        'DT1044_20:UC_QXBN3E',
+        'DT1044_20:UC_10M2QN',
+        'DT1044_20:UC_26OISW',
     }
 
     def _is_currently_enrolled(self, item):
@@ -1032,11 +1224,33 @@ class BitrixActiveStudentsView(APIView):
             except ValueError:
                 start = 0
 
+            limit = request.query_params.get('limit', 10)
+            try:
+                limit = int(limit)
+            except ValueError:
+                limit = 10
+
+            # Bitrix24 REST API requires the 'start' parameter to be a multiple of 50.
+            # We calculate the nearest lower multiple of 50 for Bitrix and slice the rest.
+            bitrix_start = (start // 50) * 50
+            relative_start = start - bitrix_start
+
+            from django.core.cache import cache
+            force_refresh = request.GET.get('refresh', '').lower() == 'true'
+            cache_key = f'bitrix_active_students_list_page_{start}'
+            
+            if not force_refresh:
+                cached_data = cache.get(cache_key)
+                if cached_data is not None:
+                    return Response(cached_data)
+
             import requests
             payload = {
                 'entityTypeId': self.ENTITY_TYPE_ID,
-                'start': start,
+                'start': bitrix_start,
+                'limit': 50, # Bitrix default/max limit
                 'filter': {
+                    'categoryId': 20,
                     'stageId': list(self.INCLUDED_STAGES)
                 },
                 'select': ['*', 'uf_*']
@@ -1051,29 +1265,47 @@ class BitrixActiveStudentsView(APIView):
 
             data = response.json()
             items = data.get('result', {}).get('items', [])
+            total = data.get('total', len(items))
             active_students = []
             for item in items:
+                formatted = format_bitrix_student_data(item)
                 active_students.append({
-                    'id': item.get('id'),
-                    'name': (item.get('title') or '').strip(),
-                    'email': item.get('ufCrm6_1761731565702') or '',
-                    'phone': item.get('ufCrm6_1761731546152') or '',
-                    'course_id': item.get('ufCrm6_1761731874888'),
-                    'start_date': (item.get('ufCrm6_1761735340146') or '')[:10],
-                    'completion_date': (item.get('ufCrm6_1761735481170') or '')[:10],
-                    'father_name': item.get('ufCrm6_1761731958409') or '',
-                    'institute': item.get('ufCrm6_1761732176981') or '',
-                    'total_fees': item.get('ufCrm6_1761732340679') or '0',
+                    'id': formatted.get('bitrix_id'),
+                    'name': formatted.get('name'),
+                    'email': formatted.get('email'),
+                    'phone': formatted.get('phone'),
+                    'course_id': formatted.get('course_name'),
+                    'start_date': formatted.get('joining_date'),
+                    'completion_date': formatted.get('completion_date'),
+                    'father_name': formatted.get('father_name'),
+                    'institute': formatted.get('institute'),
+                    'total_fees': formatted.get('total_fees'),
                     'stage': item.get('stageId', ''),
+                    'dob': formatted.get('dob'),
+                    'gender': formatted.get('gender'),
+                    'address': formatted.get('address'),
+                    'student_type': formatted.get('student_type'),
+                    'cert_type': formatted.get('cert_type'),
                 })
 
-            next_offset = data.get('next', None)
+            active_students = active_students[relative_start : relative_start + limit]
 
-            return Response({
+            if start + limit < total:
+                next_offset = start + limit
+            else:
+                next_offset = None
+
+            response_data = {
                 'count': len(active_students),
+                'total': total,
                 'results': active_students,
                 'next': next_offset
-            })
+            }
+            
+            # Cache the response for 5 minutes (300 seconds)
+            cache.set(cache_key, response_data, 300)
+
+            return Response(response_data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 

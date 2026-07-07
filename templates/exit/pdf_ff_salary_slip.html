@@ -6,201 +6,158 @@
     <style>
         @page {
             size: A4;
-            margin: 15mm;
+            margin: 20mm 15mm;
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 9.5pt;
-            line-height: 1.5;
-            color: #333;
-        }
-        .header {
-            text-align: center;
-            border-bottom: 2px solid #0056b3;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-        .company-name {
-            font-size: 18pt;
-            font-weight: bold;
-            color: #0056b3;
-        }
-        .company-sub {
-            font-size: 9pt;
-            color: #555;
-        }
-        .title {
-            font-size: 13pt;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 25px;
-            color: #0056b3;
-            text-decoration: underline;
-        }
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        .info-table td {
-            padding: 4px;
-            vertical-align: top;
+            font-size: 10pt;
+            color: #000000;
+            line-height: 1.4;
         }
         .payslip-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 25px;
+            border: 2px solid #000000;
         }
-        .payslip-table th, .payslip-table td {
-            border: 1px solid #cbd5e1;
-            padding: 8px;
-            font-size: 9pt;
+        .payslip-table td {
+            border: 1px solid #000000;
+            padding: 8px 10px;
+            vertical-align: middle;
         }
-        .payslip-table th {
-            background-color: #f1f5f9;
-            font-weight: bold;
+        .text-center {
+            text-align: center;
         }
-        .number-col {
+        .text-right {
             text-align: right;
         }
-        .section-header {
+        .font-bold {
             font-weight: bold;
-            background-color: #f8fafc;
         }
-        .total-row {
-            font-weight: bold;
+        .grey-bg {
             background-color: #f1f5f9;
         }
-        .net-pay {
-            font-size: 11pt;
+        .header-company {
+            font-size: 12pt;
             font-weight: bold;
-            border: 2px solid #0056b3;
-            padding: 15px;
-            text-align: center;
-            background-color: #e2e8f0;
-            margin-bottom: 40px;
         }
-        .signature-section {
-            margin-top: 50px;
-            page-break-inside: avoid;
-        }
-        .signature-line {
-            width: 200px;
-            border-top: 1px solid #333;
-            margin-top: 40px;
+        .header-address {
             font-size: 9pt;
+            font-weight: bold;
+        }
+        .header-slip {
+            font-size: 10pt;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="company-name">{{ company_name }}</div>
-        <div class="company-sub">HR Division • Secure Enterprise Operations</div>
-    </div>
-    
-    <div class="title">FINAL MONTH SALARY SLIP (PRO-RATED)</div>
-    
-    <table class="info-table">
-        <tr>
-            <td style="width: 15%;"><strong>Employee Name:</strong></td>
-            <td style="width: 35%;">{{ employee.first_name }} {{ employee.last_name }}</td>
-            <td style="width: 15%;"><strong>Employee ID:</strong></td>
-            <td style="width: 35%;">{{ employee.emp_id }}</td>
-        </tr>
-        <tr>
-            <td><strong>Department:</strong></td>
-            <td>{{ employee.department.name }}</td>
-            <td><strong>Designation:</strong></td>
-            <td>{{ employee.designation }}</td>
-        </tr>
-        <tr>
-            <td><strong>LWD:</strong></td>
-            <td>{{ exit_request.last_working_day|date:"F d, Y" }}</td>
-            <td><strong>Worked Days:</strong></td>
-            <td>{{ ff.salary_worked_days }} / {{ ff.salary_month_days }} Days</td>
-        </tr>
-        <tr>
-            <td><strong>Bank Account:</strong></td>
-            <td>{{ employee.bank_details.account_number|default:"N/A" }}</td>
-            <td><strong>PAN:</strong></td>
-            <td>{{ employee.pan_number|default:"N/A" }}</td>
-        </tr>
-    </table>
     
     <table class="payslip-table">
-        <thead>
-            <tr>
-                <th style="width: 30%;">Earnings Components</th>
-                <th style="width: 20%;" class="number-col">Standard Monthly (INR)</th>
-                <th style="width: 20%;" class="number-col">Pro-rated Earnings (INR)</th>
-                <th style="width: 30%;">Deductions Components</th>
-                <th style="width: 20%;" class="number-col">Pro-rated Deductions (INR)</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>Basic Salary</td>
-                <td class="number-col">{{ salary_struct.basic }}</td>
-                <td class="number-col">{{ prorated.basic }}</td>
-                <td>Provident Fund (PF)</td>
-                <td class="number-col">{{ prorated.pf }}</td>
-            </tr>
-            <tr>
-                <td>House Rent Allowance (HRA)</td>
-                <td class="number-col">{{ salary_struct.hra }}</td>
-                <td class="number-col">{{ prorated.hra }}</td>
-                <td>Professional Tax (PT)</td>
-                <td class="number-col">{{ prorated.professional_tax }}</td>
-            </tr>
-            <tr>
-                <td>Conveyance Allowance</td>
-                <td class="number-col">{{ salary_struct.conveyance }}</td>
-                <td class="number-col">{{ prorated.conveyance }}</td>
-                <td>Income Tax (TDS)</td>
-                <td class="number-col">{{ prorated.tds }}</td>
-            </tr>
-            <tr>
-                <td>Medical Allowance</td>
-                <td class="number-col">{{ salary_struct.medical }}</td>
-                <td class="number-col">{{ prorated.medical }}</td>
-                <td></td>
-                <td class="number-col"></td>
-            </tr>
-            <tr>
-                <td>Special Allowance</td>
-                <td class="number-col">{{ salary_struct.special }}</td>
-                <td class="number-col">{{ prorated.special }}</td>
-                <td></td>
-                <td class="number-col"></td>
-            </tr>
-            <tr>
-                <td>Monthly Bonus</td>
-                <td class="number-col">{{ salary_struct.monthly_bonus }}</td>
-                <td class="number-col">{{ prorated.monthly_bonus }}</td>
-                <td></td>
-                <td class="number-col"></td>
-            </tr>
-            <tr class="total-row">
-                <td>Total Earnings</td>
-                <td class="number-col">{{ salary_struct.gross_salary }}</td>
-                <td class="number-col">{{ gross_prorated }}</td>
-                <td>Total Deductions</td>
-                <td class="number-col">{{ deductions_prorated }}</td>
-            </tr>
-        </tbody>
+        <!-- Header -->
+        <tr>
+            <td colspan="4" class="text-center font-bold header-company" style="padding: 10px 0;">DEVEX HUB PVT. LTD.</td>
+        </tr>
+        <tr>
+            <td colspan="4" class="text-center font-bold header-address" style="padding: 6px 0;">GR TOWER THIRD FLOOR PLOT NO. D-258 INDUSTRIAL AREA PHASE 8-A MOHALI</td>
+        </tr>
+        <tr class="grey-bg">
+            <td colspan="4" class="text-center font-bold header-slip" style="padding: 6px 0;">SALARY SLIP FOR THE MONTH OF {{ exit_request.last_working_day|date:"F Y"|upper }}</td>
+        </tr>
+        
+        <!-- Info Section -->
+        <tr>
+            <td class="font-bold" style="width: 30%; font-size: 9pt;">EMPLOYEE NAME</td>
+            <td style="width: 20%; font-size: 9.5pt;">{{ employee.first_name|upper }} {{ employee.last_name|upper }}</td>
+            <td class="font-bold" style="width: 30%; font-size: 9pt;">NO. OF LEAVES AVAIL</td>
+            <td class="text-right" style="width: 20%; font-size: 9.5pt;">{{ ff.leave_encashment_days|floatformat:"1" }}</td>
+        </tr>
+        <tr>
+            <td class="font-bold" style="font-size: 9pt;">EMPLOYEE DESIGNATION</td>
+            <td style="font-size: 9.5pt;">{{ employee.designation|upper }}</td>
+            <td class="font-bold" style="font-size: 9pt;">NO. OF DAYS</td>
+            <td class="text-right" style="font-size: 9.5pt;">{{ ff.salary_worked_days|floatformat:"1" }}</td>
+        </tr>
+        <tr>
+            <td class="font-bold" style="font-size: 9pt;">LOCATION</td>
+            <td style="font-size: 9.5pt;">{{ employee.city|default:"Mohali" }}</td>
+            <td class="font-bold" style="font-size: 9pt;">LEAVE ENCASHMENT /EXTRA DAYS</td>
+            <td class="text-right" style="font-size: 9.5pt;">{{ ff.leave_encashment_days|floatformat:"1" }}</td>
+        </tr>
+        
+        <!-- Earnings & Deductions Columns -->
+        <tr class="font-bold text-center">
+            <td style="width: 30%;">EARNINGS</td>
+            <td style="width: 20%;">AMOUNT RS.</td>
+            <td style="width: 30%;">DEDUCTIONS</td>
+            <td style="width: 20%;">AMOUNT RS.</td>
+        </tr>
+        
+        <!-- Details (Gross Salary & PF) -->
+        <tr>
+            <td>GROSS SALARY</td>
+            <td class="text-right">{{ gross_prorated|floatformat:"0" }}</td>
+            <td>PF CONTRIBUTION</td>
+            <td class="text-right">{{ prorated.pf|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- ESI -->
+        <tr>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td>ESI</td>
+            <td class="text-right">{{ prorated.esi|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- LWF -->
+        <tr>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td>LABOUR WELFARE FUND</td>
+            <td class="text-right">{{ prorated.lwf|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- PT -->
+        <tr>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td>PROFESSIONAL TAX</td>
+            <td class="text-right">{{ prorated.professional_tax|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- Other Deductions -->
+        <tr>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td style="border-bottom: none; border-top: none;"></td>
+            <td>Other DEDUCTIONS</td>
+            <td class="text-right">{{ prorated.other_deductions|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- Total Row -->
+        <tr class="font-bold">
+            <td>TOTAL</td>
+            <td class="text-right">{{ gross_prorated|floatformat:"0" }}</td>
+            <td>TOTAL</td>
+            <td class="text-right">{{ deductions_prorated|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- Net Pay Row -->
+        <tr>
+            <td colspan="2" style="border-right: none;"></td>
+            <td class="font-bold" style="border-left: none;">NET. PAY</td>
+            <td class="font-bold text-right">{{ net_prorated|floatformat:"0" }}</td>
+        </tr>
+        
+        <!-- Amount in Words -->
+        <tr>
+            <td colspan="4" class="text-center font-bold" style="padding: 10px 0;">{{ net_prorated_words }}</td>
+        </tr>
+        
+        <!-- Footer -->
+        <tr>
+            <td colspan="4" class="text-center" style="font-style: italic; font-size: 8.5pt; padding: 8px 0; color: #475569;">
+                This is a automated pay slip and does not need a signature for verification
+            </td>
+        </tr>
     </table>
-
-    <div class="net-pay">
-        Net Pro-rated Salary Payout: INR {{ net_prorated }}
-    </div>
-
-    <p style="font-size: 8pt; color: #666; font-style: italic;">
-        Note: This is a system-generated pro-rated salary slip computed as part of the employee's Full & Final Settlement.
-    </p>
-
-    <div class="signature-section">
-        <p>For <strong>{{ company_name }}</strong>,</p>
-        <div class="signature-line">Authorized Signatory (HR Division)</div>
-    </div>
 </body>
 </html>

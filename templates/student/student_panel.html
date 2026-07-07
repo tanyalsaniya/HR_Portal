@@ -52,7 +52,7 @@
     <div class="flex-row-header">
         <h2>Student & Intern Directory</h2>
         <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" id="exportStudentBtn" onclick="window.location.href='/api/student/students/export-excel/?status=ACTIVE'">Export to Excel</button>
+            <!-- <button class="btn btn-primary" id="exportStudentBtn" onclick="window.location.href='/api/student/students/export-excel/?status=ACTIVE'">Export to Excel</button> -->
             <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()">+ Register Student</button>
         </div>
     </div>
@@ -60,14 +60,13 @@
     <!-- Student Navigation Tabs -->
     <div class="student-tabs-container">
         <button class="student-tab-btn active" id="tabStudentDirectoryBtn" onclick="switchStudentTab('directory')">Directory</button>
-        <button class="student-tab-btn" id="tabBitrixStudentsBtn" onclick="switchStudentTab('bitrix')">Active Students (Bitrix24)</button>
         <button class="student-tab-btn" id="tabCertGenBtn" onclick="switchStudentTab('certgen')" style="display: none;">Certificate Generator</button>
     </div>
 
     <!-- TAB 1: DIRECTORY CONTENT -->
     <div id="studentTabDirectory">
         <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <p style="margin: 0; color: #64748b; font-size: 9.5pt;">Currently enrolled (ongoing) students from Bitrix24 CRM. Click "Generate Cert" to create certificates.</p>
+            <p style="margin: 0; color: #64748b; font-size: 9.5pt;">List of registered active students. Click "Generate Cert" to create certificates or "Installments" to view fee schedules.</p>
             <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadStudentData()">↻ Refresh</button>
         </div>
         <div class="table-responsive">
@@ -86,56 +85,19 @@
                 </tbody>
             </table>
         </div>
-        <!-- Pagination controls -->
-        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent); background: #fafafa;">
             <div style="font-size: 9pt; color: var(--text-secondary);">
-                Showing records <span id="studentPageStart">0</span> to <span id="studentPageEnd">0</span>
+                Showing <span id="studentPageStart">0</span> to <span id="studentPageEnd">0</span> of <span id="studentTotalCount">0</span> entries
             </div>
             <div style="display: flex; gap: 8px;">
-                <button class="btn" id="studentPrevBtn" onclick="changeStudentPage(-1)" disabled>Previous</button>
-                <button class="btn" id="studentNextBtn" onclick="changeStudentPage(1)" disabled>Next</button>
+                <button id="studentPrevBtn" onclick="changeStudentPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="studentNextBtn" onclick="changeStudentPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent); cursor: pointer; border-radius: 4px;" disabled>Next</button>
             </div>
         </div>
     </div>
 
-    <!-- TAB: BITRIX24 ACTIVE STUDENTS -->
-    <div id="studentTabBitrix" style="display: none;">
-        <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <p style="margin: 0; color: #64748b; font-size: 9.5pt;">Live data from Bitrix24 CRM — showing ONLY currently enrolled (ongoing) students. Excludes completed and failed students.</p>
-            <button class="btn" style="font-size: 8.5pt; padding: 6px 14px;" onclick="loadBitrixStudents()">↻ Refresh</button>
-        </div>
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Institute</th>
-                        <th>Father's Name</th>
-                        <th>Start Date</th>
-                        <th>Completion Date</th>
-                        <th>Total Fees</th>
-                        <th>Stage</th>
-                    </tr>
-                </thead>
-                <tbody id="bitrixStudentTableBody">
-                    <!-- Populated dynamically -->
-                </tbody>
-            </table>
-        </div>
-        <!-- Pagination controls -->
-        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 9pt; color: var(--text-secondary);">
-                Showing records <span id="bitrixStudentPageStart">0</span> to <span id="bitrixStudentPageEnd">0</span>
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn" id="bitrixStudentPrevBtn" onclick="changeBitrixStudentPage(-1)" disabled>Previous</button>
-                <button class="btn" id="bitrixStudentNextBtn" onclick="changeBitrixStudentPage(1)" disabled>Next</button>
-            </div>
-        </div>
-    </div>
+    <!-- TAB: BITRIX24 ACTIVE STUDENTS REMOVED -->
 
     <!-- TAB 2: CERTIFICATE GENERATOR CONTENT -->
     <div id="studentTabCertGen" style="display: none;">
@@ -161,7 +123,11 @@
                     </div>
                     <div>
                         <label>Duration</label>
-                        <input type="text" id="certDurationInput" oninput="onCertDurationChange()">
+                        <select id="certDurationInput" onchange="onCertDurationChange()" style="width: 100%;">
+                            <option value="6 Months">6 Months</option>
+                            <option value="3 Months">3 Months</option>
+                            <option value="45 Days">45 Days</option>
+                        </select>
                     </div>
                 </div>
 
@@ -210,45 +176,49 @@
                 <h3 style="margin: 0; align-self: flex-start; color: var(--primary-color); font-weight: 800;">Final Certificate Preview</h3>
                 
                 <!-- Live Preview frame -->
-                <div class="cert-preview-frame" id="certLivePreview" style="width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0,0,0,0.08); aspect-ratio: 210/297; position: relative; background-image: url('/static/images/certificate_1.png'); background-size: 100% 100%; overflow: hidden; background-repeat: no-repeat; background-color: #ffffff; box-sizing: border-box; display: flex; flex-direction: column; padding: 50px 35px 35px 35px; font-family: 'Inter', sans-serif;">
+                <div class="cert-preview-frame" id="certLivePreview" style="width: 100%; max-width: 450px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0,0,0,0.08); aspect-ratio: 210/297; position: relative; background-image: url('/static/images/certificate_1.png'); background-size: 100% 100%; overflow: hidden; background-repeat: no-repeat; background-color: #ffffff; box-sizing: border-box; display: flex; flex-direction: column; padding: 115px 51px 35px 51px; font-family: 'Inter', sans-serif;">
+                    <!-- Absolute Logos -->
+                    <img src="/static/images/DevEx Hub logo.png" style="position: absolute; top: 51px; left: 60px; max-height: 38px; width: auto;" alt="Logo Left">
+                    <img src="/static/images/(accreditationpartner logo.png" style="position: absolute; top: 51px; right: 60px; max-height: 47px; width: auto;" alt="Logo Right">
+
                     <!-- Title -->
-                    <div style="text-align: center; margin-bottom: 12px;">
-                        <span style="font-size: 18pt; font-weight: 800; color: #0c1b33; display: inline-block; border-bottom: 2px solid #0a4f9f; padding-bottom: 2px;">Certificate</span>
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <span style="font-size: 14pt; font-weight: 800; color: #0c1b33; display: inline-block; border-bottom: 2px solid #0a4f9f; padding-bottom: 2px; width: 85px;">Certificate</span>
                     </div>
                     
                     <!-- Serial Number -->
-                    <div id="prevSerialNo" style="font-size: 7.5pt; font-weight: 600; color: #1a1a1a; margin-bottom: 8px;">
+                    <div id="prevSerialNo" style="font-size: 7.5pt; font-weight: 600; color: #1a1a1a; margin-left: 13px; margin-bottom: 15px;">
                         Sr.no DHUB|25|250
                     </div>
                     
                     <!-- Certifying Paragraph -->
-                    <div id="prevParagraph" style="font-size: 8pt; line-height: 1.5; color: #1a1a1a; text-align: justify; margin-bottom: 8px;">
+                    <div id="prevParagraph" style="font-size: 7.8pt; line-height: 1.4; color: #1a1a1a; text-align: justify; margin-left: 13px; margin-right: 13px; margin-bottom: 15px;">
                         This is to certify that ...
                     </div>
                     
                     <!-- Heading -->
-                    <div id="prevPerformanceHeading" style="font-size: 8pt; font-weight: 600; color: #1a1a1a; margin-bottom: 6px;">
+                    <div id="prevPerformanceHeading" style="font-size: 7.8pt; font-weight: 600; color: #1a1a1a; margin-left: 13px; margin-bottom: 11px;">
                         His Performance Given as Below
                     </div>
                     
                     <!-- Skills table -->
-                    <table id="prevSkillsTable" style="width: 100%; border-collapse: collapse; font-size: 7pt; color: #1a1a1a; margin-bottom: 8px;">
+                    <table id="prevSkillsTable" style="width: calc(100% - 26px); border-collapse: collapse; font-size: 7.2pt; color: #1a1a1a; margin-left: 13px; margin-right: 13px; margin-bottom: 15px;">
                         <!-- Rows populated dynamically -->
                     </table>
                     
                     <!-- Dates Section -->
-                    <div id="prevDatesSection" style="font-size: 7.5pt; font-weight: 600; color: #1a1a1a; line-height: 1.4; margin-bottom: 8px; display: none;">
+                    <div id="prevDatesSection" style="font-size: 7.5pt; font-weight: 600; color: #1a1a1a; line-height: 1.3; margin-left: 13px; margin-bottom: 11px; display: none;">
                         <div id="prevJoinDate">Date of joining : 15-01-2025</div>
                         <div id="prevCompDate">Date of completion : 15-07-2025</div>
                     </div>
                     
                     <!-- Closing Text -->
-                    <div id="prevClosingText" style="font-size: 8.5pt; font-weight: 700; color: #1a1a1a; margin-bottom: 15px;">
+                    <div id="prevClosingText" style="font-size: 8.2pt; font-weight: 700; color: #1a1a1a; margin-left: 13px; margin-bottom: 26px;">
                         We hope he serves his best service to this industry.
                     </div>
                     
                     <!-- Footer -->
-                    <div style="position: absolute; bottom: 8%; left: 35px; right: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 7.5pt; font-weight: 600; color: #1a1a1a;">
+                    <div style="position: absolute; bottom: 64px; left: 64px; right: 64px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 7.5pt; font-weight: 600; color: #1a1a1a;">
                         <div>
                             <div id="prevIssueDateText">Date: 01-09-2025</div>
                             <div id="prevPlaceText" style="margin-top: 2px;">Place: Mohali</div>

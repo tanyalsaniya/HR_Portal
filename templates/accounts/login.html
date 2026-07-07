@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | HR Portal</title>
+  <link rel="icon" type="image/png" href="{% static 'images/DevEx Hub logo.png' %}">
   <link rel="stylesheet" href="{% static 'css/theme.css' %}?v=2.0">
   <style>
     /* Inline additions if any, but most are in theme.css */
@@ -106,12 +107,12 @@
 
     <!-- LEFT SPLIT PANE (Brand Display) -->
     <div class="login-left">
-      <div class="login-brand">
-        <div class="login-brand-icon">
-          <!-- Custom HR Node Icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <div class="login-brand" style="display: flex; align-items: center; gap: 12px;">
+        <img src="{% static 'images/DevEx Hub logo.png' %}" alt="Devex Hub" style="height: 56px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));">
+        <div style="display: flex; flex-direction: column; line-height: 1.2;">
+          <span class="login-brand-text" style="font-size: 18pt; font-weight: 800; letter-spacing: -0.03em;">Devex Hub</span>
+          <span style="font-size: 10pt; font-weight: 500; opacity: 0.75; letter-spacing: 0.04em;">HR Portal</span>
         </div>
-        <span class="login-brand-text">HR Portal</span>
       </div>
 
       <h2 class="login-hero-title">HR Operations,<br><span>Simplified</span></h2>
@@ -203,7 +204,7 @@
               <input type="checkbox" id="rememberMe">
               Remember me
             </label>
-            <a href="#" class="login-forgot-link">Forgot password?</a>
+            <a href="/reset-password/" class="login-forgot-link">Forgot password?</a>
           </div>
 
           <!-- Submit Button -->

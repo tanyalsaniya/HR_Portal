@@ -367,3 +367,291 @@ class SalaryModuleTests(APITestCase):
         bank_detail.refresh_from_db()
         self.assertEqual(bank_detail.bank_account_no, "555666777")
         self.assertEqual(bank_detail.bank_name, "FinalMockBank")
+
+    @patch('exit_formality.tasks.send_exit_documents_after_fully_exited')
+    @patch('exit_formality.tasks.update_bitrix24_on_exit')
+    @patch('exit_formality.tasks.send_exit_initiation_email')
+    def test_exited_employee_payroll(self, mock_send_init, mock_update_bitrix, mock_send_docs):
+        from exit_formality.models import ExitRequest
+
+        # 1. Mock exited employee in Bitrix
+        exited_user_dict = {
+            'id': '20',
+            'emp_id': 'BITRIX-20',
+            'first_name': 'Jane',
+            'last_name': 'Smith',
+            'name': 'Jane Smith',
+            'email': 'jane@test.com',
+            'phone': '9876543211',
+            'designation': 'QA Engineer',
+            'department_name': 'Engineering',
+            'dob': '1996-06-12',
+            'gender': 'Female',
+            'joining_date': '2026-06-01',
+            'status': 'Exited'
+        }
+
+        # Keep original mocked users list (from setUp) and add the exited user
+        original_mock_users = [self.mock_get_all.return_value[0]]
+        self.mock_get_all.return_value = original_mock_users + [exited_user_dict]
+
+        # Let's verify that running export without an active ExitRequest does NOT include Jane Smith
+        self.client.force_authenticate(user=self.admin_user)
+        url = reverse('salary_export') + "?month=6&year=2026"
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        wb = openpyxl.load_workbook(io.BytesIO(res.content))
+        ws = wb.active
+        # Rows are: headers (row 1), John Doe (row 2)
+        # Verify that there are only 2 rows in the sheet (header + John Doe)
+        self.assertEqual(ws.max_row, 2)
+        self.assertEqual(ws.cell(row=2, column=2).value, "John Doe")
+
+        # Let's verify that importing a salary slip for Jane Smith without ExitRequest fails
+        excel_content = self.create_excel_file([
+            [1, "John Doe", "Software Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 87000.0, 87000.0, 0.0, 0.0, 87000.0, "123456", "ICICI"],
+            [2, "Jane Smith", "QA Engineer", 30.0, 26.0, 4.0, 0.0, 0.0, 30.0, 60000.0, 60000.0, 0.0, 0.0, 60000.0, "654321", "HDFC"]
+        ])
+        uploaded_file = SimpleUploadedFile("salary_fail_exited.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        url_import = reverse('salary_import')
+        data = {
+            'file': uploaded_file,
+            'month': 6,
+            'year': 2026
+        }
+        res_import = self.client.post(url_import, data, format='multipart')
+        self.assertEqual(res_import.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_import.data['success'], 1)
+        self.assertEqual(res_import.data['failed'], 1)  # Jane Smith should fail
+
+        # Delete any created slips to test empty template export
+        SalarySlip.objects.all().delete()
+
+        # Now let's create a pending ExitRequest for Jane Smith
+        exit_request = ExitRequest.objects.create(
+            bitrix_user_id='20',
+            resignation_date=datetime.date(2026, 6, 15),
+            last_working_day=datetime.date(2026, 6, 30),
+            exit_type='RESIGNATION',
+            exit_reason='Career growth',
+            mode_of_resignation='Email',
+            status='PENDING'
+        )
+
+        # Let's create a salary structure for Jane Smith as well
+        SalaryStructure.objects.create(
+            bitrix_user_id='20',
+            gross_salary=Decimal('60000.00'),
+            pf_contribution=Decimal('4000.00'),
+            esi=Decimal('0.00'),
+            labour_welfare_fund=Decimal('0.00'),
+            professional_tax=Decimal('200.00'),
+            other_deductions=Decimal('0.00'),
+            effective_from=datetime.date(2026, 6, 1)
+        )
+
+        # Now exporting should include Jane Smith
+        res_export2 = self.client.get(url)
+        self.assertEqual(res_export2.status_code, status.HTTP_200_OK)
+        wb2 = openpyxl.load_workbook(io.BytesIO(res_export2.content))
+        ws2 = wb2.active
+        # Rows should be: header (row 1), John Doe (row 2), Jane Smith (row 3)
+        self.assertEqual(ws2.max_row, 3)
+        self.assertEqual(ws2.cell(row=2, column=2).value, "John Doe")
+        self.assertEqual(ws2.cell(row=3, column=2).value, "Jane Smith")
+
+        # Now importing should succeed for Jane Smith too
+        uploaded_file2 = SimpleUploadedFile("salary_success_exited.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        res_import2 = self.client.post(url_import, {
+            'file': uploaded_file2,
+            'month': 6,
+            'year': 2026
+        }, format='multipart')
+        self.assertEqual(res_import2.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_import2.data['success'], 2)
+        self.assertEqual(res_import2.data['failed'], 0)
+
+        # Check slip is created in DB for Jane Smith
+        self.assertTrue(SalarySlip.objects.filter(bitrix_user_id='20', month=6, year=2026).exists())
+
+        # Let's verify that if the ExitRequest is FULLY_EXITED or CANCELLED, it is NOT included and imports fail
+        exit_request.status = 'FULLY_EXITED'
+        exit_request.last_working_day = datetime.date.today() - datetime.timedelta(days=90)
+        exit_request.save()
+
+        # Delete any created slips to test empty template export
+        SalarySlip.objects.all().delete()
+
+        # Export should NOT include Jane Smith anymore
+        res_export3 = self.client.get(url)
+        self.assertEqual(res_export3.status_code, status.HTTP_200_OK)
+        wb3 = openpyxl.load_workbook(io.BytesIO(res_export3.content))
+        ws3 = wb3.active
+        self.assertEqual(ws3.max_row, 2)
+        self.assertEqual(ws3.cell(row=2, column=2).value, "John Doe")
+
+        # Import should fail for Jane Smith
+        uploaded_file3 = SimpleUploadedFile("salary_fail_exited_completed.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        # Let's delete the Jane Smith slip to check import failure behavior
+        SalarySlip.objects.filter(bitrix_user_id='20', month=6, year=2026).delete()
+        res_import3 = self.client.post(url_import, {
+            'file': uploaded_file3,
+            'month': 6,
+            'year': 2026
+        }, format='multipart')
+        self.assertEqual(res_import3.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_import3.data['success'], 1)
+        self.assertEqual(res_import3.data['failed'], 1)
+
+    def test_salary_employee_summary(self):
+        # Create a couple of slips for the employee
+        SalarySlip.objects.create(
+            bitrix_user_id=self.employee.bitrix_id,
+            month=5,
+            year=2026,
+            month_salary=Decimal('87000.00'),
+            worked_days=Decimal('26.00'),
+            month_days=Decimal('30.00'),
+            net_payable=Decimal('87000.00'),
+            fine_advance=Decimal('500.00'),
+            payment_status='paid',
+            payment_date=datetime.date(2026, 6, 5),
+            status='published'
+        )
+        
+        SalarySlip.objects.create(
+            bitrix_user_id=self.employee.bitrix_id,
+            month=6,
+            year=2026,
+            month_salary=Decimal('87000.00'),
+            worked_days=Decimal('26.00'),
+            month_days=Decimal('30.00'),
+            net_payable=Decimal('85000.00'),
+            fine_advance=Decimal('2000.00'),
+            payment_status='paid',
+            payment_date=datetime.date(2026, 7, 5),
+            status='published'
+        )
+
+        # Authenticate as admin to view the summary
+        self.client.force_authenticate(user=self.admin_user)
+        url = reverse('salary_employee_summary', kwargs={'employee_id': int(self.employee.bitrix_id)})
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(res.data['total_salary_credited']), Decimal('148300.00')) # Calculated by save(): 74900 + 73400
+        self.assertEqual(Decimal(res.data['total_deductions']), Decimal('2500.00')) # 500 + 2000
+        self.assertEqual(res.data['total_payslips'], 2)
+        self.assertEqual(res.data['last_payment_date'], '2026-07-05')
+
+    def test_import_preserves_custom_values(self):
+        # Authenticate as admin
+        self.client.force_authenticate(user=self.admin_user)
+        
+        # Create Excel file where Month Salary is 0, but Payable Salary is 2000 and Net Payable is 20000
+        excel_content = self.create_excel_file([
+            [1, "John Doe", "Software Engineer", 30.0, 30.0, 3.0, 0.0, 2.0, 0.0, 0.0, 2000.0, 0.0, 0.0, 20000.0, "", ""]
+        ])
+        uploaded_file = SimpleUploadedFile("salary_custom.xlsx", excel_content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        url = reverse('salary_import')
+        data = {
+            'file': uploaded_file,
+            'month': 6,
+            'year': 2026
+        }
+        res = self.client.post(url, data, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['success'], 1)
+        self.assertEqual(res.data['failed'], 0)
+
+        # Check that the slip has the exact imported custom values (not overwritten to 0)
+        slip = SalarySlip.objects.get(bitrix_user_id=self.employee.bitrix_id, month=6, year=2026)
+        self.assertEqual(slip.month_salary, Decimal('0.00'))
+        self.assertEqual(slip.payable_salary, Decimal('2000.00'))
+        self.assertEqual(slip.net_payable, Decimal('20000.00'))
+        # And payable_days is calculated correctly based on attendance even though it was 0 in Excel
+        self.assertEqual(slip.payable_days, Decimal('35.00'))
+
+    def test_future_salary_slip_visibility(self):
+        # Create a slip in the future (e.g. November 2026, while today is June 2026)
+        SalarySlip.objects.create(
+            bitrix_user_id=self.employee.bitrix_id,
+            month=11,
+            year=2026,
+            month_salary=Decimal('87000.00'),
+            worked_days=Decimal('30.00'),
+            month_days=Decimal('30.00'),
+            net_payable=Decimal('87000.00'),
+            status='published'
+        )
+
+        # Authenticate as admin
+        self.client.force_authenticate(user=self.admin_user)
+
+        # Fetch history for a range covering November 2026
+        url = reverse('salary_history') + f"?employee_id={self.employee.bitrix_id}&from=2026-11&to=2030-12"
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        
+        # Verify that the future slip is successfully returned
+        slips = res.data['results'] if 'results' in res.data else res.data
+        self.assertEqual(len(slips), 1)
+        self.assertEqual(slips[0]['month'], 11)
+        self.assertEqual(slips[0]['year'], 2026)
+
+    def test_manual_generation_carry_forward(self):
+        # Create a mock batch
+        batch = SalaryImportBatch.objects.create(
+            month=1,
+            year=2026,
+            file_name="test.xlsx",
+            uploaded_by=self.admin_user,
+            status='success'
+        )
+        # Create a slip in January 2026
+        prior_slip = SalarySlip.objects.create(
+            bitrix_user_id=self.employee.bitrix_id,
+            month=1,
+            year=2026,
+            month_days=Decimal('31.00'),
+            worked_days=Decimal('20.00'),
+            weekend=Decimal('8.00'),
+            cl=Decimal('2.00'),
+            extra=Decimal('1.00'),
+            month_salary=Decimal('62000.00'),
+            extra_days_working=Decimal('2000.00'),
+            fine_advance=Decimal('1000.00'),
+            status='published',
+            uploaded_batch=batch
+        )
+        
+        # Authenticate as admin
+        self.client.force_authenticate(user=self.admin_user)
+        
+        # Manually generate for February 2026
+        url = reverse('salary_generate_individual')
+        data = {
+            'employee_id': self.employee.bitrix_id,
+            'month': 2,
+            'year': 2026
+        }
+        res = self.client.post(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        
+        # Verify the new slip is created and has correct copied values for Feb 2026 (28 days)
+        slip = SalarySlip.objects.get(bitrix_user_id=self.employee.bitrix_id, month=2, year=2026)
+        self.assertEqual(slip.month_days, Decimal('28.00'))
+        self.assertEqual(slip.worked_days, Decimal('20.00'))
+        # payable_days = 20 + 8 + 2 + 1 = 31
+        self.assertEqual(slip.payable_days, Decimal('31.00'))
+        # payable_salary is copied exactly from January: 62000.00
+        self.assertEqual(slip.payable_salary, Decimal('62000.00'))
+        # net_payable is copied exactly from January: 63000.00
+        self.assertEqual(slip.net_payable, Decimal('63000.00'))
+        self.assertTrue(bool(slip.pdf_file))
+        
+        # Generate again: should reuse and regenerate without failing
+        res2 = self.client.post(url, data, format='json')
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+
+
+

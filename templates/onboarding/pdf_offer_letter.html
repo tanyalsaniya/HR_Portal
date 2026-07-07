@@ -2,21 +2,15 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Offer Letter</title>
+    <title>Appointment Letter</title>
     <style>
         @page {
             size: A4;
             margin: 20mm;
-            @bottom-right {
-                content: "Page " counter(page) " of " counter(pages);
-                font-family: Arial, sans-serif;
-                font-size: 8pt;
-                color: #555;
-            }
         }
         body {
             font-family: Arial, sans-serif;
-            font-size: 10pt;
+            font-size: 10.5pt;
             line-height: 1.6;
             color: #000;
         }
@@ -31,6 +25,7 @@
         }
         .address {
             margin-bottom: 15px;
+            white-space: pre-line;
         }
         .salutation {
             margin-bottom: 15px;
@@ -39,66 +34,68 @@
             margin-bottom: 15px;
             text-align: justify;
         }
+        .list-container {
+            margin-top: 15px;
+        }
         .list-item {
             margin-bottom: 15px;
-            display: table;
-            width: 100%;
-            page-break-inside: avoid;
+            padding-left: 25px;
+            position: relative;
+            text-align: justify;
         }
         .list-number {
-            display: table-cell;
+            position: absolute;
+            left: 0;
+            top: 0;
             width: 25px;
             font-weight: bold;
-            vertical-align: top;
         }
         .list-content {
-            display: table-cell;
-            vertical-align: top;
-            text-align: justify;
+            display: block;
         }
         .nested-list-item {
             margin-top: 8px;
             margin-bottom: 8px;
-            display: table;
-            width: 100%;
+            padding-left: 25px;
+            position: relative;
+            text-align: justify;
         }
         .nested-list-number {
-            display: table-cell;
+            position: absolute;
+            left: 0;
+            top: 0;
             width: 25px;
             font-weight: bold;
-            vertical-align: top;
         }
         .nested-list-content {
-            display: table-cell;
-            vertical-align: top;
-            text-align: justify;
+            display: block;
         }
         .double-nested-list-item {
             margin-top: 6px;
             margin-bottom: 6px;
-            display: table;
-            width: 100%;
-        }
-        .double-nested-list-number {
-            display: table-cell;
-            width: 20px;
-            font-weight: bold;
-            vertical-align: top;
-        }
-        .double-nested-list-content {
-            display: table-cell;
-            vertical-align: top;
+            padding-left: 20px;
+            position: relative;
             text-align: justify;
         }
+        .double-nested-list-number {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 20px;
+            font-weight: bold;
+        }
+        .double-nested-list-content {
+            display: block;
+        }
         .signature-row {
-            margin-top: 30px;
+            margin-top: 40px;
             display: table;
             width: 100%;
             page-break-inside: avoid;
         }
         .signature-col {
             display: table-cell;
-            vertical-align: bottom;
+            vertical-align: top;
             font-size: 9.5pt;
         }
         .salary-table {
@@ -111,13 +108,18 @@
             padding: 6px 12px;
             border: 1px solid #000;
         }
+        .page-break {
+            page-break-before: always;
+        }
     </style>
 </head>
 <body>
-    <div class="title">Offer Letter</div>
+    <div class="title">Appointment Letter</div>
     
     <div class="date">Date: {{ date }}</div>
+    
     <div class="address">{{ address }}</div>
+    
     <div class="salutation">Dear {{ name }},</div>
     
     <div class="intro">
@@ -128,103 +130,114 @@
         Please note that your employment with the company shall be governed by the policies, rules and regulations of the company as specifically mentioned herein by way of references and in force or as amended or altered time to time/ duly notified. The terms and conditions mentioned below:
     </div>
 
-    <div class="list-item">
-        <div class="list-number">1.</div>
-        <div class="list-content">
-            <strong>Remuneration:</strong> The Company is pleased to offer you INR {{ ctc }} CTC per month. Your compensation is confidential and should not be disclosed or discussed with any other employee of the organization. It may be adjusted periodically in accordance with the company’s prevailing employee remuneration guidelines.
-        </div>
-    </div>
-    
-    <div class="list-item">
-        <div class="list-number">2.</div>
-        <div class="list-content">
-            <strong>Probation:</strong> You will be on probation for 3 months from the date of joining the company. The company retains the right to terminate the employment of any employee immediately for just cause, without prior notice or compensation in lieu of notice. If the termination is for reasons other than just cause, the company will comply with the legal requirement to provide the minimum notice period stipulated by law.
-        </div>
-    </div>
-    
-    <div class="list-item">
-        <div class="list-number">3.</div>
-        <div class="list-content">
-            <strong>General Policy:</strong> This role required a full time commitment, Monday to Friday, with a total of 9 hours per day, incorporating a 45 minutes lunch break from 1:30PM to 2:15PM.
-        </div>
-    </div>
-    
-    <div class="list-item">
-        <div class="list-number">4.</div>
-        <div class="list-content">
-            <strong>Leave Policy:</strong>
-            <div class="nested-list-item">
-                <div class="nested-list-number">A.</div>
-                <div class="nested-list-content">During the probation period, employees are not eligible for paid leave.</div>
+    <div class="list-container">
+        <div class="list-item">
+            <div class="list-number">1.</div>
+            <div class="list-content">
+                <strong>Remuneration:</strong> The Company is pleased to offer you INR {{ ctc }} CTC per month. Your compensation is confidential and should not be disclosed or discussed with any other employee of the organization. It may be adjusted periodically in accordance with the company’s prevailing employee remuneration guidelines.
             </div>
-            <div class="nested-list-item">
-                <div class="nested-list-number">B.</div>
-                <div class="nested-list-content">As a regular employee, you may take up to 1 full day leave and 1 half day or 2 short leaves per month, subject to prior approval and adherence to company policies.</div>
+        </div>
+        
+        <div class="list-item">
+            <div class="list-number">2.</div>
+            <div class="list-content">
+                <strong>Probation:</strong> You will be on probation for 3 months from the date of joining the company. The company retains the right to terminate the employment of any employee immediately for just cause, without prior notice or compensation in lieu of notice. If the termination is for reasons other than just cause, the company will comply with the legal requirement to provide the minimum notice period stipulated by law.
             </div>
-            <div class="nested-list-item">
-                <div class="nested-list-number">C.</div>
-                <div class="nested-list-content">
-                    <strong>Sandwich:-</strong>
-                    <div class="double-nested-list-item">
-                        <div class="double-nested-list-number">1.</div>
-                        <div class="double-nested-list-content">If an employee takes leave on Friday and Monday then it will be counted as a sandwich leave and there is no relaxation in this situation.</div>
+        </div>
+        
+        <div class="list-item">
+            <div class="list-number">3.</div>
+            <div class="list-content">
+                <strong>General Policy:</strong> This role required a full time commitment, Monday to Friday, with a total of 9 hours per day, incorporating a 45 minutes lunch break from 1:30PM to 2:15PM.
+            </div>
+        </div>
+        
+        <div class="list-item">
+            <div class="list-number">4.</div>
+            <div class="list-content">
+                <strong>Leave Policy:</strong>
+                <div class="nested-list-item">
+                    <div class="nested-list-number">A.</div>
+                    <div class="nested-list-content">During the probation period, employees are not eligible for paid leave.</div>
+                </div>
+                <div class="nested-list-item">
+                    <div class="nested-list-number">B.</div>
+                    <div class="nested-list-content">As a regular employee, you may take up to 1 full day leave and 1 half day or 2 short leaves per month, subject to prior approval and adherence to company policies.</div>
+                </div>
+                <div class="nested-list-item">
+                    <div class="nested-list-content">
+                        <strong>Sandwich:-</strong>
+                        <div class="double-nested-list-item">
+                            <div class="double-nested-list-number">1.</div>
+                            <div class="double-nested-list-content">If an employee takes leave on Friday and Monday then it will be counted as a sandwich leave and there is no relaxation in this situation.</div>
+                        </div>
+                        <div class="double-nested-list-item">
+                            <div class="double-nested-list-number">2.</div>
+                            <div class="double-nested-list-content">If the employee leaves on Friday, Saturday, Sunday OR Saturday, Sunday, Monday then it will also be considered as a sandwich leave but we will give exemption once in every 3 months.</div>
+                        </div>
                     </div>
-                    <div class="double-nested-list-item">
-                        <div class="double-nested-list-number">2.</div>
-                        <div class="double-nested-list-content">If the employee leaves on Friday, Saturday, Sunday OR Saturday, Sunday, Monday then it will also be considered as a sandwich leave but we will give exemption once in every 3 months.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Break to match PDF layout exactly -->
+    <div class="page-break"></div>
+
+    <div class="list-container" style="margin-top: 0;">
+        <div class="list-item" style="margin-bottom: 15px;">
+            <div class="list-content">
+                <div class="nested-list-item" style="margin-top: 0;">
+                    <div class="nested-list-number">D.</div>
+                    <div class="nested-list-content">Carried forward leaves are limited to one financial year and Six leaves encashment will be allowed at the end of the year.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-item">
+            <div class="list-number">5.</div>
+            <div class="list-content">
+                <strong>Non-Disclosure of Information:</strong> As a part of your employment, you agree to keep all company information confidential, including business strategies, and financial data. Unauthorized disclosure may lead to disciplinary action, including termination and potential legal consequences.
+            </div>
+        </div>
+        
+        <div class="list-item">
+            <div class="list-number">6.</div>
+            <div class="list-content">
+                <strong>Proprietary Information and Inventions Agreement:</strong> As a condition of your employment, you will be required to sign the Company’s Proprietary Information and Inventions Agreement.
+            </div>
+        </div>
+        
+        <div class="list-item">
+            <div class="list-number">7.</div>
+            <div class="list-content">
+                <strong>Tax Matters:</strong>
+                <div class="nested-list-item">
+                    <div class="nested-list-number">&bull;</div>
+                    <div class="nested-list-content">
+                        <strong>Tax Advice:</strong> You are encouraged to obtain your own tax advice regarding your compensation from the Company. You agree that the Company does not have a duty to design its compensation policies in a manner that minimizes your tax liabilities, and you will not make any claim against the Company or its Board of Directors related to tax liabilities arising from your compensation.
+                    </div>
+                </div>
+                <div class="nested-list-item">
+                    <div class="nested-list-number">&bull;</div>
+                    <div class="nested-list-content">
+                        <strong>Interpretation, Amendment and Enforcement:</strong> This letter agreement supersedes and replaces any prior agreements, representations or understandings (whether written, oral, implied or otherwise) between you and the Company and constitutes the complete agreement between you and the Company regarding the subject matter set forth herein. This letter agreement may not be amended or modified, except by an express written agreement signed by both you and a duly authorized officer of the Company. You may indicate your agreement with these terms and accept this offer by signing and dating this agreement or before (<strong>{{ date }}</strong>). Upon your acceptance of this employment offer, <strong>{{ company_name }}</strong> will provide you with the necessary paperwork and instructions.
                     </div>
                 </div>
             </div>
-            <div class="nested-list-item">
-                <div class="nested-list-number">D.</div>
-                <div class="nested-list-content">Carried forward leaves are limited to one financial year and Six leaves encashment will be allowed at the end of the year.</div>
-            </div>
         </div>
     </div>
     
-    <div class="list-item">
-        <div class="list-number">5.</div>
-        <div class="list-content">
-            <strong>Non-Disclosure of Information:</strong> As a part of your employment, you agree to keep all company information confidential, including business strategies, and financial data. Unauthorized disclosure may lead to disciplinary action, including termination and potential legal consequences.
-        </div>
-    </div>
-    
-    <div class="list-item">
-        <div class="list-number">6.</div>
-        <div class="list-content">
-            <strong>Proprietary Information and Inventions Agreement:</strong> As a condition of your employment, you will be required to sign the Company’s Proprietary Information and Inventions Agreement.
-        </div>
-    </div>
-    
-    <div class="list-item">
-        <div class="list-number">7.</div>
-        <div class="list-content">
-            <strong>Tax Matters:</strong>
-            <div class="nested-list-item">
-                <div class="nested-list-number">&bull;</div>
-                <div class="nested-list-content">
-                    <strong>Tax Advice:</strong> You are encouraged to obtain your own tax advice regarding your compensation from the Company. You agree that the Company does not have a duty to design its compensation policies in a manner that minimizes your tax liabilities, and you will not make any claim against the Company or its Board of Directors related to tax liabilities arising from your compensation.
-                </div>
-            </div>
-            <div class="nested-list-item">
-                <div class="nested-list-number">&bull;</div>
-                <div class="nested-list-content">
-                    <strong>Interpretation, Amendment and Enforcement:</strong> This letter agreement supersedes and replaces any prior agreements, representations or understandings (whether written, oral, implied or otherwise) between you and the Company and constitutes the complete agreement between you and the Company regarding the subject matter set forth herein. This letter agreement may not be amended or modified, except by an express written agreement signed by both you and a duly authorized officer of the Company. You may indicate your agreement with these terms and accept this offer by signing and dating this agreement or before (<strong>{{ joining_date }}</strong>). Upon your acceptance of this employment offer, <strong>{{ company_name }}</strong> will provide you with the necessary paperwork and instructions.
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div style="margin-top: 25px; text-align: left; page-break-inside: avoid;">
+    <div style="margin-top: 30px; text-align: left; page-break-inside: avoid;">
         <p>Sincerely,</p>
     </div>
     
-    <div style="margin-top: 35px; text-align: left; page-break-inside: avoid;">
+    <div style="margin-top: 40px; text-align: left; page-break-inside: avoid;">
         <div>……………………………………</div>
         <div style="margin-top: 4px;">Applicant (Sign)</div>
     </div>
 
-    <div class="signature-row" style="margin-top: 50px;">
+    <div class="signature-row" style="margin-top: 60px;">
         <div class="signature-col" style="width: 33%; text-align: left;">
             <div style="display: inline-block; text-align: left;">
                 <div>……………………………………</div>
@@ -246,7 +259,8 @@
         </div>
     </div>
 
-    <div style="page-break-before: always;"></div>
+    <!-- Page Break to Salary Breakup page -->
+    <div class="page-break"></div>
     
     <div style="font-weight: bold; font-size: 14pt; margin-top: 15px; margin-bottom: 25px; text-align: center;">SALARY BREAKUP</div>
     
@@ -291,12 +305,12 @@
         </tbody>
     </table>
 
-    <div style="margin-top: 35px; text-align: left; page-break-inside: avoid;">
+    <div style="margin-top: 40px; text-align: left; page-break-inside: avoid;">
         <div>……………………………………</div>
         <div style="margin-top: 4px;">Applicant (Sign)</div>
     </div>
 
-    <div class="signature-row" style="margin-top: 50px;">
+    <div class="signature-row" style="margin-top: 60px;">
         <div class="signature-col" style="width: 33%; text-align: left;">
             <div style="display: inline-block; text-align: left;">
                 <div>……………………………………</div>

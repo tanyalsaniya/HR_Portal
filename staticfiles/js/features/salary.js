@@ -10,6 +10,11 @@ async function loadSalaryData() {
     salaryCurrentPage = 1;
     document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
     
+    const urlTab = getUrlParam('tab');
+    if (urlTab) activeSalaryTab = urlTab;
+    // Don't update URL here, just set UI
+    switchSalaryTab(activeSalaryTab, false);
+    
     // Adjust visual panel options based on role
     const role = currentUser.role;
     const adminPanel = document.getElementById('payrollAdminPanel');
@@ -38,8 +43,9 @@ async function loadSalaryData() {
     }
 }
 
-function switchSalaryTab(tab) {
+function switchSalaryTab(tab, updateUrl = true) {
     activeSalaryTab = tab;
+    if (updateUrl) setUrlParam('tab', tab);
     
     // Toggle active classes on tab headers
     const headers = ['tabSlips', 'tabStructures', 'tabBatches'];
@@ -116,9 +122,16 @@ async function publishSlipsMonth() {
     const month = document.getElementById('payrollMonth').value;
     const year = document.getElementById('payrollYear').value;
     
-    if (!confirm(`Are you sure you want to publish all draft salary slips for ${month}/${year}?`)) {
+    const _publishConf = await showConfirm({
+        title: 'Publish Salary Slips?',
+        body: `All draft salary slips for <strong>${month}/${year}</strong> will be published and made visible to employees. This action cannot be reversed.`,
+        confirmText: 'Yes, Publish',
+        cancelText: 'Cancel',
+    });
+    if (!_publishConf || !_publishConf.confirmed) {
         return;
     }
+
     
     showToast('Publishing slips...');
     try {
@@ -128,8 +141,12 @@ async function publishSlipsMonth() {
         });
         if (res.ok) {
             const data = await res.json();
-            showToast(data.message || 'Slips published successfully.');
             await loadSlipsRegistry();
+            showSuccessModal({
+                title: 'Salary Slips Published!',
+                subtitle: data.message || `All salary slips for ${month}/${year} are now live and visible to employees.`,
+                btnText: 'View Registry',
+            });
         } else {
             const err = await res.json();
             showToast(err.error || 'Failed to publish slips.', 'error');
@@ -585,6 +602,28 @@ async function loadActiveEmployeesSelect(selectId) {
     }
 }
 
+// Dynamic calculation of modal salary fields
+function calculateModalSalary() {
+    const ctc = parseFloat(document.getElementById('structCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('structPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('structEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('structGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
+    const pf = parseFloat(document.getElementById('structPfContribution').value || 0);
+    const esi = parseFloat(document.getElementById('structEsi').value || 0);
+    const lwf = parseFloat(document.getElementById('structLabourWelfareFund').value || 0);
+    const pt = parseFloat(document.getElementById('structProfessionalTax').value || 0);
+
+    const totalDeductions = pf + esi + lwf + pt;
+    const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('structInHandSalary');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
+}
+
 // Event Listeners for Forms
 document.addEventListener('DOMContentLoaded', () => {
     // Structure Form
@@ -593,14 +632,28 @@ document.addEventListener('DOMContentLoaded', () => {
         structureForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const data = {
-                employee: document.getElementById('structEmployeeSelect').value,
+                bitrix_user_id: document.getElementById('structEmployeeSelect').value,
                 effective_from: document.getElementById('structEffectiveFrom').value,
-                gross_salary: document.getElementById('structGrossSalary').value,
-                pf_contribution: document.getElementById('structPfContribution').value,
-                esi: document.getElementById('structEsi').value,
-                labour_welfare_fund: document.getElementById('structLabourWelfareFund').value,
-                professional_tax: document.getElementById('structProfessionalTax').value,
-                other_deductions: document.getElementById('structOtherDeductions').value
+                gross_salary: parseFloat(document.getElementById('structGrossSalary').value || 0),
+                pf_contribution: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi: parseFloat(document.getElementById('structEsi').value || 0),
+                labour_welfare_fund: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                professional_tax: parseFloat(document.getElementById('structProfessionalTax').value || 0),
+                other_deductions: 0,
+                
+                ctc: parseFloat(document.getElementById('structCTC').value || 0),
+                basic_salary: 0,
+                hra: 0,
+                conveyance: 0,
+                medical_allowance: 0,
+                special_allowance: 0,
+                monthly_bonus: 0,
+                esi_employer: parseFloat(document.getElementById('structEsiEmployer').value || 0),
+                pf_employer: parseFloat(document.getElementById('structPfEmployer').value || 0),
+                pf_employee: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi_employee: parseFloat(document.getElementById('structEsi').value || 0),
+                lwf: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                in_hand_salary: parseFloat(document.getElementById('structInHandSalary').value || 0)
             };
             
             try {
@@ -848,40 +901,19 @@ async function loadDedicatedEmployeeSalaryHistory(employeeId) {
             console.error("Error loading employee details for history view:", e);
         }
 
-        // Fetch employee summary statistics
-        try {
-            const sumRes = await apiFetch(`/salary/employee/${employeeId}/summary`);
-            if (sumRes.ok) {
-                const sumData = await sumRes.json();
-                const credEl = document.getElementById('historyCardCredited');
-                if (credEl) credEl.textContent = `Rs. ${sumData.total_salary_credited || '0.00'}`;
-                
-                const dedEl = document.getElementById('historyCardDeductions');
-                if (dedEl) dedEl.textContent = `Rs. ${sumData.total_deductions || '0.00'}`;
-                
-                const paysEl = document.getElementById('historyCardPayslips');
-                if (paysEl) paysEl.textContent = sumData.total_payslips ?? 0;
-                
-                const lastPayEl = document.getElementById('historyCardLastPayment');
-                if (lastPayEl) lastPayEl.textContent = sumData.last_payment_date || '-';
-            }
-        } catch (e) {
-            console.error("Error loading employee salary summary statistics:", e);
-        }
-
-        // Set default filter values
+        // Set default filter values — default to all-time (2000 to current + 4) so displayed rows match summary count
         const today = new Date();
         const fromMonthEl = document.getElementById('historyPageFromMonth');
         if (fromMonthEl) fromMonthEl.value = "1";
         
         const fromYearEl = document.getElementById('historyPageFromYear');
-        if (fromYearEl) fromYearEl.value = today.getFullYear();
+        if (fromYearEl) fromYearEl.value = 2000;
         
         const toMonthEl = document.getElementById('historyPageToMonth');
-        if (toMonthEl) toMonthEl.value = today.getMonth() + 1;
+        if (toMonthEl) toMonthEl.value = "12";
         
         const toYearEl = document.getElementById('historyPageToYear');
-        if (toYearEl) toYearEl.value = today.getFullYear();
+        if (toYearEl) toYearEl.value = today.getFullYear() + 4;
         
         const payStatEl = document.getElementById('historyPagePaymentStatus');
         if (payStatEl) payStatEl.value = "";
@@ -918,6 +950,31 @@ async function loadDedicatedEmployeeSalaryHistoryData() {
 
         tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">Loading history records...</td></tr>`;
 
+        // Fetch employee summary statistics with filters
+        try {
+            let sumUrl = `/salary/employee/${currentHistoryEmployeeId}/summary?from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
+            if (paymentStatus) {
+                sumUrl += `&payment_status=${paymentStatus}`;
+            }
+            const sumRes = await apiFetch(sumUrl);
+            if (sumRes.ok) {
+                const sumData = await sumRes.json();
+                const credEl = document.getElementById('historyCardCredited');
+                if (credEl) credEl.textContent = `Rs. ${sumData.total_salary_credited || '0.00'}`;
+                
+                const dedEl = document.getElementById('historyCardDeductions');
+                if (dedEl) dedEl.textContent = `Rs. ${sumData.total_deductions || '0.00'}`;
+                
+                const paysEl = document.getElementById('historyCardPayslips');
+                if (paysEl) paysEl.textContent = sumData.total_payslips ?? 0;
+                
+                const lastPayEl = document.getElementById('historyCardLastPayment');
+                if (lastPayEl) lastPayEl.textContent = sumData.last_payment_date || '-';
+            }
+        } catch (e) {
+            console.error("Error loading employee salary summary statistics:", e);
+        }
+
         let url = `/salary/history?employee_id=${currentHistoryEmployeeId}&from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
         if (paymentStatus) {
             url += `&payment_status=${paymentStatus}`;
@@ -928,6 +985,11 @@ async function loadDedicatedEmployeeSalaryHistoryData() {
             if (res.ok) {
                 const slipsData = await res.json();
                 const slips = slipsData.results || slipsData;
+
+                // Keep payslips count card in sync with the actual filtered table count
+                const displayedCount = slipsData.count !== undefined ? slipsData.count : (Array.isArray(slips) ? slips.length : 0);
+                const paysEl = document.getElementById('historyCardPayslips');
+                if (paysEl) paysEl.textContent = displayedCount;
 
                 if (!Array.isArray(slips) || slips.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">No salary slips found for this selection.</td></tr>`;

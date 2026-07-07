@@ -792,13 +792,7 @@ DEFAULT_TEMPLATES = [
 def sync_db_templates():
     from .models import LetterTemplate
     for t in DEFAULT_TEMPLATES:
-        obj = LetterTemplate.objects.filter(name=t['name']).first()
-        if obj:
-            if obj.html_content != t['html_content'] or obj.title != t['title']:
-                obj.html_content = t['html_content']
-                obj.title = t['title']
-                obj.save()
-        else:
+        if not LetterTemplate.objects.filter(name=t['name']).exists():
             LetterTemplate.objects.create(**t)
 
 def render_letter_to_html(employee, doc_type, custom_context=None):
@@ -856,6 +850,28 @@ def generate_document_pdf(employee, doc_type, template_name, context, user=None)
     return doc
 
 
+import re
+from django.utils.safestring import mark_safe, SafeData
+
+def sanitize_html_context(val):
+    if callable(val):
+        return val
+    elif isinstance(val, dict):
+        return {k: sanitize_html_context(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [sanitize_html_context(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(sanitize_html_context(v) for v in val)
+    elif isinstance(val, str) and not isinstance(val, SafeData):
+        formatted = val.replace('\n', '<br>')
+        # Convert ordinals like 1st, 2nd, 3rd, 22nd to superscript HTML
+        def replace_ordinal(match):
+            return f"{match.group(1)}<sup>{match.group(2)}</sup>"
+        formatted = re.sub(r'\b(\d+)(st|nd|rd|th|ST|ND|RD|TH)\b', replace_ordinal, formatted)
+        return mark_safe(formatted)
+    return val
+
+
 def get_letter_context(employee, custom_context=None):
     salary_struct = employee.salary_structures.order_by('-effective_from').first()
     
@@ -898,14 +914,14 @@ def get_letter_context(employee, custom_context=None):
     }
     
     # Populate salary details safely
-    basic = custom_context.get('basic', str(getattr(salary_struct, 'basic', '0.00')) if salary_struct else '0.00')
+    basic = custom_context.get('basic', str(getattr(salary_struct, 'basic_salary', getattr(salary_struct, 'basic', '0.00'))) if salary_struct else '0.00')
     hra = custom_context.get('hra', str(getattr(salary_struct, 'hra', '0.00')) if salary_struct else '0.00')
     conveyance = custom_context.get('conveyance', str(getattr(salary_struct, 'conveyance', '0.00')) if salary_struct else '0.00')
-    medical = custom_context.get('medical', str(getattr(salary_struct, 'medical', '0.00')) if salary_struct else '0.00')
-    special = custom_context.get('special', str(getattr(salary_struct, 'special', '0.00')) if salary_struct else '0.00')
+    medical = custom_context.get('medical', str(getattr(salary_struct, 'medical_allowance', '0.00')) if salary_struct else '0.00')
+    special = custom_context.get('special', str(getattr(salary_struct, 'special_allowance', '0.00')) if salary_struct else '0.00')
     monthly_bonus = custom_context.get('monthly_bonus', str(getattr(salary_struct, 'monthly_bonus', '0.00')) if salary_struct else '0.00')
     
-    pf = custom_context.get('pf', str(getattr(salary_struct, 'pf_contribution', getattr(salary_struct, 'pf', '0.00'))) if salary_struct else '0.00')
+    pf = custom_context.get('pf', str(getattr(salary_struct, 'pf_employee', getattr(salary_struct, 'pf_contribution', '0.00'))) if salary_struct else '0.00')
     pt = custom_context.get('professional_tax', str(getattr(salary_struct, 'professional_tax', '200.00')) if salary_struct else '200.00')
     tds = custom_context.get('tds', str(getattr(salary_struct, 'tds', '0.00')) if salary_struct else '0.00')
     
@@ -914,13 +930,13 @@ def get_letter_context(employee, custom_context=None):
     net_salary = custom_context.get('net_salary', str(getattr(salary_struct, 'net_salary', '0.00')) if salary_struct else '0.00')
     
     # Extra breakup fields requested
-    ctc = custom_context.get('ctc', str(getattr(salary_struct, 'gross_salary', '0.00')) if salary_struct else '0.00')
-    esi_employer = custom_context.get('esi_employer', '0.00')
-    pf_employer = custom_context.get('pf_employer', '0.00')
+    ctc = custom_context.get('ctc', str(getattr(salary_struct, 'ctc', gross_salary)) if salary_struct else '0.00')
+    esi_employer = custom_context.get('esi_employer', str(getattr(salary_struct, 'esi_employer', '0.00')) if salary_struct else '0.00')
+    pf_employer = custom_context.get('pf_employer', str(getattr(salary_struct, 'pf_employer', '0.00')) if salary_struct else '0.00')
     pf_employee = custom_context.get('pf_employee', pf)
-    esi_employee = custom_context.get('esi_employee', str(getattr(salary_struct, 'esi', '0.00')) if salary_struct else '0.00')
-    lwf = custom_context.get('lwf', str(getattr(salary_struct, 'labour_welfare_fund', '0.00')) if salary_struct else '0.00')
-    in_hand = custom_context.get('in_hand', net_salary)
+    esi_employee = custom_context.get('esi_employee', str(getattr(salary_struct, 'esi_employee', getattr(salary_struct, 'esi', '0.00'))) if salary_struct else '0.00')
+    lwf = custom_context.get('lwf', str(getattr(salary_struct, 'lwf', getattr(salary_struct, 'labour_welfare_fund', '0.00'))) if salary_struct else '0.00')
+    in_hand = custom_context.get('in_hand', str(getattr(salary_struct, 'in_hand_salary', net_salary)) if salary_struct else '0.00')
     
     context.update({
         'salary': salary_struct if salary_struct else True,
@@ -958,7 +974,7 @@ def get_letter_context(employee, custom_context=None):
         ] if salary_struct else [],
     })
     
-    return context
+    return sanitize_html_context(context)
 
 def generate_offer_letter(employee, user=None, custom_context=None):
     context = get_letter_context(employee, custom_context)

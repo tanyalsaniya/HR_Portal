@@ -24,20 +24,25 @@ def generate_employee_id():
         
     return f"{prefix}{new_sequence:04d}"
 
-def generate_payslip_number(year, month):
+def generate_payslip_number(year, month, is_dismissed=False):
     """
     Generates a unique payslip number in the format: PS-YYYY-MM-XXXX
     where YYYY is the target year, MM is the target month, and XXXX is a sequential 4-digit number.
     """
     from django.apps import apps
-    SalarySlip = apps.get_model('salary', 'SalarySlip')
+    if is_dismissed:
+        SalarySlip = apps.get_model('salary', 'DismissedSalarySlip')
+    else:
+        SalarySlip = apps.get_model('salary', 'SalarySlip')
+        
     month_str = f"{int(month):02d}"
     prefix = f"PS-{year}-{month_str}-"
     
     last_slip = SalarySlip.objects.filter(payslip_no__startswith=prefix).order_by('-payslip_no').first()
     if last_slip:
         try:
-            last_sequence = int(last_slip.payslip_no.split('-')[-1])
+            payslip_str = last_slip.payslip_no.replace("-D", "")
+            last_sequence = int(payslip_str.split('-')[-1])
             new_sequence = last_sequence + 1
         except (ValueError, IndexError):
             new_sequence = 1

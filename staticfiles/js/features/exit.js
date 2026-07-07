@@ -160,13 +160,26 @@ async function loadActiveEmployeesSelect(selectId) {
 }
 
 // ---------- DETAILS VIEW WORKFLOW ----------
-async function openExitDetailModal(id) {
+async function openExitDetailModal(id, skipSwitchView = false) {
     try {
         const res = await apiFetch(`/api/exit/requests/${id}/`);
         if (res.ok) {
             activeExitRequest = await res.json();
-            switchView('exitDetailView');
+            // Only call switchView if we weren't already called from it — prevents infinite loop
+            if (!skipSwitchView) {
+                // skipDataLoad:true tells switchView NOT to call openExitDetailModal again
+                switchView('exitDetailView', true, { exitId: id, skipDataLoad: true });
+            }
             populateExitDetails(activeExitRequest);
+            // Restore tab from URL if any, else default to clearances
+            const path = window.location.pathname;
+            if (path.includes('/documents/')) {
+                switchExitTab('docs', false);
+            } else if (path.includes('/form/')) {
+                switchExitTab('form', false);
+            } else {
+                switchExitTab('clearances', false);
+            }
         } else {
             showToast('Failed to fetch details.', 'error');
         }
@@ -181,40 +194,42 @@ function closeExitDetailModal() {
 }
 
 function populateExitDetails(x) {
+    // Null-safe DOM setter — prevents TypeError if element doesn't exist
+    const setEl = (id, fn) => { const el = document.getElementById(id); if (el) fn(el); };
+
     // Basic info
     const name = x.employee_details ? `${x.employee_details.first_name} ${x.employee_details.last_name}` : 'Unknown';
-    document.getElementById('detEmpName').textContent = name;
-    document.getElementById('detEmpId').textContent = x.employee_details ? x.employee_details.emp_id : x.employee;
-    document.getElementById('detLwd').textContent = x.last_working_day;
-    document.getElementById('detResignDate').textContent = x.resignation_date;
+    setEl('detEmpName', el => el.textContent = name);
+    setEl('detEmpId', el => el.textContent = x.employee_details ? x.employee_details.emp_id : x.employee);
+    setEl('detLwd', el => el.textContent = x.last_working_day);
+    setEl('detResignDate', el => el.textContent = x.resignation_date);
 
     // Absconding flow check
     const isAbsconding = x.exit_type === 'ABSCONDING';
-    document.getElementById('abscondingBanner').style.display = isAbsconding ? 'block' : 'none';
+    setEl('abscondingBanner', el => el.style.display = isAbsconding ? 'block' : 'none');
 
     // RBAC protections check
     const isAdmin = isAdminUser();
     
     // Admin only actions
-    document.getElementById('btnCancelExit').style.display = isAdmin ? 'inline-block' : 'none';
-    document.getElementById('btnOverrideExit').style.display = isAdmin ? 'inline-block' : 'none';
-    document.getElementById('btnReopenExit').style.display = isAdmin ? 'inline-block' : 'none';
-    document.getElementById('btnExtendLwd').style.display = isAdmin ? 'inline-block' : 'none';
-    document.getElementById('btnApproveFf').style.display = isAdmin ? 'inline-block' : 'none';
-    document.getElementById('btnGenNoc').style.display = isAdmin ? 'inline-block' : 'none';
+    setEl('btnCancelExit', el => el.style.display = isAdmin ? 'inline-block' : 'none');
+    setEl('btnOverrideExit', el => el.style.display = isAdmin ? 'inline-block' : 'none');
+    setEl('btnReopenExit', el => el.style.display = isAdmin ? 'inline-block' : 'none');
+    setEl('btnExtendLwd', el => el.style.display = isAdmin ? 'inline-block' : 'none');
+    setEl('btnApproveFf', el => el.style.display = isAdmin ? 'inline-block' : 'none');
+    setEl('btnGenNoc', el => el.style.display = isAdmin ? 'inline-block' : 'none');
 
     // Resend link hide for absconding or final exit
-    document.getElementById('btnResendToken').style.display = (!isAbsconding && x.status !== 'FULLY_EXITED') ? 'inline-block' : 'none';
+    setEl('btnResendToken', el => el.style.display = (!isAbsconding && x.status !== 'FULLY_EXITED') ? 'inline-block' : 'none');
 
     // Mark Fully Exited condition
     const ff = x.ff_settlement;
-    document.getElementById('btnMarkExited').disabled = (!ff || !ff.approved_by || x.status === 'FULLY_EXITED');
+    setEl('btnMarkExited', el => el.disabled = (!ff || !ff.approved_by || x.status === 'FULLY_EXITED'));
 
-    const chkEmail = document.getElementById('chkSendEmailOnExit');
-    if (chkEmail) {
-        chkEmail.disabled = (x.status === 'FULLY_EXITED');
-        chkEmail.checked = (x.status === 'FULLY_EXITED') ? x.send_email_on_exit : true;
-    }
+    setEl('chkSendEmailOnExit', el => {
+        el.disabled = (x.status === 'FULLY_EXITED');
+        el.checked = (x.status === 'FULLY_EXITED') ? x.send_email_on_exit : true;
+    });
 
     // Update Timeline status
     const steps = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CLEARANCES_DONE', 'FF_PROCESSED', 'FULLY_EXITED'];
@@ -242,46 +257,46 @@ function populateExitDetails(x) {
     // Calculate progress line width
     let progressWidth = 0;
     if (activeIndex >= 0) {
-        // Line should extend to the active step. If fully completed, extend to the end (index 5)
         const lineTargetIndex = Math.min(activeIndex, steps.length - 1);
-        progressWidth = (lineTargetIndex / (steps.length - 1)) * 90; // max width 90%
+        progressWidth = (lineTargetIndex / (steps.length - 1)) * 90;
     }
-    document.getElementById('timelineProgress').style.width = `${progressWidth}%`;
+    setEl('timelineProgress', el => el.style.width = `${progressWidth}%`);
 
     steps.forEach((step, idx) => {
         const stepDiv = document.getElementById(`step_${step}`);
         if (!stepDiv) return;
         const dot = stepDiv.querySelector('.step-dot');
+        if (!dot) return;
         
         // Reset styles
         dot.style.backgroundColor = '#cbd5e1';
         dot.style.color = 'white';
 
         if (x.status === 'CANCELLED') {
-            dot.style.backgroundColor = '#f87171'; // red
+            dot.style.backgroundColor = '#f87171';
         } else if (x.status === 'OVERRIDDEN') {
-            dot.style.backgroundColor = '#f59e0b'; // orange
+            dot.style.backgroundColor = '#f59e0b';
         } else {
             if (idx < activeIndex) {
-                dot.style.backgroundColor = '#22c55e'; // green (completed)
+                dot.style.backgroundColor = '#22c55e';
             } else if (idx === activeIndex) {
-                dot.style.backgroundColor = '#3b82f6'; // active blue
+                dot.style.backgroundColor = '#3b82f6';
             }
         }
     });
 
     // Populate Checklists
-    document.getElementById('chkItEmail').checked = x.it_email_deactivated;
-    document.getElementById('chkItAccess').checked = x.it_system_access_revoked;
-    document.getElementById('chkItVpn').checked = x.it_vpn_removed;
-    document.getElementById('chkItBio').checked = x.it_biometric_deactivated;
-    document.getElementById('chkItBackup').checked = x.it_data_backup_completed;
+    setEl('chkItEmail', el => el.checked = x.it_email_deactivated);
+    setEl('chkItAccess', el => el.checked = x.it_system_access_revoked);
+    setEl('chkItVpn', el => el.checked = x.it_vpn_removed);
+    setEl('chkItBio', el => el.checked = x.it_biometric_deactivated);
+    setEl('chkItBackup', el => el.checked = x.it_data_backup_completed);
 
-    document.getElementById('selClrIt').value = x.clearance_it;
-    document.getElementById('selClrFinance').value = x.clearance_finance;
-    document.getElementById('selClrAdmin').value = x.clearance_admin;
-    document.getElementById('selClrManager').value = x.clearance_manager;
-    document.getElementById('selClrLibrary').value = x.clearance_library;
+    setEl('selClrIt', el => el.value = x.clearance_it);
+    setEl('selClrFinance', el => el.value = x.clearance_finance);
+    setEl('selClrAdmin', el => el.value = x.clearance_admin);
+    setEl('selClrManager', el => el.value = x.clearance_manager);
+    setEl('selClrLibrary', el => el.value = x.clearance_library);
 
     // Populate F&F Calculator
     const salaryStructures = (x.employee_details && x.employee_details.salary_structures) || [];
@@ -294,37 +309,36 @@ function populateExitDetails(x) {
     const dayOfMonth = lwd.getDate();
 
     if (ff) {
-        document.getElementById('ffMonthDays').value = ff.salary_month_days;
-        document.getElementById('ffWorkedDays').value = ff.salary_worked_days;
-        document.getElementById('ffLeaveEncashDays').value = ff.leave_encash_days;
-        document.getElementById('ffBonusArrears').value = ff.bonus_arrears;
-        document.getElementById('ffGratuityAmount').value = ff.gratuity_amount;
-        document.getElementById('ffNoticeShortDays').value = ff.notice_shortfall_days;
-        document.getElementById('ffAdvanceOutstanding').value = ff.salary_advance_outstanding;
-        document.getElementById('ffBondPenalty').value = ff.bond_penalty;
-        document.getElementById('ffTdsDeduction').value = ff.tds_deduction;
+        setEl('ffMonthDays', el => el.value = ff.salary_month_days);
+        setEl('ffWorkedDays', el => el.value = ff.salary_worked_days);
+        setEl('ffLeaveEncashDays', el => el.value = ff.leave_encash_days);
+        setEl('ffBonusArrears', el => el.value = ff.bonus_arrears);
+        setEl('ffGratuityAmount', el => el.value = ff.gratuity_amount);
+        setEl('ffNoticeShortDays', el => el.value = ff.notice_shortfall_days);
+        setEl('ffAdvanceOutstanding', el => el.value = ff.salary_advance_outstanding);
+        setEl('ffBondPenalty', el => el.value = ff.bond_penalty);
+        setEl('ffTdsDeduction', el => el.value = ff.tds_deduction);
         
         // Load custom rows
         renderCustomRows('reimbursementsContainer', ff.reimbursements_json || [], 'reimb');
         renderCustomRows('deductionsContainer', ff.other_deductions_json || [], 'ded');
     } else {
-        // defaults
-        document.getElementById('ffMonthDays').value = 30;
-        document.getElementById('ffWorkedDays').value = dayOfMonth;
-        document.getElementById('ffLeaveEncashDays').value = x.leave_balance_days || 0;
-        document.getElementById('ffBonusArrears').value = 0;
-        document.getElementById('ffGratuityAmount').value = 0;
-        document.getElementById('ffNoticeShortDays').value = 0;
-        document.getElementById('ffAdvanceOutstanding').value = 0;
-        document.getElementById('ffBondPenalty').value = 0;
-        document.getElementById('ffTdsDeduction').value = 0;
+        setEl('ffMonthDays', el => el.value = 30);
+        setEl('ffWorkedDays', el => el.value = dayOfMonth);
+        setEl('ffLeaveEncashDays', el => el.value = x.leave_balance_days || 0);
+        setEl('ffBonusArrears', el => el.value = 0);
+        setEl('ffGratuityAmount', el => el.value = 0);
+        setEl('ffNoticeShortDays', el => el.value = 0);
+        setEl('ffAdvanceOutstanding', el => el.value = 0);
+        setEl('ffBondPenalty', el => el.value = 0);
+        setEl('ffTdsDeduction', el => el.value = 0);
         
-        document.getElementById('reimbursementsContainer').innerHTML = '';
-        document.getElementById('deductionsContainer').innerHTML = '';
+        setEl('reimbursementsContainer', el => el.innerHTML = '');
+        setEl('deductionsContainer', el => el.innerHTML = '');
     }
 
     // Save basic salary as attributes for calculations
-    document.getElementById('ffPerDaySalary').dataset.basic = basicSalary;
+    setEl('ffPerDaySalary', el => el.dataset.basic = basicSalary);
     
     // Run initial calculations
     calculateFfTotals();
@@ -339,28 +353,85 @@ function populateExitDetails(x) {
             respDetailsEl.style.display = 'block';
             document.getElementById('qDetSubmittedAt').textContent = fr.submitted_at ? new Date(fr.submitted_at).toLocaleString() : '-';
             document.getElementById('qDetPersonalEmail').textContent = fr.personal_email || '-';
+            document.getElementById('qDetPersonalPhone').textContent = fr.personal_phone || '-';
+            document.getElementById('qDetPersonalAddress').textContent = fr.personal_address || '-';
+            
             document.getElementById('qDetReasonDropdown').textContent = fr.reason_dropdown || '-';
             document.getElementById('qDetKtStatus').textContent = fr.kt_status || '-';
             document.getElementById('qDetKtHandover').textContent = fr.kt_handover_to || '-';
+            document.getElementById('qDetKtCompletionDate').textContent = fr.kt_completion_date || '-';
+            
+            const getYesNoSpan = (val) => {
+                if (val === true || val === 'true') {
+                    return '<span style="color: #16a34a; font-weight: bold;">YES</span>';
+                }
+                return '<span style="color: #dc2626; font-weight: bold;">NO</span>';
+            };
+            
+            document.getElementById('qDetKtManagerConfirmed').innerHTML = getYesNoSpan(fr.kt_manager_confirmed);
+            document.getElementById('qDetKtNotes').textContent = fr.kt_remarks || '-';
+            
+            // Assets return clearance details
+            document.getElementById('qDetAssetLaptopStatus').innerHTML = getYesNoSpan(fr.asset_laptop_returned);
+            document.getElementById('qDetAssetLaptopSerial').textContent = fr.asset_laptop_serial || '-';
+            document.getElementById('qDetAssetLaptopRemarks').textContent = fr.asset_laptop_remarks || '-';
+            
+            document.getElementById('qDetAssetIdStatus').innerHTML = getYesNoSpan(fr.asset_id_returned);
+            document.getElementById('qDetAssetIdRemarks').textContent = fr.asset_id_remarks || '-';
+            
+            document.getElementById('qDetAssetAccessCardStatus').innerHTML = getYesNoSpan(fr.asset_access_card_returned);
+            document.getElementById('qDetAssetAccessCardRemarks').textContent = fr.asset_access_card_remarks || '-';
+            
+            document.getElementById('qDetAssetMobileStatus').innerHTML = getYesNoSpan(fr.asset_mobile_returned);
+            document.getElementById('qDetAssetMobileNumber').textContent = fr.asset_mobile_number || '-';
+            document.getElementById('qDetAssetMobileRemarks').textContent = fr.asset_mobile_remarks || '-';
+            
+            document.getElementById('qDetAssetLockerStatus').innerHTML = getYesNoSpan(fr.asset_locker_returned);
+            document.getElementById('qDetAssetLockerRemarks').textContent = fr.asset_locker_remarks || '-';
+            
+            document.getElementById('qDetAssetOthers').textContent = fr.asset_others_details || '-';
+            document.getElementById('qDetAssetsConfirmation').innerHTML = getYesNoSpan(fr.assets_confirmation);
+            
+            // Feedback details
             document.getElementById('qDetRecommend').textContent = fr.recommend || '-';
             document.getElementById('qDetRatingEnv').textContent = fr.rating_env || '-';
             document.getElementById('qDetRatingMgmt').textContent = fr.rating_mgmt || '-';
             document.getElementById('qDetRatingBalance').textContent = fr.rating_balance || '-';
             document.getElementById('qDetReasonDetails').textContent = fr.reason_details || '-';
-            document.getElementById('qDetKtNotes').textContent = fr.kt_remarks || '-';
+            document.getElementById('qDetLikedMost').textContent = fr.liked_most || '-';
+            document.getElementById('qDetImprovedMost').textContent = fr.improved_most || '-';
             document.getElementById('qDetFeedback').textContent = fr.other_feedback || '-';
+            document.getElementById('qDetDeclarationConfirmed').innerHTML = getYesNoSpan(fr.declaration_confirmed);
         }
     } else {
         if (noRespEl) noRespEl.style.display = 'block';
         if (respDetailsEl) respDetailsEl.style.display = 'none';
     }
 
-    // Reset view to first tab
-    switchExitTab('clearances');
+    // Reset view to requested tab
+    const urlTab = getUrlParam('extab');
+    switchExitTab(urlTab || 'clearances', false);
 }
 
 // Switch Profile Detail Tab Views in Exit Panel
-function switchExitTab(tabId) {
+function switchExitTab(tabId, updateUrl = true) {
+    // Map tab IDs to clean URL paths
+    const tabToPath = {
+        'clearances': 'clearances',
+        'ff': 'clearances',   // ff is part of clearances section
+        'docs': 'documents',
+        'form': 'form'
+    };
+
+    if (updateUrl && activeExitRequest) {
+        const urlSegment = tabToPath[tabId] || 'clearances';
+        history.replaceState(
+            { viewId: 'exitDetailView', exitId: activeExitRequest.id },
+            '',
+            `/exits/${activeExitRequest.id}/${urlSegment}/`
+        );
+    }
+
     const tabs = ['clearances', 'ff', 'docs', 'form'];
     tabs.forEach(t => {
         const btn = document.getElementById(`exitTab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
@@ -424,47 +495,70 @@ function addDeductionRow() {
 }
 
 function calculateFfTotals() {
-    const basicMonthly = parseFloat(document.getElementById('ffPerDaySalary').dataset.basic) || 0;
-    const monthDays = parseFloat(document.getElementById('ffMonthDays').value) || 30;
-    const workedDays = parseFloat(document.getElementById('ffWorkedDays').value) || 0;
-    const leaveDays = parseFloat(document.getElementById('ffLeaveEncashDays').value) || 0;
-    const noticeDays = parseFloat(document.getElementById('ffNoticeShortDays').value) || 0;
+    const getElVal = (id, fallback = 0) => {
+        const el = document.getElementById(id);
+        return el ? (parseFloat(el.value) || fallback) : fallback;
+    };
+    const getElDataset = (id, key, fallback = '') => {
+        const el = document.getElementById(id);
+        return el ? (el.dataset[key] || fallback) : fallback;
+    };
+    const setElVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+    const setElText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    const basicMonthly = parseFloat(getElDataset('ffPerDaySalary', 'basic')) || 0;
+    const monthDays = getElVal('ffMonthDays', 30);
+    const workedDays = getElVal('ffWorkedDays', 0);
+    const leaveDays = getElVal('ffLeaveEncashDays', 0);
+    const noticeDays = getElVal('ffNoticeShortDays', 0);
 
     const perDay = monthDays > 0 ? basicMonthly / monthDays : 0;
     const proratedBasic = perDay * workedDays;
     const leaveEncash = perDay * leaveDays;
     const noticeShort = perDay * noticeDays;
 
-    document.getElementById('ffPerDaySalary').value = perDay.toFixed(2);
-    document.getElementById('ffProportionalSalary').value = proratedBasic.toFixed(2);
-    document.getElementById('ffLeaveEncashAmount').value = leaveEncash.toFixed(2);
-    document.getElementById('ffNoticeShortAmount').value = noticeShort.toFixed(2);
+    setElVal('ffPerDaySalary', perDay.toFixed(2));
+    setElVal('ffProportionalSalary', proratedBasic.toFixed(2));
+    setElVal('ffLeaveEncashAmount', leaveEncash.toFixed(2));
+    setElVal('ffNoticeShortAmount', noticeShort.toFixed(2));
 
     // Sum earnings
-    const bonus = parseFloat(document.getElementById('ffBonusArrears').value) || 0;
-    const gratuity = parseFloat(document.getElementById('ffGratuityAmount').value) || 0;
+    const bonus = getElVal('ffBonusArrears', 0);
+    const gratuity = getElVal('ffGratuityAmount', 0);
     let customReimb = 0;
     document.querySelectorAll('.reimb-row').forEach(row => {
-        customReimb += parseFloat(row.querySelector('.reimb-amount').value) || 0;
+        const amtInput = row.querySelector('.reimb-amount');
+        if (amtInput) {
+            customReimb += parseFloat(amtInput.value) || 0;
+        }
     });
 
     const totalEarnings = proratedBasic + leaveEncash + bonus + gratuity + customReimb;
 
     // Sum deductions
-    const advance = parseFloat(document.getElementById('ffAdvanceOutstanding').value) || 0;
-    const bond = parseFloat(document.getElementById('ffBondPenalty').value) || 0;
-    const tds = parseFloat(document.getElementById('ffTdsDeduction').value) || 0;
+    const advance = getElVal('ffAdvanceOutstanding', 0);
+    const bond = getElVal('ffBondPenalty', 0);
+    const tds = getElVal('ffTdsDeduction', 0);
     let customDeds = 0;
     document.querySelectorAll('.ded-row').forEach(row => {
-        customDeds += parseFloat(row.querySelector('.ded-amount').value) || 0;
+        const amtInput = row.querySelector('.ded-amount');
+        if (amtInput) {
+            customDeds += parseFloat(amtInput.value) || 0;
+        }
     });
 
     const totalDeductions = noticeShort + advance + bond + tds + customDeds;
     const netPayable = totalEarnings - totalDeductions;
 
-    document.getElementById('lblTotalEarnings').textContent = `INR ${totalEarnings.toFixed(2)}`;
-    document.getElementById('lblTotalDeductions').textContent = `INR ${totalDeductions.toFixed(2)}`;
-    document.getElementById('lblNetPayable').textContent = `INR ${netPayable.toFixed(2)}`;
+    setElText('lblTotalEarnings', `INR ${totalEarnings.toFixed(2)}`);
+    setElText('lblTotalDeductions', `INR ${totalDeductions.toFixed(2)}`);
+    setElText('lblNetPayable', `INR ${netPayable.toFixed(2)}`);
 }
 
 // ---------- API MUTATIONS ----------
@@ -573,7 +667,13 @@ async function saveFfCalculations() {
 
 async function approveFfCalculations() {
     if (!activeExitRequest) return;
-    if (!confirm('Are you sure you want to approve this Full & Final Settlement? This will freeze the computations.')) return;
+    const _approveConf = await showConfirm({
+        title: 'Approve F\u0026F Settlement?',
+        body: 'This will freeze all computations for the Full \u0026 Final Settlement. This action cannot be undone.',
+        confirmText: 'Yes, Approve',
+        cancelText: 'Cancel',
+    });
+    if (!_approveConf || !_approveConf.confirmed) return;
 
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/approve-ff/`, {
@@ -610,8 +710,19 @@ async function actionResendLink() {
 
 async function actionExtendLwd() {
     if (!activeExitRequest) return;
-    const newDate = prompt('Enter new Last Working Day (YYYY-MM-DD):', activeExitRequest.last_working_day);
-    if (!newDate) return;
+    const _lwdResult = await showPromptDialog({
+        title: 'Update Last Working Day',
+        body: 'Enter the new Last Working Day date for this employee.',
+        label: 'New Last Working Day',
+        placeholder: 'YYYY-MM-DD (e.g. 2025-08-31)',
+        type: 'text',
+        confirmText: 'Update LWD',
+        required: true,
+        requiredMsg: 'Please enter a valid date.',
+        validate: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? null : 'Date must be in YYYY-MM-DD format.'),
+    });
+    if (!_lwdResult || !_lwdResult.confirmed) return;
+    const newDate = _lwdResult.value;
 
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/extend-lwd/`, {
@@ -633,7 +744,13 @@ async function actionExtendLwd() {
 
 async function actionReopenExit() {
     if (!activeExitRequest) return;
-    if (!confirm('Are you sure you want to reopen this exit request?')) return;
+    const _reopenConf = await showConfirm({
+        title: 'Reopen Exit Request?',
+        body: 'The exit request will be moved back to the previous stage for further processing.',
+        confirmText: 'Yes, Reopen',
+        cancelText: 'Cancel',
+    });
+    if (!_reopenConf || !_reopenConf.confirmed) return;
 
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/reopen/`, {
@@ -653,8 +770,19 @@ async function actionReopenExit() {
 
 async function actionCancelExit() {
     if (!activeExitRequest) return;
-    const reason = prompt('Please enter cancellation reason:');
-    if (!reason) return;
+    const _cancelResult = await showPromptDialog({
+        title: 'Cancel Exit Request',
+        body: 'The employee status will be restored to Active. Please provide a reason for cancellation.',
+        label: 'Cancellation Reason',
+        placeholder: 'Enter the reason for cancelling this exit process...',
+        type: 'textarea',
+        confirmText: 'Cancel Exit',
+        confirmClass: 'hr-modal-btn--danger',
+        required: true,
+        requiredMsg: 'A cancellation reason is required.',
+    });
+    if (!_cancelResult || !_cancelResult.confirmed) return;
+    const reason = _cancelResult.value;
 
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/cancel/`, {
@@ -676,8 +804,19 @@ async function actionCancelExit() {
 
 async function actionOverrideExit() {
     if (!activeExitRequest) return;
-    const reason = prompt('Please enter Override reason (e.g. Absconding Override):');
-    if (!reason) return;
+    const _overrideResult = await showPromptDialog({
+        title: 'Override Exit Status',
+        body: 'Provide a reason for manually overriding the exit status (e.g. Absconding, Termination, etc.).',
+        label: 'Override Reason',
+        placeholder: 'e.g. Absconding — employee did not serve notice period',
+        type: 'textarea',
+        confirmText: 'Apply Override',
+        confirmClass: 'hr-modal-btn--danger',
+        required: true,
+        requiredMsg: 'An override reason is required.',
+    });
+    if (!_overrideResult || !_overrideResult.confirmed) return;
+    const reason = _overrideResult.value;
 
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/override/`, {
@@ -700,12 +839,58 @@ async function actionOverrideExit() {
 let currentPreviewPdfUrl = null;
 let currentPreviewPdfName = '';
 
+async function actionSendEmailDocs() {
+    if (!activeExitRequest) return;
+    const _emailConf = await showConfirm({
+        title: 'Send Documents via Email?',
+        body: 'The selected exit documents will be emailed to the employee immediately. Please ensure the selections are correct.',
+        confirmText: 'Yes, Send Email',
+        cancelText: 'Cancel',
+    });
+    if (!_emailConf || !_emailConf.confirmed) return;
+
+    const email_documents = [];
+    if (document.getElementById('chkEmailRelieving') && document.getElementById('chkEmailRelieving').checked) email_documents.push('RELIEVING_LETTER');
+    if (document.getElementById('chkEmailExperience') && document.getElementById('chkEmailExperience').checked) email_documents.push('EXPERIENCE_LETTER');
+    if (document.getElementById('chkEmailNotice') && document.getElementById('chkEmailNotice').checked) email_documents.push('NOTICE_LETTER');
+    if (document.getElementById('chkEmailNoc') && document.getElementById('chkEmailNoc').checked) email_documents.push('NOC_LETTER');
+    if (document.getElementById('chkEmailFfLetter') && document.getElementById('chkEmailFfLetter').checked) email_documents.push('FF_SETTLEMENT_LETTER');
+    if (document.getElementById('chkEmailFfSlip') && document.getElementById('chkEmailFfSlip').checked) email_documents.push('FF_SALARY_SLIP');
+
+    try {
+        const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/send-documents-email/`, {
+            method: 'POST',
+            body: JSON.stringify({ 
+                email_documents: email_documents
+            })
+        });
+        if (res.ok) {
+            showSuccessModal({
+                title: 'Documents Dispatched!',
+                subtitle: 'The selected exit documents have been queued for delivery to the employee via email.',
+                btnText: 'Done',
+            });
+        } else {
+            const err = await res.json();
+            showToast(JSON.stringify(err), 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Error dispatching emails.', 'error');
+    }
+}
+
 async function actionMarkExited() {
     if (!activeExitRequest) return;
-    if (!confirm('Marking this employee as fully exited will transition their profile to Exited status. Proceed?')) return;
+    const _exitConf = await showDangerConfirm({
+        title: 'Mark as Fully Exited?',
+        body: "This will permanently transition the employee's profile to Exited status and complete the offboarding process.",
+        confirmText: 'Yes, Complete Exit',
+        cancelText: 'Cancel',
+    });
+    if (!_exitConf || !_exitConf.confirmed) return;
 
-    const chkEmail = document.getElementById('chkSendEmailOnExit');
-    const sendEmail = chkEmail ? chkEmail.checked : true;
+    const sendEmail = false;
 
     const email_documents = [];
     if (document.getElementById('chkEmailRelieving') && document.getElementById('chkEmailRelieving').checked) email_documents.push('RELIEVING_LETTER');
@@ -736,16 +921,78 @@ async function actionMarkExited() {
     }
 }
 
+async function sendSelectedDocumentsManual() {
+    if (!activeExitRequest) return;
+
+    const email_documents = [];
+    if (document.getElementById('chkEmailRelieving') && document.getElementById('chkEmailRelieving').checked) email_documents.push('RELIEVING_LETTER');
+    if (document.getElementById('chkEmailExperience') && document.getElementById('chkEmailExperience').checked) email_documents.push('EXPERIENCE_LETTER');
+    if (document.getElementById('chkEmailNotice') && document.getElementById('chkEmailNotice').checked) email_documents.push('NOTICE_LETTER');
+    if (document.getElementById('chkEmailNoc') && document.getElementById('chkEmailNoc').checked) email_documents.push('NOC_LETTER');
+    if (document.getElementById('chkEmailFfLetter') && document.getElementById('chkEmailFfLetter').checked) email_documents.push('FF_SETTLEMENT_LETTER');
+    if (document.getElementById('chkEmailFfSlip') && document.getElementById('chkEmailFfSlip').checked) email_documents.push('FF_SALARY_SLIP');
+
+    if (email_documents.length === 0) {
+        showToast('Please select at least one document to dispatch.', 'warning');
+        return;
+    }
+
+    const _confirm = await showConfirm({
+        title: 'Dispatch Documents?',
+        body: `Are you sure you want to send the ${email_documents.length} selected document(s) via email to the employee?`,
+        confirmText: 'Yes, Send Now',
+        cancelText: 'Cancel'
+    });
+    if (!_confirm || !_confirm.confirmed) return;
+
+    const btn = document.getElementById('btnSendManualEmail');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Sending...';
+    }
+
+    try {
+        const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/send-documents-email/`, {
+            method: 'POST',
+            body: JSON.stringify({ email_documents: email_documents })
+        });
+        if (res.ok) {
+            showToast('Selected documents are being dispatched via email.');
+        } else {
+            const data = await res.json();
+            showToast(data.detail || 'Failed to dispatch documents.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('An error occurred while sending documents.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '✉ Dispatch Selected Documents to Employee';
+        }
+    }
+}
+
 async function generateDocument(type) {
     if (!activeExitRequest) return;
-    showToast(`Generating ${type.toUpperCase()} PDF...`);
+    const _docConf = await showConfirm({
+        title: `Generate ${type.toUpperCase()} Document?`,
+        body: 'This will compile and generate the PDF for this exit request. The document will open for preview automatically.',
+        confirmText: 'Yes, Generate',
+        cancelText: 'Cancel',
+    });
+    if (!_docConf || !_docConf.confirmed) return;
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/generate-${type}/`, {
             method: 'POST'
         });
         if (res.ok) {
             const data = await res.json();
-            showToast('PDF compilation complete.');
+            showSuccessModal({
+                title: 'Document Generated!',
+                subtitle: `The ${type.toUpperCase()} has been compiled successfully. It will open in the preview panel.`,
+                btnText: 'Done',
+            });
             if (data.document && data.document.file) {
                 openPdfPreview(data.document.file, `${type.toUpperCase()} Document`);
             }
@@ -1038,7 +1285,13 @@ async function downloadCustomizedExitLetter() {
     if (!activeExitRequest || !activeWorkspaceDocType) return;
     
     const label = DOC_TYPE_LABELS[activeWorkspaceDocType] || activeWorkspaceDocType;
-    showToast(`Generating customized ${label} PDF...`);
+    const _dlConf = await showConfirm({
+        title: `Generate ${label}?`,
+        body: 'This will generate a customized version of this document using your current workspace edits. It will open in the preview panel.',
+        confirmText: 'Yes, Generate',
+        cancelText: 'Cancel',
+    });
+    if (!_dlConf || !_dlConf.confirmed) return;
     
     try {
         const customContext = getWorkspaceCustomContext();
@@ -1049,7 +1302,11 @@ async function downloadCustomizedExitLetter() {
         
         if (res.ok) {
             const data = await res.json();
-            showToast('Customized PDF generated successfully.');
+            showSuccessModal({
+                title: 'Document Ready!',
+                subtitle: `Your customized ${label} has been generated. It will open in the preview panel automatically.`,
+                btnText: 'Done',
+            });
             if (data.document && data.document.file) {
                 openPdfPreview(data.document.file, `${label} (Customized)`);
             }
@@ -1092,8 +1349,9 @@ async function openExitTemplateEditor() {
             selector.innerHTML = '<option value="">— Choose a template —</option>' +
                 exitTemplatesCache.map(t => `<option value="${t.id}">${t.title} (${t.name})</option>`).join('');
             
-            // Clear editor
-            document.getElementById('templateEditorTextarea').value = '';
+            // Clear visual editor
+            const visualEditor = document.getElementById('exitVisualTemplateEditor');
+            if (visualEditor) visualEditor.innerHTML = '';
             document.getElementById('templateEditorStatus').textContent = `${exitTemplatesCache.length} exit templates loaded`;
             activeEditorTemplateId = null;
             
@@ -1117,7 +1375,8 @@ function loadExitTemplateToEditor() {
     const selectedId = selector.value;
     
     if (!selectedId) {
-        document.getElementById('templateEditorTextarea').value = '';
+        const visualEditor = document.getElementById('exitVisualTemplateEditor');
+        if (visualEditor) visualEditor.innerHTML = '';
         document.getElementById('templateEditorStatus').textContent = 'No template selected';
         activeEditorTemplateId = null;
         return;
@@ -1127,7 +1386,22 @@ function loadExitTemplateToEditor() {
     if (!template) return;
     
     activeEditorTemplateId = template.id;
-    document.getElementById('templateEditorTextarea').value = template.html_content || '';
+    
+    // Populate the visual contenteditable editor (like onboarding)
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (visualEditor) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(template.html_content || '', 'text/html');
+        
+        let styles = '';
+        doc.querySelectorAll('style').forEach(s => {
+            styles += s.outerHTML;
+        });
+        
+        const bodyContent = doc.body ? doc.body.innerHTML : (template.html_content || '');
+        visualEditor.innerHTML = styles + bodyContent;
+    }
+    
     document.getElementById('templateEditorStatus').textContent = `Editing: ${template.title}`;
     document.getElementById('templateEditorLastSaved').textContent = template.updated_at
         ? `Last saved: ${new Date(template.updated_at).toLocaleString()}`
@@ -1143,11 +1417,44 @@ async function saveExitTemplateChanges() {
     const template = exitTemplatesCache.find(t => t.id == activeEditorTemplateId);
     if (!template) return;
     
-    const newContent = document.getElementById('templateEditorTextarea').value;
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (!visualEditor) return;
     
-    if (!confirm(`Are you sure you want to save changes to "${template.title}"? This will affect all future document generations using this template.`)) {
+    // Parse current content to separate styles and body content (like onboarding)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(visualEditor.innerHTML, 'text/html');
+    
+    let styles = '';
+    doc.querySelectorAll('style').forEach(s => {
+        styles += s.outerHTML;
+        s.remove();
+    });
+    
+    const bodyContent = doc.body ? doc.body.innerHTML : visualEditor.innerHTML;
+    
+    // Reconstruct valid full-page HTML for WeasyPrint
+    const newContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${template.title || 'Exit Document'}</title>
+    ${styles}
+</head>
+<body>
+    ${bodyContent}
+</body>
+</html>`;
+    
+    const _saveConf = await showConfirm({
+        title: 'Save Template Changes?',
+        body: `Saving "<strong>${template.title}</strong>" will affect all future exit documents generated using this template.`,
+        confirmText: 'Yes, Save',
+        cancelText: 'Cancel',
+    });
+    if (!_saveConf || !_saveConf.confirmed) {
         return;
     }
+
     
     try {
         const res = await apiFetch(`/api/onboarding/templates/${activeEditorTemplateId}/`, {
@@ -1155,7 +1462,7 @@ async function saveExitTemplateChanges() {
             body: JSON.stringify({
                 name: template.name,
                 title: template.title,
-                html_content: newContent,
+                html_content: fullHtml,
                 allow_hr_edit: template.allow_hr_edit
             })
         });
@@ -1168,7 +1475,11 @@ async function saveExitTemplateChanges() {
             
             document.getElementById('templateEditorLastSaved').textContent = `Last saved: ${new Date().toLocaleString()}`;
             document.getElementById('templateEditorStatus').textContent = `✅ "${template.title}" saved successfully`;
-            showToast('Template saved successfully.');
+            showSuccessModal({
+                title: 'Template Saved!',
+                subtitle: `"${template.title}" has been updated. All future documents generated from this template will use the new content.`,
+                btnText: 'Done',
+            });
         } else {
             const err = await res.json();
             const errMsg = err.detail || err.error || JSON.stringify(err);
@@ -1177,6 +1488,41 @@ async function saveExitTemplateChanges() {
     } catch (e) {
         console.error(e);
         showToast('Server error saving template.', 'error');
+    }
+}
+
+// ---- Exit visual editor toolbar helpers ----
+function execExitEditorCommand(command) {
+    document.execCommand(command, false, null);
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (visualEditor) visualEditor.focus();
+}
+
+function insertExitPlaceholderAtCursor(placeholder) {
+    if (!placeholder) return;
+    const visualEditor = document.getElementById('exitVisualTemplateEditor');
+    if (!visualEditor) return;
+    
+    visualEditor.focus();
+    
+    const sel = window.getSelection();
+    if (sel.getRangeAt && sel.rangeCount) {
+        let range = sel.getRangeAt(0);
+        
+        if (visualEditor.contains(range.commonAncestorContainer)) {
+            range.deleteContents();
+            const textNode = document.createTextNode(placeholder);
+            range.insertNode(textNode);
+            range = range.cloneRange();
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            visualEditor.appendChild(document.createTextNode(placeholder));
+        }
+    } else {
+        visualEditor.appendChild(document.createTextNode(placeholder));
     }
 }
 
@@ -1193,6 +1539,33 @@ async function previewExitTemplateInEditor() {
     
     const template = exitTemplatesCache.find(t => t.id == activeEditorTemplateId);
     if (!template) return;
+    
+    const visualEditor = document.getElementById('visualExitTemplateEditor');
+    if (!visualEditor) return;
+    
+    // Parse current content to separate styles and body content
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(visualEditor.innerHTML, 'text/html');
+    
+    let styles = '';
+    doc.querySelectorAll('style').forEach(s => {
+        styles += s.outerHTML;
+        s.remove();
+    });
+    
+    const bodyContent = doc.body ? doc.body.innerHTML : visualEditor.innerHTML;
+    
+    const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${template.title || 'Exit Template'}</title>
+    ${styles}
+</head>
+<body>
+    ${bodyContent}
+</body>
+</html>`;
     
     // Map template name to doc type slug
     const nameToSlug = {
@@ -1213,7 +1586,10 @@ async function previewExitTemplateInEditor() {
     try {
         const res = await apiFetch(`/api/exit/requests/${activeExitRequest.id}/preview-letter/`, {
             method: 'POST',
-            body: JSON.stringify({ doc_type: docType })
+            body: JSON.stringify({ 
+                doc_type: docType,
+                template_html: fullHtml
+            })
         });
         
         if (res.ok) {
@@ -1231,6 +1607,44 @@ async function previewExitTemplateInEditor() {
     } catch (e) {
         console.error(e);
         showToast('Error generating preview.', 'error');
+    }
+}
+
+function execExitEditorCommand(command) {
+    document.execCommand(command, false, null);
+    const visualEditor = document.getElementById('visualExitTemplateEditor');
+    if (visualEditor) {
+        visualEditor.focus();
+    }
+}
+
+function insertExitPlaceholderAtCursor(placeholder) {
+    if (!placeholder) return;
+    const visualEditor = document.getElementById('visualExitTemplateEditor');
+    if (!visualEditor) return;
+    
+    visualEditor.focus();
+    
+    const sel = window.getSelection();
+    if (sel.getRangeAt && sel.rangeCount) {
+        let range = sel.getRangeAt(0);
+        
+        if (visualEditor.contains(range.commonAncestorContainer)) {
+            range.deleteContents();
+            
+            const textNode = document.createTextNode(placeholder);
+            range.insertNode(textNode);
+            
+            range = range.cloneRange();
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } else {
+            visualEditor.appendChild(document.createTextNode(placeholder));
+        }
+    } else {
+        visualEditor.appendChild(document.createTextNode(placeholder));
     }
 }
 

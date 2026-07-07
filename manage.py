@@ -26,7 +26,21 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
+    # Patch Django's template context copy bug on Python 3.14
+    try:
+        from django.template.context import BaseContext
+        def _base_context_copy(self):
+            cls = self.__class__
+            duplicate = cls.__new__(cls)
+            duplicate.__dict__.update(self.__dict__)
+            duplicate.dicts = self.dicts[:]
+            return duplicate
+        BaseContext.__copy__ = _base_context_copy
+    except ImportError:
+        pass
+
     execute_from_command_line(sys.argv)
+
 
 
 if __name__ == '__main__':

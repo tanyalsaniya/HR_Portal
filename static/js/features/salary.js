@@ -10,13 +10,20 @@ async function loadSalaryData() {
     salaryCurrentPage = 1;
     document.getElementById('pageTitle').textContent = 'Salaries & Payroll';
     
+    const urlTab = getUrlParam('tab');
+    if (urlTab) activeSalaryTab = urlTab;
+    // Don't update URL here, just set UI
+    switchSalaryTab(activeSalaryTab, false);
+    
     // Adjust visual panel options based on role
     const role = currentUser.role;
     const adminPanel = document.getElementById('payrollAdminPanel');
+    const dismissedAdminPanel = document.getElementById('dismissedPayrollAdminPanel');
     const bulkActions = document.getElementById('slipBulkDownloadActions');
     
     if (role !== 'ADMIN') {
         if (adminPanel) adminPanel.style.display = 'none';
+        if (dismissedAdminPanel) dismissedAdminPanel.style.display = 'none';
         // Non-admin can only do single/range downloads
         const setupSalaryBtn = document.getElementById('setupSalaryBtn');
         if (setupSalaryBtn) setupSalaryBtn.style.display = 'none';
@@ -35,14 +42,16 @@ async function loadSalaryData() {
     if (role !== 'EMPLOYEE') {
         await loadStructuresRegistry();
         await loadImportBatches();
+        await loadDismissedSlipsRegistry();
     }
 }
 
-function switchSalaryTab(tab) {
+function switchSalaryTab(tab, updateUrl = true) {
     activeSalaryTab = tab;
+    if (updateUrl) setUrlParam('tab', tab);
     
     // Toggle active classes on tab headers
-    const headers = ['tabSlips', 'tabStructures', 'tabBatches'];
+    const headers = ['tabSlips', 'tabStructures', 'tabBatches', 'tabDismissed'];
     headers.forEach(h => {
         const el = document.getElementById(h);
         if (el) {
@@ -55,7 +64,7 @@ function switchSalaryTab(tab) {
     });
 
     // Toggle visibility of panels
-    const panels = ['salaryTabSlips', 'salaryTabStructures', 'salaryTabBatches'];
+    const panels = ['salaryTabSlips', 'salaryTabStructures', 'salaryTabBatches', 'salaryTabDismissed'];
     panels.forEach(p => {
         const el = document.getElementById(p);
         if (el) {
@@ -116,9 +125,16 @@ async function publishSlipsMonth() {
     const month = document.getElementById('payrollMonth').value;
     const year = document.getElementById('payrollYear').value;
     
-    if (!confirm(`Are you sure you want to publish all draft salary slips for ${month}/${year}?`)) {
+    const _publishConf = await showConfirm({
+        title: 'Publish Salary Slips?',
+        body: `All draft salary slips for <strong>${month}/${year}</strong> will be published and made visible to employees. This action cannot be reversed.`,
+        confirmText: 'Yes, Publish',
+        cancelText: 'Cancel',
+    });
+    if (!_publishConf || !_publishConf.confirmed) {
         return;
     }
+
     
     showToast('Publishing slips...');
     try {
@@ -128,8 +144,12 @@ async function publishSlipsMonth() {
         });
         if (res.ok) {
             const data = await res.json();
-            showToast(data.message || 'Slips published successfully.');
             await loadSlipsRegistry();
+            showSuccessModal({
+                title: 'Salary Slips Published!',
+                subtitle: data.message || `All salary slips for ${month}/${year} are now live and visible to employees.`,
+                btnText: 'View Registry',
+            });
         } else {
             const err = await res.json();
             showToast(err.error || 'Failed to publish slips.', 'error');
@@ -210,7 +230,7 @@ async function loadSlipsRegistry() {
                     
                     const actions = `
                         <div style="display:flex; gap:5px;">
-                            <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#7c3aed;" onclick="downloadSlipSingle(${s.employee_id}, ${s.month}, ${s.year})">Download PDF</button>
+                            <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#7c3aed;" onclick="${isDismissed ? 'downloadDismissedSlipSingle' : 'downloadSlipSingle'}(${s.employee_id}, ${s.month}, ${s.year})">Download PDF</button>
                         </div>
                     `;
 
@@ -234,7 +254,7 @@ async function loadSlipsRegistry() {
     } else {
         // Admin or HR: Consolidated list of employees (one row per employee)
         try {
-            const res = await apiFetch('/employees/?type=all&no_pagination=true');
+            const res = await apiFetch('/employees/?type=salary_list&no_pagination=true');
             if (res.ok) {
                 const empsData = await res.json();
                 salaryFilteredList = empsData.results || empsData;
@@ -261,7 +281,9 @@ async function loadSlipsRegistry() {
                         currentSalaryHtml = `<strong>Rs. ${sorted[0].net_salary}</strong>`;
                     }
                     
-                    const statusColor = emp.status === 'Active' ? '#16a34a' : '#ef4444';
+                    const isExited = emp.status === 'Exited';
+                    const statusColor = emp.status === 'Active' ? '#16a34a' : (isExited ? '#64748b' : '#ef4444');
+                    const statusDisplay = isExited ? `<span style="font-weight:bold; color:${statusColor};" title="Exited Employee (Retained for Final Settlement)">Exited</span> <span style="font-size: 0.8em; color: #dc2626; border: 1px solid #fca5a5; background: #fee2e2; padding: 2px 4px; border-radius: 4px; margin-left: 5px; display: inline-block;">Final Settlement</span>` : `<span style="font-weight:bold; color:${statusColor};">${emp.status}</span>`;
                     
                     const actions = `
                         <div style="display:flex; gap:5px;">
@@ -270,12 +292,12 @@ async function loadSlipsRegistry() {
                     `;
 
                     return `
-                        <tr>
+                        <tr ${isExited ? 'style="background-color: #f8fafc;"' : ''}>
                             <td><strong>${emp.emp_id}</strong></td>
                             <td><strong>${emp.name}</strong></td>
-                            <td>${emp.department_name || 'N/A'}${emp.department ? ` (ID: ${emp.department})` : ''}</td>
+                            <td>${emp.department || 'N/A'}</td>
                             <td>${currentSalaryHtml}</td>
-                            <td><span style="font-weight:bold; color:${statusColor};">${emp.status}</span></td>
+                            <td>${statusDisplay}</td>
                             <td>${actions}</td>
                         </tr>
                     `;
@@ -585,6 +607,28 @@ async function loadActiveEmployeesSelect(selectId) {
     }
 }
 
+// Dynamic calculation of modal salary fields
+function calculateModalSalary() {
+    const ctc = parseFloat(document.getElementById('structCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('structPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('structEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('structGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
+    const pf = parseFloat(document.getElementById('structPfContribution').value || 0);
+    const esi = parseFloat(document.getElementById('structEsi').value || 0);
+    const lwf = parseFloat(document.getElementById('structLabourWelfareFund').value || 0);
+    const pt = parseFloat(document.getElementById('structProfessionalTax').value || 0);
+
+    const totalDeductions = pf + esi + lwf + pt;
+    const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('structInHandSalary');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
+}
+
 // Event Listeners for Forms
 document.addEventListener('DOMContentLoaded', () => {
     // Structure Form
@@ -593,14 +637,28 @@ document.addEventListener('DOMContentLoaded', () => {
         structureForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const data = {
-                employee: document.getElementById('structEmployeeSelect').value,
+                bitrix_user_id: document.getElementById('structEmployeeSelect').value,
                 effective_from: document.getElementById('structEffectiveFrom').value,
-                gross_salary: document.getElementById('structGrossSalary').value,
-                pf_contribution: document.getElementById('structPfContribution').value,
-                esi: document.getElementById('structEsi').value,
-                labour_welfare_fund: document.getElementById('structLabourWelfareFund').value,
-                professional_tax: document.getElementById('structProfessionalTax').value,
-                other_deductions: document.getElementById('structOtherDeductions').value
+                gross_salary: parseFloat(document.getElementById('structGrossSalary').value || 0),
+                pf_contribution: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi: parseFloat(document.getElementById('structEsi').value || 0),
+                labour_welfare_fund: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                professional_tax: parseFloat(document.getElementById('structProfessionalTax').value || 0),
+                other_deductions: 0,
+                
+                ctc: parseFloat(document.getElementById('structCTC').value || 0),
+                basic_salary: 0,
+                hra: 0,
+                conveyance: 0,
+                medical_allowance: 0,
+                special_allowance: 0,
+                monthly_bonus: 0,
+                esi_employer: parseFloat(document.getElementById('structEsiEmployer').value || 0),
+                pf_employer: parseFloat(document.getElementById('structPfEmployer').value || 0),
+                pf_employee: parseFloat(document.getElementById('structPfContribution').value || 0),
+                esi_employee: parseFloat(document.getElementById('structEsi').value || 0),
+                lwf: parseFloat(document.getElementById('structLabourWelfareFund').value || 0),
+                in_hand_salary: parseFloat(document.getElementById('structInHandSalary').value || 0)
             };
             
             try {
@@ -779,16 +837,70 @@ document.addEventListener('DOMContentLoaded', () => {
             if (el) el.textContent = `Rs. ${val.toFixed(2)}`;
         });
     }
+
+    // Manual Individual Generate Form
+    const manualGenerateForm = document.getElementById('salaryManualGenerateForm');
+    if (manualGenerateForm) {
+        manualGenerateForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const employeeId = document.getElementById('manualGenerateEmployee').value;
+            const month = document.getElementById('manualGenerateMonth').value;
+            const year = document.getElementById('manualGenerateYear').value;
+            
+            if (!employeeId || !month || !year) {
+                showToast('Please fill all required fields.', 'warning');
+                return;
+            }
+            
+            showToast('Generating individual payslip...');
+            try {
+                const res = await apiFetch('/admin/salary/generate-individual', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        month: parseInt(month),
+                        year: parseInt(year)
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    showToast(data.message || 'Payslip generated successfully.', 'success');
+                    closeManualGenerateModal();
+                    
+                    // Reload slips list or history
+                    if (activeSalaryTab === 'slips') {
+                        loadSlipsRegistry();
+                    }
+                    const historyView = document.getElementById('salaryHistoryView');
+                    if (historyView && historyView.style.display !== 'none') {
+                        loadDedicatedEmployeeSalaryHistoryData();
+                    }
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Failed to generate payslip.', 'error');
+                }
+            } catch (error) {
+                console.error("Error generating manual payslip:", error);
+                showToast('Connection error.', 'error');
+            }
+        });
+    }
 });
 
 // Dedicated Salary History Page Logic
 let currentHistoryEmployeeId = null;
 let currentHistoryEmployeeName = "";
 
+function viewDismissedEmployeeSalaryHistory(employeeId, employeeName) {
+    const url = `/salaries/employee/${employeeId}/?type=dismissed`;
+    window.open(url, '_blank');
+}
+
+
 function viewEmployeeSalaryHistory(employeeId, employeeName) {
-    currentHistoryEmployeeId = employeeId;
-    currentHistoryEmployeeName = employeeName;
-    switchView('salaryHistoryView', true, { employeeId: employeeId });
+    const url = `/salaries/employee/${employeeId}/`;
+    window.open(url, '_blank');
 }
 
 async function loadDedicatedEmployeeSalaryHistory(employeeId) {
@@ -815,9 +927,7 @@ async function loadDedicatedEmployeeSalaryHistory(employeeId) {
                 if (idEl) idEl.textContent = emp.emp_id || "--";
                 
                 const deptEl = document.getElementById('historyEmployeeDept');
-                if (deptEl) {
-                    deptEl.textContent = emp.department_name ? `${emp.department_name} (ID: ${emp.department || 'N/A'})` : (emp.department || 'N/A');
-                }
+                if (deptEl) deptEl.textContent = emp.department || 'N/A';
                 
                 const desgEl = document.getElementById('historyEmployeeDesg');
                 if (desgEl) desgEl.textContent = emp.designation || 'N/A';
@@ -848,40 +958,19 @@ async function loadDedicatedEmployeeSalaryHistory(employeeId) {
             console.error("Error loading employee details for history view:", e);
         }
 
-        // Fetch employee summary statistics
-        try {
-            const sumRes = await apiFetch(`/salary/employee/${employeeId}/summary`);
-            if (sumRes.ok) {
-                const sumData = await sumRes.json();
-                const credEl = document.getElementById('historyCardCredited');
-                if (credEl) credEl.textContent = `Rs. ${sumData.total_salary_credited || '0.00'}`;
-                
-                const dedEl = document.getElementById('historyCardDeductions');
-                if (dedEl) dedEl.textContent = `Rs. ${sumData.total_deductions || '0.00'}`;
-                
-                const paysEl = document.getElementById('historyCardPayslips');
-                if (paysEl) paysEl.textContent = sumData.total_payslips ?? 0;
-                
-                const lastPayEl = document.getElementById('historyCardLastPayment');
-                if (lastPayEl) lastPayEl.textContent = sumData.last_payment_date || '-';
-            }
-        } catch (e) {
-            console.error("Error loading employee salary summary statistics:", e);
-        }
-
-        // Set default filter values
+        // Set default filter values — default to all-time (2000 to current + 4) so displayed rows match summary count
         const today = new Date();
         const fromMonthEl = document.getElementById('historyPageFromMonth');
         if (fromMonthEl) fromMonthEl.value = "1";
         
         const fromYearEl = document.getElementById('historyPageFromYear');
-        if (fromYearEl) fromYearEl.value = today.getFullYear();
+        if (fromYearEl) fromYearEl.value = 2000;
         
         const toMonthEl = document.getElementById('historyPageToMonth');
-        if (toMonthEl) toMonthEl.value = today.getMonth() + 1;
+        if (toMonthEl) toMonthEl.value = "12";
         
         const toYearEl = document.getElementById('historyPageToYear');
-        if (toYearEl) toYearEl.value = today.getFullYear();
+        if (toYearEl) toYearEl.value = today.getFullYear() + 4;
         
         const payStatEl = document.getElementById('historyPagePaymentStatus');
         if (payStatEl) payStatEl.value = "";
@@ -918,7 +1007,38 @@ async function loadDedicatedEmployeeSalaryHistoryData() {
 
         tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">Loading history records...</td></tr>`;
 
-        let url = `/salary/history?employee_id=${currentHistoryEmployeeId}&from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
+        const isDismissed = new URLSearchParams(window.location.search).get('type') === 'dismissed';
+        
+        // Fetch employee summary statistics with filters
+        try {
+            let sumUrl = isDismissed 
+                ? `/salary/dismissed/employee/${currentHistoryEmployeeId}/summary?from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`
+                : `/salary/employee/${currentHistoryEmployeeId}/summary?from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
+            if (paymentStatus) {
+                sumUrl += `&payment_status=${paymentStatus}`;
+            }
+            const sumRes = await apiFetch(sumUrl);
+            if (sumRes.ok) {
+                const sumData = await sumRes.json();
+                const credEl = document.getElementById('historyCardCredited');
+                if (credEl) credEl.textContent = `Rs. ${sumData.total_salary_credited || '0.00'}`;
+                
+                const dedEl = document.getElementById('historyCardDeductions');
+                if (dedEl) dedEl.textContent = `Rs. ${sumData.total_deductions || '0.00'}`;
+                
+                const paysEl = document.getElementById('historyCardPayslips');
+                if (paysEl) paysEl.textContent = sumData.total_payslips ?? 0;
+                
+                const lastPayEl = document.getElementById('historyCardLastPayment');
+                if (lastPayEl) lastPayEl.textContent = sumData.last_payment_date || '-';
+            }
+        } catch (e) {
+            console.error("Error loading employee salary summary statistics:", e);
+        }
+
+        let url = isDismissed
+            ? `/salary/dismissed/history?employee_id=${currentHistoryEmployeeId}&from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`
+            : `/salary/history?employee_id=${currentHistoryEmployeeId}&from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
         if (paymentStatus) {
             url += `&payment_status=${paymentStatus}`;
         }
@@ -928,6 +1048,11 @@ async function loadDedicatedEmployeeSalaryHistoryData() {
             if (res.ok) {
                 const slipsData = await res.json();
                 const slips = slipsData.results || slipsData;
+
+                // Keep payslips count card in sync with the actual filtered table count
+                const displayedCount = slipsData.count !== undefined ? slipsData.count : (Array.isArray(slips) ? slips.length : 0);
+                const paysEl = document.getElementById('historyCardPayslips');
+                if (paysEl) paysEl.textContent = displayedCount;
 
                 if (!Array.isArray(slips) || slips.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777; padding: 20px;">No salary slips found for this selection.</td></tr>`;
@@ -943,7 +1068,7 @@ async function loadDedicatedEmployeeSalaryHistoryData() {
                     const actions = `
                         <div style="display:flex; gap:5px; justify-content: flex-end;">
                             <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#7c3aed; border-radius: 4px;" onclick="viewPayslipSingle(${s.employee_id}, ${s.month}, ${s.year})">View Payslip</button>
-                            <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#10b981; border-radius: 4px;" onclick="downloadSlipSingle(${s.employee_id}, ${s.month}, ${s.year})">Download PDF</button>
+                            <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#10b981; border-radius: 4px;" onclick="${isDismissed ? 'downloadDismissedSlipSingle' : 'downloadSlipSingle'}(${s.employee_id}, ${s.month}, ${s.year})">Download PDF</button>
                             ${isAdmin ? `<button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#475569; border-radius: 4px;" onclick="openEditSlipModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">Edit</button>` : ''}
                         </div>
                     `;
@@ -987,7 +1112,9 @@ function downloadSelectedPayslips() {
     const token = localStorage.getItem('accessToken');
     
     showToast('Generating ZIP for selected payslips...');
-    fetch(`/api/salary/slip/download?type=selected&slip_ids=${ids}&employee_id=${currentHistoryEmployeeId}`, {
+    const isDismissed = new URLSearchParams(window.location.search).get('type') === 'dismissed';
+    const baseUrl = isDismissed ? '/api/salary/dismissed/slip/download' : '/api/salary/slip/download';
+    fetch(`${baseUrl}?type=selected&slip_ids=${ids}&employee_id=${currentHistoryEmployeeId}`, {
         headers: {
             'Authorization': `Bearer ${token}`
         }
@@ -1020,7 +1147,9 @@ function downloadHistoryZIPRange() {
 
     showToast('Generating ZIP file...');
     
-    fetch(`/api/salary/slip/download?type=range&from_month=${fromMonth}&from_year=${fromYear}&to_month=${toMonth}&to_year=${toYear}&employee_id=${currentHistoryEmployeeId}`, {
+    const isDismissed = new URLSearchParams(window.location.search).get('type') === 'dismissed';
+    const baseUrl = isDismissed ? '/api/salary/dismissed/slip/download' : '/api/salary/slip/download';
+    fetch(`${baseUrl}?type=range&from_month=${fromMonth}&from_year=${fromYear}&to_month=${toMonth}&to_year=${toYear}&employee_id=${currentHistoryEmployeeId}`, {
         headers: {
             'Authorization': `Bearer ${token}`
         }
@@ -1053,7 +1182,9 @@ function exportHistoryExcel() {
 
     showToast('Generating Excel report...');
     
-    let url = `/api/salary/employee/${currentHistoryEmployeeId}/export?from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
+    const isDismissed = new URLSearchParams(window.location.search).get('type') === 'dismissed';
+    const baseUrl = isDismissed ? `/api/salary/dismissed/employee/${currentHistoryEmployeeId}/export` : `/api/salary/employee/${currentHistoryEmployeeId}/export`;
+    let url = `${baseUrl}?from=${fromYear}-${fromMonth}&to=${toYear}-${toMonth}`;
     if (paymentStatus) {
         url += `&payment_status=${paymentStatus}`;
     }
@@ -1084,7 +1215,9 @@ async function viewPayslipSingle(employeeId, month, year) {
     const token = localStorage.getItem('accessToken');
     showToast('Loading payslip PDF preview...');
     try {
-        const res = await fetch(`/api/salary/slip/download?type=single&employee_id=${employeeId}&month=${month}&year=${year}`, {
+        const isDismissed = new URLSearchParams(window.location.search).get('type') === 'dismissed';
+        const baseUrl = isDismissed ? '/api/salary/dismissed/slip/download' : '/api/salary/slip/download';
+        const res = await fetch(`${baseUrl}?type=single&employee_id=${employeeId}&month=${month}&year=${year}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -1105,3 +1238,740 @@ async function viewPayslipSingle(employeeId, month, year) {
         showToast('Preview error.', 'error');
     }
 }
+
+function openManualGenerateModal() {
+    const isDismissed = new URLSearchParams(window.location.search).get('type') === 'dismissed';
+    if (isDismissed && typeof openDismissedManualGenerateModal === 'function') {
+        openDismissedManualGenerateModal();
+        return;
+    }
+    const modal = document.getElementById('salaryManualGenerateModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Populate employee select
+        const employeeSelect = document.getElementById('manualGenerateEmployee');
+        if (employeeSelect) {
+            employeeSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
+            apiFetch('/employees/?type=all&no_pagination=true')
+                .then(res => res.json())
+                .then(data => {
+                    const emps = data.results || data;
+                    emps.forEach(emp => {
+                        const opt = document.createElement('option');
+                        opt.value = emp.bitrix_id || emp.id;
+                        opt.textContent = `${emp.name} (${emp.emp_id || 'N/A'})`;
+                        employeeSelect.appendChild(opt);
+                    });
+                    
+                    const historyView = document.getElementById('salaryHistoryView');
+                    if (historyView && historyView.style.display !== 'none' && currentHistoryEmployeeId) {
+                        const matchingEmp = emps.find(e => String(e.id) === String(currentHistoryEmployeeId) || String(e.bitrix_id) === String(currentHistoryEmployeeId));
+                        if (matchingEmp) {
+                            employeeSelect.value = matchingEmp.bitrix_id || matchingEmp.id;
+                        }
+                    }
+                })
+                .catch(err => console.error("Error loading employees for dropdown:", err));
+        }
+        
+        // Set default month/year to target inputs
+        const targetMonthEl = document.getElementById('payrollMonth');
+        const targetYearEl = document.getElementById('payrollYear');
+        const defaultMonth = targetMonthEl ? targetMonthEl.value : String(new Date().getMonth() + 1);
+        const defaultYear = targetYearEl ? targetYearEl.value : String(new Date().getFullYear());
+        if (document.getElementById('manualGenerateMonth')) {
+            document.getElementById('manualGenerateMonth').value = defaultMonth;
+        }
+        if (document.getElementById('manualGenerateYear')) {
+            document.getElementById('manualGenerateYear').value = defaultYear;
+        }
+    }
+}
+
+function closeManualGenerateModal() {
+    const modal = document.getElementById('salaryManualGenerateModal');
+    if (modal) modal.style.display = 'none';
+}
+
+// EDITABLE PAYROLL GRID LOGIC
+async function loadPayrollGrid() {
+    const month = document.getElementById('payrollMonth').value;
+    const year = document.getElementById('payrollYear').value;
+    if (!month || !year) {
+        showToast('Please select Target Month and Year.', 'error');
+        return;
+    }
+
+    try {
+        const res = await apiFetch(`/admin/salary/grid?month=${month}&year=${year}`);
+        
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to fetch payroll grid.');
+        }
+        
+        const data = await res.json();
+        
+        // Show container and update month/year text
+        const monthText = document.getElementById('payrollMonth').options[document.getElementById('payrollMonth').selectedIndex].text;
+        document.getElementById('payrollGridMonthYear').textContent = `${monthText} ${year}`;
+        document.getElementById('payrollGridContainer').style.display = 'block';
+
+        renderPayrollGrid(data);
+    } catch (err) {
+        showToast(err.message || 'Failed to load payroll grid.', 'error');
+    }
+}
+
+function renderPayrollGrid(data) {
+    const tbody = document.getElementById('payrollGridBody');
+    tbody.innerHTML = '';
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 20px;">No employees found.</td></tr>';
+        return;
+    }
+
+    data.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.dataset.bitrix_id = row.bitrix_id;
+        tr.dataset.id = row.id || '';
+        tr.dataset.bank_account_no = row.bank_account_no || '';
+        tr.dataset.bank_name = row.bank_name || '';
+
+        const cols = [
+            { key: 'name', value: row.name, readOnly: true },
+            { key: 'designation', value: row.designation, readOnly: true },
+            { key: 'month_days', value: row.month_days, type: 'number' },
+            { key: 'worked_days', value: row.worked_days, type: 'number' },
+            { key: 'weekend', value: row.weekend, type: 'number' },
+            { key: 'cl', value: row.cl, type: 'number' },
+            { key: 'extra', value: row.extra, type: 'number' },
+            { key: 'payable_days', value: row.payable_days, type: 'number' },
+            { key: 'month_salary', value: row.month_salary, type: 'number' },
+            { key: 'payable_salary', value: row.payable_salary, type: 'number' },
+            { key: 'extra_days_working', value: row.extra_days_working, type: 'number' },
+            { key: 'fine_advance', value: row.fine_advance, type: 'number' },
+            { key: 'net_payable', value: row.net_payable, type: 'number' }
+        ];
+
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.padding = '5px';
+            td.style.border = '1px solid #e5e7eb';
+            
+            if (c.readOnly) {
+                td.textContent = c.value;
+                td.style.backgroundColor = '#f9fafb';
+                td.style.color = '#6b7280';
+            } else {
+                const input = document.createElement('input');
+                input.type = c.type === 'number' ? 'text' : 'text'; // Use text to allow empty/decimals easily
+                input.value = c.value;
+                input.dataset.key = c.key;
+                input.className = 'grid-input';
+                input.style.width = '100%';
+                input.style.border = '1px solid transparent';
+                input.style.padding = '5px';
+                input.style.boxSizing = 'border-box';
+                
+                // Highlight on focus
+                input.addEventListener('focus', function() {
+                    this.style.border = '1px solid var(--primary-color)';
+                    this.style.outline = 'none';
+                    this.style.backgroundColor = '#f0f9ff';
+                });
+                input.addEventListener('blur', function() {
+                    this.style.border = '1px solid transparent';
+                    this.style.backgroundColor = 'transparent';
+                });
+                
+                // Support keyboard navigation (arrows)
+                input.addEventListener('keydown', function(e) {
+                    const currentTd = this.closest('td');
+                    const currentTr = this.closest('tr');
+                    const tdIndex = Array.from(currentTr.children).indexOf(currentTd);
+                    
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const prevTr = currentTr.previousElementSibling;
+                        if (prevTr) {
+                            const targetInput = prevTr.children[tdIndex].querySelector('input');
+                            if (targetInput) targetInput.focus();
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const nextTr = currentTr.nextElementSibling;
+                        if (nextTr) {
+                            const targetInput = nextTr.children[tdIndex].querySelector('input');
+                            if (targetInput) targetInput.focus();
+                        }
+                    }
+                });
+
+                td.appendChild(input);
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+function cancelPayrollGrid() {
+    document.getElementById('payrollGridContainer').style.display = 'none';
+}
+
+async function savePayrollGrid() {
+    const month = document.getElementById('payrollMonth').value;
+    const year = document.getElementById('payrollYear').value;
+    
+    const tbody = document.getElementById('payrollGridBody');
+    const rows = tbody.querySelectorAll('tr');
+    
+    if (rows.length === 0 || rows[0].querySelector('td[colspan]')) {
+        showToast('No data to save.', 'error');
+        return;
+    }
+
+    const payload = [];
+    rows.forEach(tr => {
+        const rowData = {
+            bitrix_id: tr.dataset.bitrix_id,
+            id: tr.dataset.id || null,
+            bank_account_no: tr.dataset.bank_account_no,
+            bank_name: tr.dataset.bank_name
+        };
+        
+        tr.querySelectorAll('input').forEach(input => {
+            rowData[input.dataset.key] = input.value;
+        });
+        
+        payload.push(rowData);
+    });
+
+    const btn = document.querySelector('#payrollGridContainer button.btn-primary');
+    const originalText = btn.textContent;
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
+    try {
+        const res = await apiFetch('/admin/salary/grid', {
+            method: 'POST',
+            body: JSON.stringify({
+                month: month,
+                year: year,
+                rows: payload
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+            throw new Error(data.error || 'Failed to save payroll grid.');
+        }
+        
+        showToast(data.message || 'Saved successfully.', 'success');
+        document.getElementById('payrollGridContainer').style.display = 'none';
+        
+        // Refresh salary data table
+        loadSalaryData();
+    } catch (err) {
+        showToast(err.message || 'Failed to save grid.', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// -- DISMISSED EMPLOYEES TAB LOGIC --
+let dismissedCurrentPage = 1;
+let dismissedTotalCount = 0;
+let dismissedFilteredList = [];
+
+async function loadDismissedSlipsRegistry() {
+    console.log("loadDismissedSlipsRegistry CALLED!");
+    const tbody = document.getElementById('dismissedSlipsTableBody');
+    if (!tbody) return;
+
+    const role = currentUser.role;
+    if (role === 'EMPLOYEE') return; // Employees don't see this
+
+    const paginationFooter = document.getElementById('dismissedSlipsPaginationFooter');
+
+    try {
+        const res = await apiFetch('/employees/?type=dismissed&no_pagination=true');
+        if (res.ok) {
+            const empsData = await res.json();
+            dismissedFilteredList = empsData.results || empsData;
+            dismissedTotalCount = dismissedFilteredList.length;
+
+            if (paginationFooter) {
+                paginationFooter.style.display = 'flex';
+                updateDismissedPaginationControls(dismissedCurrentPage, dismissedTotalCount);
+            }
+
+            if (dismissedFilteredList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #777; padding: 20px;">No dismissed employees found.</td></tr>`;
+                return;
+            }
+
+            const startIdx = (dismissedCurrentPage - 1) * 10;
+            const paginatedEmps = dismissedFilteredList.slice(startIdx, startIdx + 10);
+
+            tbody.innerHTML = paginatedEmps.map(emp => {
+                const isExited = true; // They are all dismissed
+                const statusDisplay = `<span style="font-weight:bold; color:#64748b;">Exited</span>`;
+                
+                const actions = `
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn btn-primary" style="font-size:8pt; padding:4px 8px; background-color:#2563eb;" onclick="viewDismissedEmployeeSalaryHistory(${emp.id}, '${emp.name.replace(/'/g, "\\'")}')">View History</button>
+                    </div>
+                `;
+
+                return `
+                    <tr style="background-color: #f8fafc;">
+                        <td><strong>${emp.emp_id}</strong></td>
+                        <td><strong>${emp.name}</strong></td>
+                        <td>${emp.department || 'N/A'}</td>
+                        <td>${statusDisplay}</td>
+                        <td>${actions}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function changeDismissedPage(dir) {
+    const totalPages = Math.ceil(dismissedTotalCount / 10);
+    const newPage = dismissedCurrentPage + dir;
+    if (newPage >= 1 && newPage <= totalPages) {
+        dismissedCurrentPage = newPage;
+        loadDismissedSlipsRegistry(); // Re-render with new slice
+    }
+}
+
+function updateDismissedPaginationControls(currentPage, totalCount) {
+    const prevBtn = document.getElementById('dismissedPrevBtn');
+    const nextBtn = document.getElementById('dismissedNextBtn');
+    const pageStart = document.getElementById('dismissedPageStart');
+    const pageEnd = document.getElementById('dismissedPageEnd');
+    const countEl = document.getElementById('dismissedTotalCount');
+
+    if (!prevBtn || !nextBtn) return;
+
+    const totalPages = Math.ceil(totalCount / 10);
+    
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+
+    const start = totalCount === 0 ? 0 : ((currentPage - 1) * 10) + 1;
+    let end = currentPage * 10;
+    if (end > totalCount) end = totalCount;
+
+    if (pageStart) pageStart.textContent = start;
+    if (pageEnd) pageEnd.textContent = end;
+    if (countEl) countEl.textContent = totalCount;
+}
+
+function downloadDismissedSlipSingle(employeeId, month, year) {
+    const token = localStorage.getItem('accessToken');
+    fetch(`/api/salary/dismissed/slip/download?type=single&employee_id=${employeeId}&month=${month}&year=${year}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Download failed');
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `payslip_dismissed_${month}_${year}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    })
+    .catch(err => {
+        showToast('Error downloading slip: ' + err.message, 'error');
+    });
+}
+
+function downloadDismissedSlipBulk() {
+    const month = document.getElementById('payrollMonth').value;
+    const year = document.getElementById('payrollYear').value;
+    const token = localStorage.getItem('accessToken');
+    
+    showToast('Preparing ZIP download...');
+    
+    fetch(`/api/salary/dismissed/slip/download?type=bulk_month&month=${month}&year=${year}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Download failed');
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dismissed_payslips_bulk_${month}_${year}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('ZIP downloaded successfully.');
+    })
+    .catch(err => {
+        showToast('Error downloading ZIP: ' + err.message, 'error');
+    });
+}
+
+// ----------------------------------------------------
+// DISMISSED PAYROLL ADMIN PANEL FUNCTIONS
+// ----------------------------------------------------
+
+function exportDismissedExcelTemplate() {
+    const month = document.getElementById('dismissedPayrollMonth').value;
+    const year = document.getElementById('dismissedPayrollYear').value;
+    const token = localStorage.getItem('accessToken');
+    
+    showToast('Generating Dismissed Excel Template...');
+    
+    fetch(`/api/admin/salary/dismissed/export?month=${month}&year=${year}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Export failed');
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dismissed_salary_sheet_${month}_${year}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('Template downloaded successfully.');
+    })
+    .catch(err => {
+        showToast('Error exporting template: ' + err.message, 'error');
+    });
+}
+
+function openDismissedImportModal() {
+    const modal = document.getElementById('dismissedSalaryImportModal');
+    if (modal) modal.style.display = 'flex';
+}
+function closeDismissedImportModal() {
+    const modal = document.getElementById('dismissedSalaryImportModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function openDismissedManualGenerateModal() {
+    const modal = document.getElementById('dismissedSalaryManualGenerateModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        const employeeSelect = document.getElementById('dismissedManualGenerateEmployee');
+        if (employeeSelect) {
+            employeeSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
+            apiFetch('/employees/?type=dismissed&no_pagination=true')
+                .then(res => res.json())
+                .then(data => {
+                    const emps = data.results || data;
+                    emps.forEach(emp => {
+                        const opt = document.createElement('option');
+                        opt.value = emp.bitrix_id || emp.id;
+                        opt.textContent = `${emp.name} (${emp.emp_id || 'N/A'})`;
+                        employeeSelect.appendChild(opt);
+                    });
+                })
+                .catch(err => console.error("Error loading dismissed employees for dropdown:", err));
+        }
+        
+        const targetMonthEl = document.getElementById('dismissedPayrollMonth');
+        const targetYearEl = document.getElementById('dismissedPayrollYear');
+        const defaultMonth = targetMonthEl ? targetMonthEl.value : String(new Date().getMonth() + 1);
+        const defaultYear = targetYearEl ? targetYearEl.value : String(new Date().getFullYear());
+        if (document.getElementById('dismissedManualGenerateMonth')) {
+            document.getElementById('dismissedManualGenerateMonth').value = defaultMonth;
+        }
+        if (document.getElementById('dismissedManualGenerateYear')) {
+            document.getElementById('dismissedManualGenerateYear').value = defaultYear;
+        }
+    }
+}
+
+function closeDismissedManualGenerateModal() {
+    const modal = document.getElementById('dismissedSalaryManualGenerateModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadDismissedPayrollGrid() {
+    const month = document.getElementById('dismissedPayrollMonth').value;
+    const year = document.getElementById('dismissedPayrollYear').value;
+    if (!month || !year) {
+        showToast('Please select Target Month and Year.', 'error');
+        return;
+    }
+
+    try {
+        const res = await apiFetch(`/admin/salary/dismissed/grid?month=${month}&year=${year}`);
+        
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to fetch payroll grid.');
+        }
+        
+        const data = await res.json();
+        
+        const monthText = document.getElementById('dismissedPayrollMonth').options[document.getElementById('dismissedPayrollMonth').selectedIndex].text;
+        document.getElementById('dismissedPayrollGridMonthYear').textContent = `${monthText} ${year}`;
+        document.getElementById('dismissedPayrollGridContainer').style.display = 'block';
+
+        renderDismissedPayrollGrid(data);
+    } catch (err) {
+        showToast(err.message || 'Failed to load payroll grid.', 'error');
+    }
+}
+
+function cancelDismissedPayrollGrid() {
+    document.getElementById('dismissedPayrollGridContainer').style.display = 'none';
+}
+
+function renderDismissedPayrollGrid(data) {
+    const tbody = document.getElementById('dismissedPayrollGridBody');
+    tbody.innerHTML = '';
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 20px;">No employees found.</td></tr>';
+        return;
+    }
+
+    data.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.dataset.bitrix_id = row.bitrix_id;
+        tr.dataset.id = row.id || '';
+        tr.dataset.bank_account_no = row.bank_account_no || '';
+        tr.dataset.bank_name = row.bank_name || '';
+
+        const cols = [
+            { key: 'name', value: row.name, readOnly: true },
+            { key: 'designation', value: row.designation, readOnly: true },
+            { key: 'month_days', value: row.month_days, type: 'number' },
+            { key: 'worked_days', value: row.worked_days, type: 'number' },
+            { key: 'weekend', value: row.weekend, type: 'number' },
+            { key: 'cl', value: row.cl, type: 'number' },
+            { key: 'extra', value: row.extra, type: 'number' },
+            { key: 'payable_days', value: row.payable_days, type: 'number' },
+            { key: 'month_salary', value: row.month_salary, type: 'number' },
+            { key: 'payable_salary', value: row.payable_salary, type: 'number' },
+            { key: 'extra_days_working', value: row.extra_days_working, type: 'number' },
+            { key: 'fine_advance', value: row.fine_advance, type: 'number' },
+            { key: 'net_payable', value: row.net_payable, type: 'number' }
+        ];
+
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.style.padding = '5px';
+            td.style.border = '1px solid #e5e7eb';
+            
+            if (c.readOnly) {
+                td.textContent = c.value;
+                td.style.backgroundColor = '#f9fafb';
+                td.style.color = '#6b7280';
+            } else {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = c.value;
+                input.dataset.key = c.key;
+                input.className = 'grid-input';
+                input.style.width = '100%';
+                input.style.border = '1px solid transparent';
+                input.style.padding = '5px';
+                input.style.boxSizing = 'border-box';
+                
+                input.addEventListener('focus', function() {
+                    this.style.border = '1px solid var(--primary-color)';
+                    this.style.outline = 'none';
+                    this.style.backgroundColor = '#f0f9ff';
+                });
+                input.addEventListener('blur', function() {
+                    this.style.border = '1px solid transparent';
+                    this.style.backgroundColor = 'transparent';
+                });
+                
+                td.appendChild(input);
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+async function saveDismissedPayrollGrid() {
+    const month = document.getElementById('dismissedPayrollMonth').value;
+    const year = document.getElementById('dismissedPayrollYear').value;
+    
+    const tbody = document.getElementById('dismissedPayrollGridBody');
+    const rows = tbody.querySelectorAll('tr');
+    
+    if (rows.length === 0 || rows[0].querySelector('td[colspan]')) {
+        showToast('No data to save.', 'error');
+        return;
+    }
+
+    const payload = [];
+    rows.forEach(tr => {
+        const rowData = {
+            bitrix_id: tr.dataset.bitrix_id,
+            id: tr.dataset.id || null,
+            bank_account_no: tr.dataset.bank_account_no,
+            bank_name: tr.dataset.bank_name
+        };
+        
+        tr.querySelectorAll('input').forEach(input => {
+            rowData[input.dataset.key] = input.value;
+        });
+        
+        payload.push(rowData);
+    });
+
+    const btn = document.querySelector('#dismissedPayrollGridContainer button.btn-primary:nth-of-type(2)');
+    const originalText = btn.textContent;
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
+    try {
+        const res = await apiFetch('/admin/salary/dismissed/grid', {
+            method: 'POST',
+            body: JSON.stringify({
+                month: month,
+                year: year,
+                rows: payload
+            })
+        });
+        
+        if (res.ok) {
+            showToast('Payroll sheet saved successfully.', 'success');
+            document.getElementById('dismissedPayrollGridContainer').style.display = 'none';
+            if (activeSalaryTab === 'dismissed') {
+                loadDismissedSlipsRegistry();
+            }
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Failed to save payroll.', 'error');
+        }
+    } catch (e) {
+        showToast(e.message, 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// BIND DISMISSED EVENT LISTENERS AFTER LOAD
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const disImportForm = document.getElementById('dismissedSalaryImportForm');
+        if (disImportForm) {
+            disImportForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('dismissedImportExcelFile');
+                const month = document.getElementById('dismissedPayrollMonth').value;
+                const year = document.getElementById('dismissedPayrollYear').value;
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('month', month);
+                formData.append('year', year);
+                
+                showToast('Uploading and processing excel sheet for dismissed...');
+                closeDismissedImportModal();
+
+                const token = localStorage.getItem('accessToken');
+                try {
+                    const res = await fetch('/api/admin/salary/dismissed/import', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    if (res.ok) {
+                        showToast(`Import completed. Success: ${data.success}, Failed: ${data.failed}`);
+                        if (data.error_report_url) {
+                            showToast('Some rows failed. Error report downloaded.', 'warning');
+                            window.open(data.error_report_url, '_blank');
+                        }
+                        if (activeSalaryTab === 'dismissed') {
+                            loadDismissedSlipsRegistry();
+                        }
+                    } else {
+                        showToast(`Failed: ${data.detail || 'Import failed'}`, 'error');
+                        if (data.error_report_url) {
+                            window.open(data.error_report_url, '_blank');
+                        }
+                    }
+                } catch (ex) {
+                    showToast(ex.message, 'error');
+                }
+            });
+        }
+
+        const disManualGenForm = document.getElementById('dismissedSalaryManualGenerateForm');
+        if (disManualGenForm) {
+            disManualGenForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const employeeId = document.getElementById('dismissedManualGenerateEmployee').value;
+                const month = document.getElementById('dismissedManualGenerateMonth').value;
+                const year = document.getElementById('dismissedManualGenerateYear').value;
+                
+                if (!employeeId || !month || !year) {
+                    showToast('Please fill all required fields.', 'warning');
+                    return;
+                }
+                
+                showToast('Generating individual dismissed payslip...');
+                try {
+                    const res = await apiFetch('/admin/salary/dismissed/generate-individual', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            employee_id: employeeId,
+                            month: parseInt(month),
+                            year: parseInt(year)
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        showToast(data.message || 'Payslip generated successfully.', 'success');
+                        closeDismissedManualGenerateModal();
+                        
+                        if (activeSalaryTab === 'dismissed') {
+                            loadDismissedSlipsRegistry();
+                        }
+                    } else {
+                        const err = await res.json();
+                        showToast(err.error || 'Failed to generate payslip.', 'error');
+                    }
+                } catch (e) {
+                    showToast(e.message, 'error');
+                }
+            });
+        }
+    }, 1000);
+});
+

@@ -5,7 +5,137 @@ import zipfile
 from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.conf import settings
+from django.db.models import Q
 from .models import SalaryStructure, SalarySlip, SalaryIncrementApproval
+
+
+def get_latest_prior_slip(bitrix_user_id, month, year):
+    """
+    Returns the most recently saved SalarySlip for the given employee
+    that is strictly BEFORE the specified month/year, in reverse chrono order.
+    Skips slips with month_salary = 0.00 to ensure valid salary data is carried forward.
+
+    Returns None if no prior slip exists (new employee / no imports yet).
+
+    Examples
+    --------
+    Selected = April 2026, imported = Jan 2026 + Feb 2026  → returns Feb 2026
+    Selected = April 2026, imported = Jan 2026 only         → returns Jan 2026
+    Selected = April 2026, no prior imports                 → returns None
+    """
+    from decimal import Decimal
+    from django.db.models import Q
+    from salary.models import SalarySlip
+    
+    slips = (
+        SalarySlip.objects
+        .filter(bitrix_user_id=str(bitrix_user_id))
+        .filter(Q(year__lt=year) | Q(year=year, month__lt=month))
+        .order_by('-year', '-month')
+    )
+    # Return the first (most recent) prior slip regardless of month_salary value
+    if slips.exists():
+        return slips.first()
+    return None
+
+
+def calculate_carry_forward_slip(employee_id, month, year, prior_slip):
+    """
+    Returns an unsaved (in-memory) SalarySlip instance calculated using the
+    prior_slip's salary data and the target month's calendar days.
+    """
+    import calendar
+    from decimal import Decimal
+    from salary.models import SalarySlip
+    
+    month_days = Decimal(calendar.monthrange(year, month)[1])
+    
+    slip = SalarySlip(
+        bitrix_user_id=str(employee_id),
+        month=month,
+        year=year,
+        location=prior_slip.location,
+        month_days=month_days,
+        worked_days=prior_slip.worked_days,
+        weekend=prior_slip.weekend,
+        cl=prior_slip.cl,
+        extra=prior_slip.extra,
+        payable_days=prior_slip.payable_days,
+        month_salary=prior_slip.month_salary,
+        payable_salary=prior_slip.payable_salary,
+        extra_days_working=prior_slip.extra_days_working,
+        fine_advance=prior_slip.fine_advance,
+        net_payable=prior_slip.net_payable,
+        bank_account_no=prior_slip.bank_account_no,
+        bank_name=prior_slip.bank_name,
+        payment_status='pending',
+        status='published'
+    )
+    slip._skip_recalculation = True
+    return slip
+
+
+def generate_payslip_pdf_bytes(salary_slip, override_month=None, override_year=None):
+    """
+    Renders a payslip to PDF bytes WITHOUT saving anything to DB.
+
+    Useful for carry-forward months where no actual SalarySlip record exists:
+    we temporarily set month/year on the slip object only in memory.
+
+    Args:
+        salary_slip:    A real or temporary SalarySlip-like object with salary data.
+        override_month: If provided, use this month on the rendered PDF instead of
+                        salary_slip.month (carry-forward use case).
+        override_year:  If provided, use this year on the rendered PDF.
+
+    Returns:
+        (pdf_bytes, filename) tuple — nothing written to DB or disk.
+    """
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+
+    user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
+    employee = BitrixEmployeeMock(user_data) if user_data else None
+
+    from salary.models import EmployeeBankDetail
+    bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=salary_slip.bitrix_user_id).first()
+    bank_acc = ""
+    if bank_detail and bank_detail.bank_account_no:
+        bank_acc = bank_detail.bank_account_no
+    elif salary_slip.bank_account_no:
+        bank_acc = salary_slip.bank_account_no
+    elif employee:
+        bank_acc = getattr(employee, 'bank_account', '') or ''
+    else:
+        bank_acc = ''
+
+    bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
+    net_pay_words = num_to_words(salary_slip.net_salary)
+
+    # For carry-forward: display the requested month/year on the slip, not the source month
+    display_month = override_month if override_month is not None else salary_slip.month
+    display_year = override_year if override_year is not None else salary_slip.year
+
+    context = {
+        'slip': salary_slip,
+        'display_month': display_month,
+        'display_year': display_year,
+        'employee': employee,
+        'bank_account_masked': bank_account_masked,
+        'net_pay_words': net_pay_words,
+        'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
+        'today': datetime.date.today(),
+    }
+
+    html_string = render_to_string('salary/pdf_payslip.html', context)
+    pdf_bytes = HTML(string=html_string).write_pdf()
+
+    emp_id = getattr(employee, 'emp_id', None) if employee else None
+    if not emp_id:
+        emp_id = salary_slip.bitrix_user_id
+    filename = f"payslip_{emp_id}_{display_month}_{display_year}.pdf"
+    return pdf_bytes, filename
 
 def num_to_words(number):
     """
@@ -61,13 +191,25 @@ def generate_payslip_pdf(salary_slip):
     user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
     employee = BitrixEmployeeMock(user_data) if user_data else None
     
-    bank_acc = salary_slip.bank_account_no or (employee.bank_account if employee else "")
+    from salary.models import EmployeeBankDetail
+    bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=salary_slip.bitrix_user_id).first()
+    if bank_detail:
+        if bank_detail.bank_account_no:
+            salary_slip.bank_account_no = bank_detail.bank_account_no
+        if bank_detail.bank_name:
+            salary_slip.bank_name = bank_detail.bank_name
+        salary_slip._skip_recalculation = True
+        salary_slip.save(update_fields=['bank_account_no', 'bank_name'])
+    
+    bank_acc = salary_slip.bank_account_no or (getattr(employee, 'bank_account', '') if employee else "")
     bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
     
     net_pay_words = num_to_words(salary_slip.net_salary)
     
     context = {
         'slip': salary_slip,
+        'display_month': salary_slip.month,
+        'display_year': salary_slip.year,
         'employee': employee,
         'bank_account_masked': bank_account_masked,
         'net_pay_words': net_pay_words,
@@ -78,7 +220,9 @@ def generate_payslip_pdf(salary_slip):
     html_string = render_to_string('salary/pdf_payslip.html', context)
     pdf_bytes = HTML(string=html_string).write_pdf()
     
-    emp_id = employee.emp_id if employee else salary_slip.bitrix_user_id
+    emp_id = getattr(employee, 'emp_id', None) if employee else None
+    if not emp_id:
+        emp_id = salary_slip.bitrix_user_id
     filename = f"payslip_{emp_id}_{salary_slip.month}_{salary_slip.year}.pdf"
     salary_slip.pdf_file.save(filename, ContentFile(pdf_bytes), save=True)
     return salary_slip
@@ -105,7 +249,9 @@ def generate_increment_letter_pdf(approval, user=None):
     html_string = render_to_string('salary/pdf_increment_letter.html', context)
     pdf_bytes = HTML(string=html_string).write_pdf()
     
-    emp_id = employee.emp_id if employee else approval.bitrix_user_id
+    emp_id = getattr(employee, 'emp_id', None) if employee else None
+    if not emp_id:
+        emp_id = approval.bitrix_user_id
     filename = f"increment_letter_{emp_id}_{int(datetime.datetime.now().timestamp())}.pdf"
     approval.pdf_file.save(filename, ContentFile(pdf_bytes), save=True)
     return approval
@@ -127,13 +273,23 @@ def generate_payslips_zip(slips, zip_type='employee'):
             user_data = BitrixClient.get_user_detail(slip.bitrix_user_id)
             employee = BitrixEmployeeMock(user_data) if user_data else None
             
-            bank_acc = slip.bank_account_no or (employee.bank_account if employee else "")
+            from salary.models import EmployeeBankDetail
+            bank_detail = EmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+            if bank_detail:
+                if bank_detail.bank_account_no:
+                    slip.bank_account_no = bank_detail.bank_account_no
+                if bank_detail.bank_name:
+                    slip.bank_name = bank_detail.bank_name
+            
+            bank_acc = slip.bank_account_no or (getattr(employee, 'bank_account', '') if employee else "")
             bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
             
             net_pay_words = num_to_words(slip.net_salary)
             
             context = {
                 'slip': slip,
+                'display_month': slip.month,
+                'display_year': slip.year,
                 'employee': employee,
                 'bank_account_masked': bank_account_masked,
                 'net_pay_words': net_pay_words,
@@ -147,9 +303,11 @@ def generate_payslips_zip(slips, zip_type='employee'):
             months_abbr = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
             month_name = months_abbr[slip.month]
             
-            first_name = employee.first_name if employee else "Employee"
-            last_name = employee.last_name if employee else slip.bitrix_user_id
-            emp_id = employee.emp_id if employee else slip.bitrix_user_id
+            first_name = getattr(employee, 'first_name', 'Employee') if employee else "Employee"
+            last_name = getattr(employee, 'last_name', str(slip.bitrix_user_id)) if employee else slip.bitrix_user_id
+            emp_id = getattr(employee, 'emp_id', None) if employee else None
+            if not emp_id:
+                emp_id = slip.bitrix_user_id
             
             if zip_type == 'employee':
                 # Structure: "EmpName_EmpID/Apr_2026.pdf"
@@ -158,6 +316,209 @@ def generate_payslips_zip(slips, zip_type='employee'):
             else:
                 # Structure: "Apr_2026/EmpID_EmpName.pdf"
                 folder_name = f"{month_name}_{slip.year}"
+                emp_name = f"{first_name}_{last_name}".replace(" ", "_")
+                file_path = f"{folder_name}/{emp_id}_{emp_name}.pdf"
+                
+            zip_file.writestr(file_path, pdf_bytes)
+            
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+
+
+# =====================================================================
+# DISMISSED EMPLOYEE SERVICES
+# =====================================================================
+
+def get_latest_prior_dismissed_slip(bitrix_user_id, month, year):
+    from decimal import Decimal
+    from django.db.models import Q
+    from salary.models import DismissedSalarySlip
+    
+    slips = (
+        DismissedSalarySlip.objects
+        .filter(bitrix_user_id=str(bitrix_user_id))
+        .filter(Q(year__lt=year) | Q(year=year, month__lt=month))
+        .order_by('-year', '-month')
+    )
+    if slips.exists():
+        return slips.first()
+    return None
+
+def calculate_carry_forward_dismissed_slip(employee_id, month, year, prior_slip):
+    import calendar
+    from decimal import Decimal
+    from salary.models import DismissedSalarySlip
+    
+    month_days = Decimal(calendar.monthrange(year, month)[1])
+    
+    slip = DismissedSalarySlip(
+        bitrix_user_id=str(employee_id),
+        month=month,
+        year=year,
+        location=prior_slip.location,
+        month_days=month_days,
+        worked_days=prior_slip.worked_days,
+        weekend=prior_slip.weekend,
+        cl=prior_slip.cl,
+        extra=prior_slip.extra,
+        payable_days=prior_slip.payable_days,
+        month_salary=prior_slip.month_salary,
+        payable_salary=prior_slip.payable_salary,
+        extra_days_working=prior_slip.extra_days_working,
+        fine_advance=prior_slip.fine_advance,
+        net_payable=prior_slip.net_payable,
+        bank_account_no=prior_slip.bank_account_no,
+        bank_name=prior_slip.bank_name,
+        payment_status='pending',
+        status='published'
+    )
+    slip._skip_recalculation = True
+    return slip
+
+def generate_dismissed_payslip_pdf_bytes(salary_slip, override_month=None, override_year=None):
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+
+    user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
+    employee = BitrixEmployeeMock(user_data) if user_data else None
+
+    from salary.models import DismissedEmployeeBankDetail
+    bank_detail = DismissedEmployeeBankDetail.objects.filter(bitrix_user_id=salary_slip.bitrix_user_id).first()
+    bank_acc = ""
+    if bank_detail and bank_detail.bank_account_no:
+        bank_acc = bank_detail.bank_account_no
+    elif salary_slip.bank_account_no:
+        bank_acc = salary_slip.bank_account_no
+    elif employee:
+        bank_acc = getattr(employee, 'bank_account', '') or ''
+
+    bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
+    net_pay_words = num_to_words(salary_slip.net_salary)
+
+    display_month = override_month if override_month is not None else salary_slip.month
+    display_year = override_year if override_year is not None else salary_slip.year
+
+    context = {
+        'slip': salary_slip,
+        'display_month': display_month,
+        'display_year': display_year,
+        'employee': employee,
+        'bank_account_masked': bank_account_masked,
+        'net_pay_words': net_pay_words,
+        'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
+        'today': datetime.date.today(),
+        'is_dismissed': True
+    }
+
+    html_string = render_to_string('salary/pdf_payslip.html', context)
+    pdf_bytes = HTML(string=html_string).write_pdf()
+
+    emp_id = getattr(employee, 'emp_id', None) if employee else None
+    if not emp_id:
+        emp_id = salary_slip.bitrix_user_id
+    filename = f"dismissed_payslip_{emp_id}_{display_month}_{display_year}.pdf"
+    return pdf_bytes, filename
+
+def generate_dismissed_payslip_pdf(salary_slip):
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+    
+    user_data = BitrixClient.get_user_detail(salary_slip.bitrix_user_id)
+    employee = BitrixEmployeeMock(user_data) if user_data else None
+    
+    from salary.models import DismissedEmployeeBankDetail
+    bank_detail = DismissedEmployeeBankDetail.objects.filter(bitrix_user_id=salary_slip.bitrix_user_id).first()
+    if bank_detail:
+        if bank_detail.bank_account_no:
+            salary_slip.bank_account_no = bank_detail.bank_account_no
+        if bank_detail.bank_name:
+            salary_slip.bank_name = bank_detail.bank_name
+        salary_slip._skip_recalculation = True
+        salary_slip.save(update_fields=['bank_account_no', 'bank_name'])
+    
+    bank_acc = salary_slip.bank_account_no or (getattr(employee, 'bank_account', '') if employee else "")
+    bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
+    
+    net_pay_words = num_to_words(salary_slip.net_salary)
+    
+    context = {
+        'slip': salary_slip,
+        'display_month': salary_slip.month,
+        'display_year': salary_slip.year,
+        'employee': employee,
+        'bank_account_masked': bank_account_masked,
+        'net_pay_words': net_pay_words,
+        'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
+        'today': datetime.date.today(),
+        'is_dismissed': True
+    }
+    
+    html_string = render_to_string('salary/pdf_payslip.html', context)
+    pdf_bytes = HTML(string=html_string).write_pdf()
+    
+    emp_id = getattr(employee, 'emp_id', None) if employee else None
+    if not emp_id:
+        emp_id = salary_slip.bitrix_user_id
+    filename = f"dismissed_payslip_{emp_id}_{salary_slip.month}_{salary_slip.year}.pdf"
+    salary_slip.pdf_file.save(filename, ContentFile(pdf_bytes), save=True)
+    return salary_slip
+
+def generate_dismissed_payslips_zip(slips, zip_type='employee'):
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+    from common.bitrix_client import BitrixClient, BitrixEmployeeMock
+    
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for slip in slips:
+            user_data = BitrixClient.get_user_detail(slip.bitrix_user_id)
+            employee = BitrixEmployeeMock(user_data) if user_data else None
+            
+            from salary.models import DismissedEmployeeBankDetail
+            bank_detail = DismissedEmployeeBankDetail.objects.filter(bitrix_user_id=slip.bitrix_user_id).first()
+            if bank_detail:
+                if bank_detail.bank_account_no:
+                    slip.bank_account_no = bank_detail.bank_account_no
+                if bank_detail.bank_name:
+                    slip.bank_name = bank_detail.bank_name
+            
+            bank_acc = slip.bank_account_no or (getattr(employee, 'bank_account', '') if employee else "")
+            bank_account_masked = f"XXXXXX{bank_acc[-4:]}" if len(bank_acc) >= 4 else "XXXXXX"
+            
+            net_pay_words = num_to_words(slip.net_salary)
+            
+            context = {
+                'slip': slip,
+                'display_month': slip.month,
+                'display_year': slip.year,
+                'employee': employee,
+                'bank_account_masked': bank_account_masked,
+                'net_pay_words': net_pay_words,
+                'company_name': getattr(settings, 'COMPANY_NAME', 'Devex Hub Pvt Ltd.'),
+                'today': datetime.date.today(),
+                'is_dismissed': True
+            }
+            
+            html_string = render_to_string('salary/pdf_payslip.html', context)
+            pdf_bytes = HTML(string=html_string).write_pdf()
+            
+            months_abbr = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            month_name = months_abbr[slip.month]
+            
+            first_name = getattr(employee, 'first_name', 'Employee') if employee else "Employee"
+            last_name = getattr(employee, 'last_name', str(slip.bitrix_user_id)) if employee else slip.bitrix_user_id
+            emp_id = getattr(employee, 'emp_id', None) if employee else None
+            if not emp_id:
+                emp_id = slip.bitrix_user_id
+            
+            if zip_type == 'employee':
+                folder_name = f"{first_name}_{last_name}_{emp_id}".replace(" ", "_")
+                file_path = f"{folder_name}/Dismissed_{month_name}_{slip.year}.pdf"
+            else:
+                folder_name = f"Dismissed_{month_name}_{slip.year}"
                 emp_name = f"{first_name}_{last_name}".replace(" ", "_")
                 file_path = f"{folder_name}/{emp_id}_{emp_name}.pdf"
                 

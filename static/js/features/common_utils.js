@@ -64,7 +64,33 @@ function applyPermissionsToUI() {
     if (adminLogsLink) adminLogsLink.style.display = hasPermission('audit.read') ? 'block' : 'none';
 
     const adminRolesLink = document.getElementById('adminRolesLink');
-    if (adminRolesLink) adminRolesLink.style.display = hasPermission('roles.manage') ? 'block' : 'none';
+    if (adminRolesLink) {
+        const isHr = currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR');
+        const hasRolesManage = hasPermission('roles.manage');
+        adminRolesLink.style.display = (hasRolesManage && !isHr) ? 'block' : 'none';
+    }
+
+    // Hide settings icon for HR role
+    const settingsIconBtn = document.querySelector('button[title="Settings"]');
+    if (settingsIconBtn) {
+        const isHr = currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR');
+        settingsIconBtn.style.display = isHr ? 'none' : 'flex';
+    }
+
+    // Hide Roles & Permissions view panel for HR role
+    const rolesView = document.getElementById('rolesView');
+    if (rolesView) {
+        const isHr = currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR');
+        if (isHr) {
+            rolesView.style.display = 'none';
+        }
+    }
+
+    const probationLink = document.getElementById('probationLink');
+    if (probationLink) {
+        probationLink.style.display = (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR')) ? 'block' : 'none';
+    }
+
 
     // Dashboard items
     const incrementWidget = document.getElementById('adminWidgetIncrements');
@@ -140,4 +166,19 @@ function applyPermissionsToUI() {
             subTabTemplateBtn.style.display = (isAdmin || hasTemplatePerm) ? 'inline-block' : 'none';
         }
     }
+}
+
+// ---------- URL State Helpers ----------
+function setUrlParam(key, value) {
+    const url = new URL(window.location);
+    url.searchParams.set(key, value);
+    // Merge with existing history state so we don't clobber it
+    const currentState = history.state || {};
+    currentState[key] = value;
+    history.replaceState(currentState, '', url);
+}
+
+function getUrlParam(key) {
+    const url = new URL(window.location);
+    return url.searchParams.get(key);
 }

@@ -48,12 +48,14 @@ class PasswordResetRequestView(APIView):
         token = AccessToken.for_user(user)
 
         reset_link = f"http://localhost:8000/reset-password?token={str(token)}"
+        html_msg = f'<p>Click the link below to reset your password:</p><p><a href="{reset_link}">{reset_link}</a></p>'
         send_mail(
             subject="HR Portal Password Reset",
             message=f"Click the link to reset your password: {reset_link}",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
             fail_silently=False,
+            html_message=html_msg
         )
         return Response({'message': 'Reset link sent to email'}, status=status.HTTP_200_OK)
 
@@ -65,6 +67,16 @@ class PasswordResetConfirmView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({'message': 'Password reset successfully'}, status=status.HTTP_200_OK)
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from django.contrib.auth.signals import user_logged_out
+        user_logged_out.send(sender=request.user.__class__, request=request, user=request.user)
+        return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+
 
 
 from student_certificate.models import Student

@@ -8,32 +8,39 @@ let generatedPdfUrl = null;
 let certEditorSkills = [];
 let currentStudentList = [];
 
-let studentDirectoryStart = 0;
-let studentDirectoryNext = null;
-let bitrixStudentStart = 0;
-let bitrixStudentNext = null;
+let studentCurrentPage = 1;
+let studentTotalCount = 0;
+let bitrixStudentCurrentPage = 1;
+let bitrixStudentTotalCount = 0;
+const STUDENT_PAGE_SIZE = 10;
 
 // ---------- STUDENTS & INTERNS VIEW ----------
-async function loadStudentData() {
+async function loadStudentData(forceLoad = false) {
+    if (!forceLoad) {
+        const urlTab = getUrlParam('tab');
+        if (urlTab && urlTab !== 'directory') {
+            switchStudentTab(urlTab, null, false);
+            return;
+        }
+    }
     document.getElementById('pageTitle').textContent = 'Student / Intern Module';
     // Load ongoing students from Bitrix24 API with pagination
     try {
-        const res = await apiFetch(`/api/student/bitrix-active/?start=${studentDirectoryStart}`);
+        const start = (studentCurrentPage - 1) * STUDENT_PAGE_SIZE;
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${start}&limit=${STUDENT_PAGE_SIZE}`);
         if (res.ok) {
             const data = await res.json();
             const studList = data.results || [];
             currentStudentList = studList;
-            studentDirectoryNext = data.next !== undefined ? data.next : null;
-            
+            studentTotalCount = data.total || 0;
             const tbody = document.getElementById('studentTableBody');
             if (tbody) {
                 if (studList.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#64748b;">No ongoing students found.</td></tr>';
-                    // Update pagination controls
-                    updateStudentDirectoryPagination(0);
+                    updateStudentPaginationControls();
                     return;
                 }
-                
+
                 tbody.innerHTML = studList.map((s, index) => `
                     <tr onclick="handleStudentRowClick(event, ${index})" style="cursor: pointer;">
                         <td>${s.name || '-'}</td>
@@ -45,9 +52,7 @@ async function loadStudentData() {
                         </td>
                     </tr>
                 `).join('');
-                
-                // Update pagination controls
-                updateStudentDirectoryPagination(studList.length);
+                updateStudentPaginationControls();
             }
         } else {
             const tbody = document.getElementById('studentTableBody');
@@ -64,20 +69,22 @@ async function loadStudentData() {
     }
 }
 
-function updateStudentDirectoryPagination(count) {
-    const pageStart = count === 0 ? 0 : studentDirectoryStart + 1;
-    const pageEnd = count === 0 ? 0 : studentDirectoryStart + count;
-    
+function updateStudentPaginationControls() {
+    const pageStart = studentTotalCount === 0 ? 0 : (studentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
+    const pageEnd = Math.min(studentCurrentPage * STUDENT_PAGE_SIZE, studentTotalCount);
     const startEl = document.getElementById('studentPageStart');
     const endEl = document.getElementById('studentPageEnd');
+    const totalEl = document.getElementById('studentTotalCount');
     const prevBtn = document.getElementById('studentPrevBtn');
     const nextBtn = document.getElementById('studentNextBtn');
-    
+
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (studentDirectoryStart === 0);
-    if (nextBtn) nextBtn.disabled = (studentDirectoryNext === null);
+    if (totalEl) totalEl.textContent = studentTotalCount;
+    if (prevBtn) prevBtn.disabled = studentCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= studentTotalCount;
 }
+
 
 function openStudentModal() {
     const modal = document.getElementById('studentModal');
@@ -120,15 +127,7 @@ function addInstallmentRow() {
 
 // Open Certificate tab and automatically select a student
 function openCertTabWithStudent(studentId) {
-    switchStudentTab('certgen');
-    // We wait a tiny bit to make sure select option elements are loaded
-    setTimeout(() => {
-        const select = document.getElementById('certStudentSelect');
-        if (select) {
-            select.value = studentId;
-            loadStudentCertPrefills();
-        }
-    }, 400);
+    switchStudentTab('certgen', studentId);
 }
 
 // Open Certificate tab with Bitrix student data (from API, not database)
@@ -145,7 +144,14 @@ async function openCertTabWithBitrixStudent(index) {
             institute: s.institute || '',
             start_date: s.start_date || '',
             completion_date: s.completion_date || '',
-            total_fees: s.total_fees || '0'
+            total_fees: s.total_fees || '0',
+            father_name: s.father_name || '',
+            phone: s.phone || '',
+            dob: s.dob || '',
+            gender: s.gender || '',
+            address: s.address || '',
+            student_type: s.student_type || '',
+            cert_type: s.cert_type || ''
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
@@ -154,10 +160,10 @@ async function openCertTabWithBitrixStudent(index) {
         if (res.ok) {
             const student = await res.json();
             switchStudentTab('certgen');
-            
+
             // Reload the students select dropdown so it contains the new/updated student
             await loadStudentsSelect();
-            
+
             // Pre-select the student in the dropdown
             const select = document.getElementById('certStudentSelect');
             if (select) {
@@ -186,7 +192,7 @@ async function viewInstallmentsModal(studentId, name) {
         if (res.ok) {
             const installments = await res.json();
             const list = installments.results || installments;
-            
+
             // Open warning toast/alert showing details or build inline popup
             let htmlList = list.map(inst => `
                 <div style="border-bottom:1px solid var(--border-color); padding:10px 0; display:flex; justify-content:space-between; align-items:center;">
@@ -270,60 +276,64 @@ async function triggerWarningEmail(instId) {
 }
 
 // ---------- TABS CONTROLLERS & DROPDOWNS ----------
-function switchStudentTab(tab) {
+function switchStudentTab(tab, selectedStudentId = null, updateUrl = true) {
+    if (updateUrl) setUrlParam('tab', tab);
     const dirTab = document.getElementById('studentTabDirectory');
     const certTab = document.getElementById('studentTabCertGen');
     const bitrixTab = document.getElementById('studentTabBitrix');
     const dirBtn = document.getElementById('tabStudentDirectoryBtn');
     const certBtn = document.getElementById('tabCertGenBtn');
     const bitrixBtn = document.getElementById('tabBitrixStudentsBtn');
-    
+
     // Hide all tabs
     if (dirTab) dirTab.style.display = 'none';
     if (certTab) certTab.style.display = 'none';
     if (bitrixTab) bitrixTab.style.display = 'none';
-    
+
     // Remove active from all buttons
     if (dirBtn) dirBtn.classList.remove('active');
     if (certBtn) certBtn.classList.remove('active');
     if (bitrixBtn) bitrixBtn.classList.remove('active');
-    
+
     if (tab === 'directory') {
         if (dirTab) dirTab.style.display = 'block';
         if (dirBtn) dirBtn.classList.add('active');
-        studentDirectoryStart = 0;
-        loadStudentData(); // Load Bitrix ongoing students
+        studentCurrentPage = 1;
+        loadStudentData(true); // Load Bitrix ongoing students
     } else if (tab === 'bitrix') {
         if (bitrixTab) bitrixTab.style.display = 'block';
         if (bitrixBtn) bitrixBtn.classList.add('active');
-        bitrixStudentStart = 0;
+        bitrixStudentCurrentPage = 1;
         loadBitrixStudents();
     } else {
         if (certTab) certTab.style.display = 'block';
-        if (certBtn) certBtn.classList.add('active');
-        loadStudentsSelect();
+        if (certBtn) {
+            certBtn.classList.add('active');
+            certBtn.style.display = 'inline-block'; // Ensure the tab button is shown
+        }
+        loadStudentsSelect(selectedStudentId);
         loadCoursesSelect('certCourseSelect');
     }
 }
 
-async function loadBitrixStudents() {
+async function loadBitrixStudents(forceRefresh = false) {
     const tbody = document.getElementById('bitrixStudentTableBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading active students from Bitrix24...</td></tr>';
-    
+
     try {
-        const res = await apiFetch(`/api/student/bitrix-active/?start=${bitrixStudentStart}`);
+        const start = (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE;
+        const res = await apiFetch(`/api/student/bitrix-active/?start=${start}&limit=${STUDENT_PAGE_SIZE}`);
         if (res.ok) {
             const data = await res.json();
             const students = data.results || [];
-            bitrixStudentNext = data.next !== undefined ? data.next : null;
-            
+            bitrixStudentTotalCount = data.total || 0;
             if (students.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No active students found.</td></tr>';
-                updateBitrixStudentPagination(0);
+                updateBitrixStudentPaginationControls();
                 return;
             }
-            
+
             tbody.innerHTML = students.map(s => `
                 <tr>
                     <td>${s.id}</td>
@@ -338,8 +348,7 @@ async function loadBitrixStudents() {
                     <td><span style="font-size:7.5pt; padding:2px 8px; border-radius:10px; background:#e0f2fe; color:#0369a1; font-weight:600;">${s.stage.split(':').pop()}</span></td>
                 </tr>
             `).join('');
-            
-            updateBitrixStudentPagination(students.length);
+            updateBitrixStudentPaginationControls();
         } else {
             tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Failed to fetch data from Bitrix24.</td></tr>';
         }
@@ -349,19 +358,20 @@ async function loadBitrixStudents() {
     }
 }
 
-function updateBitrixStudentPagination(count) {
-    const pageStart = count === 0 ? 0 : bitrixStudentStart + 1;
-    const pageEnd = count === 0 ? 0 : bitrixStudentStart + count;
-    
+function updateBitrixStudentPaginationControls() {
+    const pageStart = bitrixStudentTotalCount === 0 ? 0 : (bitrixStudentCurrentPage - 1) * STUDENT_PAGE_SIZE + 1;
+    const pageEnd = Math.min(bitrixStudentCurrentPage * STUDENT_PAGE_SIZE, bitrixStudentTotalCount);
     const startEl = document.getElementById('bitrixStudentPageStart');
     const endEl = document.getElementById('bitrixStudentPageEnd');
+    const totalEl = document.getElementById('bitrixStudentTotalCount');
     const prevBtn = document.getElementById('bitrixStudentPrevBtn');
     const nextBtn = document.getElementById('bitrixStudentNextBtn');
-    
+
     if (startEl) startEl.textContent = pageStart;
     if (endEl) endEl.textContent = pageEnd;
-    if (prevBtn) prevBtn.disabled = (bitrixStudentStart === 0);
-    if (nextBtn) nextBtn.disabled = (bitrixStudentNext === null);
+    if (totalEl) totalEl.textContent = bitrixStudentTotalCount;
+    if (prevBtn) prevBtn.disabled = bitrixStudentCurrentPage <= 1;
+    if (nextBtn) nextBtn.disabled = pageEnd >= bitrixStudentTotalCount;
 }
 
 async function loadCoursesSelect(elementId) {
@@ -372,7 +382,7 @@ async function loadCoursesSelect(elementId) {
         if (res.ok) {
             const data = await res.json();
             const list = data.results || data;
-            
+
             let html = '<option value="">-- Select Course --</option>';
             list.forEach(c => {
                 html += `<option value="${c.id}" data-skills='${JSON.stringify(c.skills_list)}' data-duration="${c.default_duration}">${c.course_name}</option>`;
@@ -384,19 +394,51 @@ async function loadCoursesSelect(elementId) {
     }
 }
 
-async function loadStudentsSelect() {
+async function loadStudentsSelect(selectedStudentId = null) {
     const el = document.getElementById('certStudentSelect');
     if (!el) return;
     try {
-        const res = await apiFetch('/api/student/students/?status=ACTIVE');
-        if (res.ok) {
-            const data = await res.json();
-            const list = data.results || data;
-            let html = '<option value="">-- Select Student --</option>';
-            list.forEach(s => {
-                html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
-            });
-            el.innerHTML = html;
+        // 1. Fetch database students
+        const resDb = await apiFetch('/api/student/students/');
+        let dbStudents = [];
+        if (resDb.ok) {
+            const dataDb = await resDb.json();
+            dbStudents = dataDb.results || dataDb;
+        }
+
+        // 2. Fetch active students from Bitrix24
+        const resBitrix = await apiFetch('/api/student/bitrix-active/?limit=200');
+        let bitrixStudents = [];
+        if (resBitrix.ok) {
+            const dataBitrix = await resBitrix.json();
+            bitrixStudents = dataBitrix.results || [];
+        }
+
+        // Combine. Match by email to avoid duplicates.
+        const dbEmails = new Set(dbStudents.map(s => (s.email || '').toLowerCase()));
+        
+        let html = '<option value="">-- Select Student --</option>';
+        
+        // Add database students first
+        dbStudents.forEach(s => {
+            html += `<option value="${s.id}">${s.name} (${s.cert_no})</option>`;
+        });
+
+        // Add Bitrix students who aren't in the database yet
+        bitrixStudents.forEach(s => {
+            const email = (s.email || '').toLowerCase();
+            if (email && !dbEmails.has(email)) {
+                const certNo = `BITRIX-${s.id}`;
+                const detailJson = JSON.stringify(s).replace(/"/g, '&quot;');
+                html += `<option value="bitrix_${s.id}" data-student="${detailJson}">${s.name} (${certNo}) [Bitrix24]</option>`;
+            }
+        });
+
+        el.innerHTML = html;
+
+        if (selectedStudentId) {
+            el.value = selectedStudentId;
+            switchStudentProfileTab(defaultTab, false);
         }
     } catch (e) {
         console.error(e);
@@ -416,47 +458,108 @@ function onSelectModalCourse() {
 async function loadStudentCertPrefills() {
     const select = document.getElementById('certStudentSelect');
     if (!select || !select.value) return;
+
+    let studentId = select.value;
     
-    const studentId = select.value;
+    // If it's a Bitrix-only student, dynamically sync them first
+    if (String(studentId).startsWith('bitrix_')) {
+        const option = select.options[select.selectedIndex];
+        const studentDataStr = option.getAttribute('data-student');
+        if (studentDataStr) {
+            showGlobalLoader(true);
+            try {
+                const s = JSON.parse(studentDataStr);
+                const payload = {
+                    id: s.id,
+                    name: s.name,
+                    email: s.email,
+                    course_name: s.course_id ? String(s.course_id) : '',
+                    institute: s.institute || '',
+                    start_date: s.start_date || s.joining_date || '',
+                    completion_date: s.completion_date || '',
+                    total_fees: s.total_fees || '0',
+                    father_name: s.father_name || '',
+                    phone: s.phone || '',
+                    dob: s.dob || '',
+                    gender: s.gender || '',
+                    address: s.address || '',
+                    student_type: s.student_type || '',
+                    cert_type: s.cert_type || ''
+                };
+                const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    const student = await res.json();
+                    option.value = student.id;
+                    option.textContent = `${student.name} (${student.cert_no})`;
+                    select.value = student.id;
+                    studentId = student.id;
+                    showToast(`Synced student from Bitrix24: ${student.name}`);
+                } else {
+                    const err = await res.json();
+                    showToast(JSON.stringify(err), 'error');
+                    select.value = "";
+                    return;
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Error syncing student data.', 'error');
+                select.value = "";
+                return;
+            } finally {
+                showGlobalLoader(false);
+            }
+        } else {
+            select.value = "";
+            return;
+        }
+    }
+
     currentSelectedStudentName = select.options[select.selectedIndex].text.split(' (')[0];
-    
+
     try {
         const res = await apiFetch(`/api/student/students/${studentId}/enrollment-details/`);
         if (res.ok) {
             const data = await res.json();
             currentStudentDetails = data;
-            
+
             // Disable downloads until new generation succeeds
             generatedPdfUrl = null;
             document.getElementById('btnDownloadPDF').disabled = true;
-            
+
             // Set Course select
             const courseSelect = document.getElementById('certCourseSelect');
             if (courseSelect) {
                 courseSelect.value = data.course_id || '';
             }
-            
+
             // Set Duration input
             const durationInput = document.getElementById('certDurationInput');
             if (durationInput) {
-                durationInput.value = data.duration || '';
+                let dur = data.duration || '6 Months';
+                dur = dur.toLowerCase();
+                if (dur.includes('45')) durationInput.value = '45 Days';
+                else if (dur.includes('3')) durationInput.value = '3 Months';
+                else durationInput.value = '6 Months';
             }
-            
+
             // Set Place and Issue Date (today)
             document.getElementById('certPlace').value = "Mohali";
             const todayStr = new Date().toISOString().split('T')[0];
             document.getElementById('certIssueDate').value = todayStr;
-            
+
             // Build skills
             certEditorSkills = (data.skills || []).map(s => ({ name: s, rating: 'Excellent' }));
             renderEditorSkills();
-            
+
             // Set Paragraph Text
             const showDates = document.getElementById('certShowDatesToggle').checked;
             document.getElementById('certParagraphTextarea').value = showDates ? data.default_paragraph_with_dates : data.default_paragraph;
-            
-            // Update preview
-            updateLivePreview();
+
+            // Update preview and recalculate dates
+            onCertDurationChange();
         }
     } catch (e) {
         console.error(e);
@@ -466,12 +569,12 @@ async function loadStudentCertPrefills() {
 function renderEditorSkills() {
     const container = document.getElementById('certSkillsContainer');
     if (!container) return;
-    
+
     if (certEditorSkills.length === 0) {
         container.innerHTML = '<div style="color:#64748b; font-size:9.5pt; text-align: center; padding: 15px;">No skills added. Click "+ Add Skill" to add one.</div>';
         return;
     }
-    
+
     let html = '';
     certEditorSkills.forEach((skill, idx) => {
         html += `
@@ -532,46 +635,58 @@ function updateSkillRating(idx, rating) {
 function onCertCourseChange() {
     const select = document.getElementById('certCourseSelect');
     if (!select) return;
-    
+
     if (select.selectedIndex > 0) {
         const option = select.options[select.selectedIndex];
-        const duration = option.getAttribute('data-duration') || '6 months';
         const skills = JSON.parse(option.getAttribute('data-skills') || '[]');
-        
-        document.getElementById('certDurationInput').value = duration;
+
         certEditorSkills = skills.map(s => ({ name: s, rating: 'Excellent' }));
         renderEditorSkills();
-        
+
         if (currentStudentDetails) {
             currentStudentDetails.course_name = option.text;
-            currentStudentDetails.duration = duration;
             currentStudentDetails.skills = skills;
-            
-            const s_o_d_o = currentStudentDetails.s_o_d_o;
-            const father_name = currentStudentDetails.father_name;
-            const address = currentStudentDetails.address;
-            const student_name = currentStudentDetails.student_name;
-            const completion_month = currentStudentDetails.completion_month;
-            
-            currentStudentDetails.default_paragraph = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed ${duration} \"**${option.text}**\" course .`;
-            currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${student_name}** **${s_o_d_o} ${father_name}**, ${address}. Has successfully Completed \"**${option.text}**\" course in the month of **${completion_month}**.`;
-            
-            const showDates = document.getElementById('certShowDatesToggle').checked;
-            document.getElementById('certParagraphTextarea').value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
+            onCertDurationChange(); // This will recalculate the text and dates
         }
     }
     updateLivePreview();
 }
 
 function onCertDurationChange() {
-    const duration = document.getElementById('certDurationInput').value;
+    const durationSelect = document.getElementById('certDurationInput');
+    if (!durationSelect) return;
+    
+    const duration = durationSelect.value;
     const textarea = document.getElementById('certParagraphTextarea');
-    if (textarea && currentStudentDetails) {
-        let text = textarea.value;
-        const oldDuration = currentStudentDetails.duration;
-        if (text.includes(oldDuration)) {
-            textarea.value = text.replace(oldDuration, duration);
-            currentStudentDetails.duration = duration;
+    
+    if (currentStudentDetails && currentStudentDetails.joining_date) {
+        let joiningDate = new Date(currentStudentDetails.joining_date);
+        let daysToAdd = 180; // default 6 Months
+        if (duration.includes("3 Month")) daysToAdd = 90;
+        if (duration.includes("45 Day")) daysToAdd = 45;
+        
+        let newComp = new Date(joiningDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+        currentStudentDetails.completion_date = newComp.toISOString().split('T')[0];
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        currentStudentDetails.completion_month = monthNames[newComp.getMonth()] + " " + newComp.getFullYear();
+        
+        currentStudentDetails.duration = duration;
+        
+        // Update paragraphs
+        const s_name = currentStudentDetails.student_name;
+        const sodo = currentStudentDetails.s_o_d_o;
+        const fname = currentStudentDetails.father_name;
+        const addr = currentStudentDetails.address;
+        const cname = currentStudentDetails.course_name;
+        const cmonth = currentStudentDetails.completion_month;
+        
+        currentStudentDetails.default_paragraph = `This is to certify that **${s_name}** **${sodo} ${fname}**, ${addr}. Has successfully Completed ${duration} \"**${cname}**\" course .`;
+        currentStudentDetails.default_paragraph_with_dates = `This is to certify that **${s_name}** **${sodo} ${fname}**, ${addr}. Has successfully Completed \"**${cname}**\" course in the month of **${cmonth}**.`;
+        
+        if (textarea) {
+            const showDates = document.getElementById('certShowDatesToggle').checked;
+            textarea.value = showDates ? currentStudentDetails.default_paragraph_with_dates : currentStudentDetails.default_paragraph;
         }
     }
     updateLivePreview();
@@ -588,35 +703,35 @@ function onShowDatesToggle() {
 
 function updateLivePreview() {
     if (!currentStudentDetails) return;
-    
+
     // 1. Serial Number Preview
     const completionYear = new Date(currentStudentDetails.completion_date).getFullYear() || 2025;
     const batchCode = String(completionYear).slice(-2);
     document.getElementById('prevSerialNo').textContent = `Sr.no DHUB|${batchCode}|XXX`;
-    
+
     // 2. Paragraph Text formatting
     let text = document.getElementById('certParagraphTextarea').value || "";
     let htmlText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     htmlText = htmlText.replace(/\n/g, '<br>');
     document.getElementById('prevParagraph').innerHTML = htmlText;
-    
+
     // 3. Performance Heading
     const hisHer = currentStudentDetails.his_her || 'his/her';
     const capHisHer = hisHer.charAt(0).toUpperCase() + hisHer.slice(1);
     document.getElementById('prevPerformanceHeading').textContent = `${capHisHer} Performance Given as Below`;
-    
+
     // 4. Skills checkboxes
     const skillsContainer = document.getElementById('certSkillsContainer');
     const prevTable = document.getElementById('prevSkillsTable');
     if (skillsContainer && prevTable) {
         const hiddenInputs = skillsContainer.querySelectorAll('.skill-name-hidden');
         let tableHtml = '<tbody>';
-        
+
         hiddenInputs.forEach((input, idx) => {
             const skillName = input.value;
             const ratingRadio = skillsContainer.querySelector(`input[name="skill_${idx}"]:checked`);
             const rating = ratingRadio ? ratingRadio.value : 'Excellent';
-            
+
             tableHtml += `
                 <tr>
                     <td style="padding: 2.5px 0; font-weight:600; width:40%;">${skillName}</td>
@@ -629,7 +744,7 @@ function updateLivePreview() {
         tableHtml += '</tbody>';
         prevTable.innerHTML = tableHtml;
     }
-    
+
     // 5. Show Dates Section
     const showDates = document.getElementById('certShowDatesToggle').checked;
     const prevDatesSection = document.getElementById('prevDatesSection');
@@ -644,16 +759,16 @@ function updateLivePreview() {
             prevDatesSection.style.display = 'none';
         }
     }
-    
+
     // 6. Closing Text
     const heShe = currentStudentDetails.he_she || 'he/she';
     document.getElementById('prevClosingText').textContent = `We hope ${heShe} serves ${hisHer} best service to this industry.`;
-    
+
     // 7. Footer text
     const issueDateVal = document.getElementById('certIssueDate').value;
     const formattedIssueDate = issueDateVal ? formatInputDate(issueDateVal) : '';
     document.getElementById('prevIssueDateText').textContent = `Date: ${formattedIssueDate}`;
-    
+
     const placeVal = document.getElementById('certPlace').value;
     document.getElementById('prevPlaceText').textContent = `Place: ${placeVal}`;
 }
@@ -679,7 +794,7 @@ async function generateAndSaveCertificate() {
         showToast('Please select a course.', 'error');
         return;
     }
-    
+
     const skillRatings = {};
     const container = document.getElementById('certSkillsContainer');
     if (container) {
@@ -690,54 +805,93 @@ async function generateAndSaveCertificate() {
             skillRatings[skillName] = ratingRadio ? ratingRadio.value : 'Excellent';
         });
     }
-    
+
     const data = {
         student: parseInt(select.value),
         course: parseInt(courseSelect.value),
+        duration: document.getElementById('certDurationInput').value,
         skill_ratings: skillRatings,
         show_dates: document.getElementById('certShowDatesToggle').checked,
         issue_date: document.getElementById('certIssueDate').value,
         place: document.getElementById('certPlace').value,
         cert_content: document.getElementById('certParagraphTextarea').value
     };
-    
+
+    // Confirm before generating
+    const _certConf = await showConfirm({
+        title: 'Generate Certificate?',
+        body: 'This will generate and save a PDF certificate for the selected student. The certificate will be auto-downloaded.',
+        confirmText: 'Yes, Generate',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_certConf || !_certConf.confirmed) return;
+
     showToast('Generating and saving certificate PDF...');
-    
+
     try {
         const res = await apiFetch('/api/student/certificates/', {
             method: 'POST',
             body: JSON.stringify(data)
         });
-        
+
         if (res.ok) {
             const result = await res.json();
-            showToast('Certificate saved & PDF generated successfully!');
-            
             generatedPdfUrl = result.pdf_file;
             document.getElementById('btnDownloadPDF').disabled = false;
-            
             document.getElementById('prevSerialNo').textContent = `Sr.no ${result.serial_no}`;
             loadStudentData();
+            showSuccessModal({
+                title: 'Certificate Generated!',
+                subtitle: `Certificate Sr. No. ${result.serial_no} has been saved and automatically downloaded.`,
+                btnText: 'Done',
+            });
         } else {
             const err = await res.json();
             if (err.requires_override) {
-                if (confirm(err.warning)) {
-                    data.confirm_override = true;
-                    showToast('Generating and saving certificate (with override)...');
-                    const retryRes = await apiFetch('/api/student/certificates/', {
-                        method: 'POST',
-                        body: JSON.stringify(data)
+                const _earlyConf = await showConfirm({
+                    title: 'Early Generation Warning',
+                    body: err.warning || 'This certificate is being generated before the course completion date.',
+                    confirmText: 'Yes, Generate Early',
+                    cancelText: 'Cancel',
+                    icon: 'modalWarning',
+                });
+
+                if (_earlyConf && _earlyConf.confirmed) {
+                    const _reasonResult = await showPromptDialog({
+                        title: 'Reason for Early Generation',
+                        body: 'Please provide the reason for generating this certificate before the course completion date.',
+                        label: 'Reason',
+                        placeholder: 'Enter your reason here...',
+                        type: 'textarea',
+                        confirmText: 'Submit & Generate',
+                        required: true,
+                        requiredMsg: 'A valid reason is required to generate the certificate early.',
                     });
-                    if (retryRes.ok) {
-                        const retryResult = await retryRes.json();
-                        showToast('Certificate saved & PDF generated successfully!');
-                        generatedPdfUrl = retryResult.pdf_file;
-                        document.getElementById('btnDownloadPDF').disabled = false;
-                        document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
-                        loadStudentData();
-                    } else {
-                        const retryErr = await retryRes.json();
-                        showToast(retryErr.error || JSON.stringify(retryErr), 'error');
+
+                    if (_reasonResult && _reasonResult.confirmed && _reasonResult.value) {
+                        data.confirm_override = true;
+                        data.early_generation_reason = _reasonResult.value.trim();
+                        showToast('Generating and saving certificate (with override)...');
+                        const retryRes = await apiFetch('/api/student/certificates/', {
+                            method: 'POST',
+                            body: JSON.stringify(data)
+                        });
+                        if (retryRes.ok) {
+                            const retryResult = await retryRes.json();
+                            generatedPdfUrl = retryResult.pdf_file;
+                            document.getElementById('btnDownloadPDF').disabled = false;
+                            document.getElementById('prevSerialNo').textContent = `Sr.no ${retryResult.serial_no}`;
+                            loadStudentData();
+                            showSuccessModal({
+                                title: 'Certificate Generated!',
+                                subtitle: `Certificate Sr. No. ${retryResult.serial_no} has been saved with override approval and automatically downloaded.`,
+                                btnText: 'Done',
+                            });
+                        } else {
+                            const retryErr = await retryRes.json();
+                            showToast(retryErr.error || JSON.stringify(retryErr), 'error');
+                        }
                     }
                 }
             } else {
@@ -767,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (studentForm) {
         studentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             // Build installments schedule
             const schedule = [];
             const amounts = document.querySelectorAll('.inst-amount');
@@ -861,7 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editStudentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentStudentDetails) return;
-            
+
             showToast('Saving changes...');
             const enrolledCourseVal = document.getElementById('editStudEnrolledCourse').value;
             const data = {
@@ -919,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('doc_type', document.getElementById('studentUploadDocType').value);
             formData.append('label', document.getElementById('studentUploadDocLabel').value);
             formData.append('remarks', document.getElementById('studentUploadDocRemarks').value);
-            
+
             const fileInput = document.getElementById('studentUploadDocFile');
             if (fileInput.files.length > 0) {
                 formData.append('file', fileInput.files[0]);
@@ -955,10 +1109,10 @@ async function handleStudentRowClick(event, index) {
     if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
         return;
     }
-    
+
     const s = currentStudentList[index];
     if (!s) return;
-    
+
     switchView('studentDetailView', false);
     showGlobalLoader(true);
     try {
@@ -970,7 +1124,14 @@ async function handleStudentRowClick(event, index) {
             institute: s.institute || '',
             start_date: s.start_date || '',
             completion_date: s.completion_date || '',
-            total_fees: s.total_fees || '0'
+            total_fees: s.total_fees || '0',
+            father_name: s.father_name || '',
+            phone: s.phone || '',
+            dob: s.dob || '',
+            gender: s.gender || '',
+            address: s.address || '',
+            student_type: s.student_type || '',
+            cert_type: s.cert_type || ''
         };
         const res = await apiFetch('/api/student/students/get-or-create-from-bitrix/', {
             method: 'POST',
@@ -991,11 +1152,15 @@ async function handleStudentRowClick(event, index) {
     }
 }
 
-async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shouldSwitchView = true) {
-    if (shouldSwitchView) {
+async function openStudentProfileDetail(studentId, defaultTab = 'personal', updateUrl = true) {
+    const urlTab = getUrlParam('ptab');
+    if (urlTab) defaultTab = urlTab;
+    
+    currentStudentDetails = null;
+    if (updateUrl) {
         switchView('studentDetailView', true, {
             studentId: studentId,
-            studentTab: tabToFocus,
+            studentTab: defaultTab,
             skipStudentDetailLoad: true
         });
     }
@@ -1015,7 +1180,7 @@ async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shou
             if (deptEl) deptEl.textContent = student.department_details ? student.department_details.name : 'Training';
             const certNoEl = document.getElementById('detailStudentCertNo');
             if (certNoEl) certNoEl.textContent = student.cert_no || 'Pending';
-            
+
             // Student type badge styling
             const typeBadge = document.getElementById('detailStudentTypeBadge');
             if (typeBadge) {
@@ -1049,7 +1214,7 @@ async function openStudentProfileDetail(studentId, tabToFocus = 'personal', shou
                 const el = document.getElementById(id);
                 if (el) el.value = val || '';
             };
-            
+
             setVal('editStudName', student.name);
             setVal('editStudEmail', student.email);
             setVal('editStudPhone', student.phone);
@@ -1122,14 +1287,15 @@ async function loadStudentDetailSelects(enrolledCourseId, deptId) {
     }
 }
 
-function switchStudentProfileTab(tabId) {
+function switchStudentProfileTab(tabId, updateUrl = true) {
+    if (updateUrl) setUrlParam('ptab', tabId);
     activeStudentProfileTab = tabId;
     const tabs = ['personal', 'docs', 'installments', 'certificates'];
-    
+
     tabs.forEach(t => {
         const btn = document.getElementById(`sTab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
         const block = document.getElementById(`studentTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
-        
+
         if (t === tabId) {
             if (btn) {
                 btn.classList.add('active');
@@ -1173,16 +1339,16 @@ function toggleStudentDocLabelField() {
 
 async function loadStudentDocumentsList() {
     if (!currentStudentDetails) return;
-    
+
     try {
         const res = await apiFetch(`/api/student/documents/?student_id=${currentStudentDetails.id}`);
         if (res.ok) {
             const docs = await res.json();
             const docList = docs.results || docs;
-            
+
             // Render interactive checklist
             renderStudentDocumentsChecklist(docList);
-            
+
             // Render attachments table
             const tbody = document.getElementById('studentDocsTableBody');
             if (tbody) {
@@ -1190,7 +1356,7 @@ async function loadStudentDocumentsList() {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No documents uploaded yet.</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = docList.map(d => `
                     <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${getDocTypeLabel(d.doc_type)}</td>
@@ -1227,7 +1393,7 @@ function getDocTypeLabel(docType) {
 function renderStudentDocumentsChecklist(docList) {
     const container = document.getElementById('studentDocumentsChecklistContainer');
     if (!container) return;
-    
+
     const requiredDocs = [
         { type: 'RESUME', name: 'Resume / CV', desc: 'Verify professional/academic experience.' },
         { type: 'AADHAAR', name: 'ID Proof (Aadhaar Card)', desc: 'Government identity verification.' },
@@ -1235,16 +1401,16 @@ function renderStudentDocumentsChecklist(docList) {
         { type: 'JOINING_LETTER', name: 'Signed Joining Letter', desc: 'Acceptance of student guidelines.' },
         { type: 'FEE_RECEIPT', name: 'Fee Receipt', desc: 'Payment receipt confirmation.' }
     ];
-    
+
     container.innerHTML = requiredDocs.map(req => {
         const doc = docList.find(d => d.doc_type === req.type);
         const isUploaded = !!doc;
-        
+
         const badgeBg = isUploaded ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
         const badgeTextColor = isUploaded ? '#10b981' : '#ef4444';
         const badgeBorderColor = isUploaded ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
         const badgeText = isUploaded ? 'Uploaded' : 'Missing';
-        
+
         return `
             <div style="background-color: var(--bg-card); border: 1.5px solid ${isUploaded ? '#e2e8f0' : badgeBorderColor}; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-sm); transition: all 0.2s;" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow-sm)'">
                 <div>
@@ -1270,8 +1436,14 @@ function renderStudentDocumentsChecklist(docList) {
 }
 
 async function deleteStudentDoc(docId) {
-    if (!confirm('Are you sure you want to delete this document?')) return;
-    
+    const _docDelConf = await showDangerConfirm({
+        title: 'Delete Document?',
+        body: 'This will permanently remove the document from the student profile. This action cannot be undone.',
+        confirmText: 'Yes, Delete',
+        cancelText: 'Cancel',
+    });
+    if (!_docDelConf || !_docDelConf.confirmed) return;
+
     showToast('Deleting document...');
     try {
         const res = await apiFetch(`/api/student/documents/${docId}/`, {
@@ -1291,20 +1463,20 @@ async function deleteStudentDoc(docId) {
 // ---------- FEE INSTALLMENTS TAB LOGIC ----------
 async function loadStudentInstallmentsList() {
     if (!currentStudentDetails) return;
-    
+
     try {
         const res = await apiFetch(`/api/student/installments/?student_id=${currentStudentDetails.id}`);
         if (res.ok) {
             const list = await res.json();
             const instList = list.results || list;
-            
+
             const tbody = document.getElementById('studentInstallmentsTableBody');
             if (tbody) {
                 if (instList.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-light);">No fee installments defined.</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = instList.map(inst => `
                     <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">Installment ${inst.installment_number}</td>
@@ -1336,25 +1508,29 @@ async function loadStudentInstallmentsList() {
 // ---------- CERTIFICATES TAB LOGIC ----------
 async function loadStudentCertificatesList() {
     if (!currentStudentDetails) return;
-    
+
     try {
         const res = await apiFetch(`/api/student/certificates/?student_id=${currentStudentDetails.id}`);
         if (res.ok) {
             const list = await res.json();
             const certs = list.results || list;
-            
+
             const tbody = document.getElementById('studentCertificatesTableBody');
             if (tbody) {
                 if (certs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-light);">No certificates generated yet.</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = certs.map(c => `
                     <tr style="border-bottom: 1px solid var(--border-color); height: 50px;">
                         <td style="padding: 10px 20px; font-weight: 600; color: var(--text-main); font-size: 13px;">${c.serial_no}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.course_name || '-'}</td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${formatSimpleDate(c.issue_date)}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.generated_by_username || 'System'}</td>
+                        <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">
+                            ${c.early_generation_reason ? `<span style="color:#ef4444; font-weight:600;">Early Gen:</span> ${c.early_generation_reason} (${c.calculated_completed_duration || '-'})` : 'No'}
+                        </td>
                         <td style="padding: 10px 20px; color: var(--text-secondary); font-size: 13px;">${c.place || 'Mohali'}</td>
                         <td style="padding: 10px 20px; text-align: center;">
                             ${c.pdf_file ? `
@@ -1371,20 +1547,14 @@ async function loadStudentCertificatesList() {
 }
 
 function changeStudentPage(direction) {
-    if (direction === 1 && studentDirectoryNext !== null) {
-        studentDirectoryStart = studentDirectoryNext;
-    } else if (direction === -1) {
-        studentDirectoryStart = Math.max(0, studentDirectoryStart - 50);
-    }
+    const maxPage = Math.ceil(studentTotalCount / STUDENT_PAGE_SIZE) || 1;
+    studentCurrentPage = Math.max(1, Math.min(maxPage, studentCurrentPage + direction));
     loadStudentData();
 }
 
 function changeBitrixStudentPage(direction) {
-    if (direction === 1 && bitrixStudentNext !== null) {
-        bitrixStudentStart = bitrixStudentNext;
-    } else if (direction === -1) {
-        bitrixStudentStart = Math.max(0, bitrixStudentStart - 50);
-    }
+    const maxPage = Math.ceil(bitrixStudentTotalCount / STUDENT_PAGE_SIZE) || 1;
+    bitrixStudentCurrentPage = Math.max(1, Math.min(maxPage, bitrixStudentCurrentPage + direction));
     loadBitrixStudents();
 }
 

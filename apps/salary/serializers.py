@@ -20,6 +20,29 @@ class SalaryStructureSerializer(serializers.ModelSerializer):
         model = SalaryStructure
         fields = '__all__'
 
+    def to_internal_value(self, data):
+        emp_id_val = data.get('employee') or data.get('employee_id')
+        if emp_id_val and 'bitrix_user_id' not in data:
+            if hasattr(data, 'copy'):
+                data = data.copy()
+            data['bitrix_user_id'] = emp_id_val
+        return super().to_internal_value(data)
+
+    def create(self, validated_data):
+        bitrix_user_id = validated_data.get('bitrix_user_id')
+        effective_from = validated_data.get('effective_from')
+        if bitrix_user_id and effective_from:
+            existing = SalaryStructure.objects.filter(
+                bitrix_user_id=bitrix_user_id,
+                effective_from=effective_from
+            ).first()
+            if existing:
+                for field, value in validated_data.items():
+                    setattr(existing, field, value)
+                existing.save()
+                return existing
+        return super().create(validated_data)
+
     def get_employee_details(self, obj):
         from common.bitrix_client import BitrixClient
         user = BitrixClient.get_user_detail(obj.bitrix_user_id)

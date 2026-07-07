@@ -28,8 +28,18 @@ function populateStatesDropdown(selectId = 'empState') {
 }
 
 // Switch between Active, Onboarding, Offboarding, Dismissed sub-tabs
-function switchOnboardingSubTab(tabId) {
+function getOnboardingPathFromTab(tabId) {
+    if (tabId === 'all') return '/employees/active/';
+    if (tabId === 'offboarding') return '/employees/offboarding/';
+    if (tabId === 'dismissed') return '/employees/dismissed/';
+    return '/employees/onboarding/';
+}
+
+function switchOnboardingSubTab(tabId, updateUrl = true) {
     activeOnboardingSubTab = tabId;
+    if (updateUrl) {
+        history.replaceState(history.state || { viewId: 'onboardingView' }, '', getOnboardingPathFromTab(tabId));
+    }
     
     // Toggle active header tab classes
     const tabs = ['all', 'onboarding', 'offboarding', 'dismissed'];
@@ -100,7 +110,16 @@ async function loadOnboardingData() {
     await loadDepartmentsSelect('onboardingDeptFilter');
     
     // Default sub tab
-    switchOnboardingSubTab(activeOnboardingSubTab);
+    function getOnboardingTabFromPath() {
+        const path = window.location.pathname;
+        if (path.includes('/active')) return 'all';
+        if (path.includes('/offboarding')) return 'offboarding';
+        if (path.includes('/dismissed')) return 'dismissed';
+        return 'onboarding';
+    }
+    const urlTab = getOnboardingTabFromPath();
+    if (urlTab) activeOnboardingSubTab = urlTab;
+    switchOnboardingSubTab(activeOnboardingSubTab, false);
 }
 
 // Pagination state variables
@@ -266,7 +285,12 @@ function renderOnboardingTrackerTable(list) {
             { bg: '#f3e8ff', text: '#9333ea' }, // Purple tint
             { bg: '#ecfeff', text: '#0891b2' }  // Cyan tint
         ];
-        const colorIdx = e.id % colors.length;
+        let numericId = 0;
+        if (e.id) {
+            const match = e.id.toString().match(/\d+/);
+            if (match) numericId = parseInt(match[0], 10);
+        }
+        const colorIdx = numericId % colors.length;
         const pair = colors[colorIdx];
         
         const avatarCell = e.profile_photo 
@@ -300,13 +324,13 @@ function renderOnboardingTrackerTable(list) {
         }
 
         return `
-            <tr onclick="openEmployeeProfileDetail(${e.id})" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
+            <tr onclick="openEmployeeProfileDetail('${e.id}')" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
                 <td style="padding: 12px 20px; width: 40px;" onclick="event.stopPropagation()"><input type="checkbox" style="cursor:pointer; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #cbd5e1;" onclick="event.stopPropagation()"></td>
                 <td style="padding: 12px 20px; white-space: nowrap;">
                     <div style="display:flex; align-items:center;">
                         ${avatarCell}
                         <div>
-                            <a href="#" onclick="openEmployeeProfileDetail(${e.id}); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                            <a href="#" onclick="openEmployeeProfileDetail('${e.id}'); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
                             <div style="font-size: 8.5pt; color: var(--text-muted); margin-top:2px;">${e.email}</div>
                         </div>
                     </div>
@@ -328,13 +352,13 @@ function renderOnboardingTrackerTable(list) {
                 </td>
                 <td style="padding: 12px 20px; text-align: right; position: relative;" onclick="event.stopPropagation()">
                     <div class="dropdown-menu-wrapper">
-                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, ${e.id})" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
+                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, '${e.id}')" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
                         <div class="premium-actions-dropdown" id="actionDropdown-${e.id}" style="position: absolute; right: 0; top: 35px;">
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id})">View Profile</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'salary')">Setup Salary</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'letters')">Generate Letters</button>
-                            <button class="premium-dropdown-item" onclick="manuallyGraduateEmployee(event, ${e.id})">Graduate Onboarding</button>
-                            ${hasPermission('onboarding.delete') ? `<button class="premium-dropdown-item" onclick="softDeleteEmployee(${e.id})" style="color:#ef4444;">Delete Profile</button>` : ''}
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}')">View Profile</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'salary')">Setup Salary</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'letters')">Generate Letters</button>
+                            <button class="premium-dropdown-item" onclick="manuallyGraduateEmployee(event, '${e.id}')">Graduate Onboarding</button>
+                            ${hasPermission('onboarding.delete') ? `<button class="premium-dropdown-item" onclick="softDeleteEmployee('${e.id}')" style="color:#ef4444;">Delete Profile</button>` : ''}
                         </div>
                     </div>
                 </td>
@@ -364,7 +388,12 @@ function renderActiveDirectoryTable(list) {
             { bg: '#f3e8ff', text: '#9333ea' },
             { bg: '#ecfeff', text: '#0891b2' }
         ];
-        const colorIdx = e.id % colors.length;
+        let numericId = 0;
+        if (e.id) {
+            const match = e.id.toString().match(/\d+/);
+            if (match) numericId = parseInt(match[0], 10);
+        }
+        const colorIdx = numericId % colors.length;
         const pair = colors[colorIdx];
 
         const avatarCell = e.profile_photo 
@@ -374,15 +403,20 @@ function renderActiveDirectoryTable(list) {
         let statusClass = 'synced';
         if (e.status === 'Exited') statusClass = 'action-needed';
         else if (e.status === 'Rejoined') statusClass = 'pending';
+        
+        const newJoinerBadge = e.is_new_joiner ? `<span style="margin-left: 8px; font-size: 7pt; font-weight: 700; background-color: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #fde047; vertical-align: middle;">New Joiner</span>` : '';
 
         return `
-            <tr onclick="openEmployeeProfileDetail(${e.id})" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
+            <tr onclick="openEmployeeProfileDetail('${e.id}')" style="border-bottom: 1px solid var(--border-color); height: 70px; cursor: pointer;">
                 <td style="padding: 12px 20px; width: 40px;" onclick="event.stopPropagation()"><input type="checkbox" style="cursor:pointer; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #cbd5e1;" onclick="event.stopPropagation()"></td>
                 <td style="padding: 12px 20px; white-space: nowrap;">
                     <div style="display:flex; align-items:center;">
                         ${avatarCell}
                         <div>
-                            <a href="#" onclick="openEmployeeProfileDetail(${e.id}); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                            <div style="display: flex; align-items: center;">
+                                <a href="#" onclick="openEmployeeProfileDetail('${e.id}'); return false;" style="font-weight: 700; color: #0f172a; text-decoration: none; font-size: 10.5pt; font-family: 'Inter', sans-serif;">${e.first_name} ${e.last_name}</a>
+                                ${newJoinerBadge}
+                            </div>
                             <div style="font-size: 8.5pt; color: var(--text-muted); margin-top:2px;">${e.email}</div>
                         </div>
                     </div>
@@ -397,13 +431,16 @@ function renderActiveDirectoryTable(list) {
                 </td>
                 <td style="padding: 12px 20px; text-align: right; position: relative;" onclick="event.stopPropagation()">
                     <div class="dropdown-menu-wrapper">
-                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, ${e.id})" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
+                        <button class="btn-dot-menu" onclick="toggleRowActionMenu(event, '${e.id}')" style="font-size:14pt; font-weight:bold; color: #94a3b8; border: none; background: none; cursor: pointer; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">⋮</button>
                         <div class="premium-actions-dropdown" id="actionDropdown-${e.id}" style="position: absolute; right: 0; top: 35px;">
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id})">View Profile</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'salary')">Edit Salary</button>
-                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail(${e.id}, 'letters')">Documents History</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}')">View Profile</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'salary')">Edit Salary</button>
+                            <button class="premium-dropdown-item" onclick="openEmployeeProfileDetail('${e.id}', 'letters')">Documents History</button>
                             ${e.status === 'Active' && hasPermission('exit.create') ? `
-                                <button class="premium-dropdown-item" onclick="triggerExitFormality(${e.id})" style="color:#ef4444;">Initiate Exit</button>
+                                <button class="premium-dropdown-item" onclick="triggerExitFormality('${e.id}')" style="color:#ef4444;">Initiate Exit</button>
+                            ` : ''}
+                            ${activeOnboardingSubTab === 'dismissed' ? `
+                                <button class="premium-dropdown-item" onclick="openDownloadExitedSalaryModal('${e.id}', '${e.first_name} ${e.last_name}')">Download Salary Slip</button>
                             ` : ''}
                         </div>
                     </div>
@@ -416,7 +453,14 @@ function renderActiveDirectoryTable(list) {
 // Manual onboarding completion trigger
 async function manuallyGraduateEmployee(event, empId) {
     event.stopPropagation();
-    if (!confirm('Are you sure you want to graduate this employee from onboarding?')) return;
+    const _gradConf = await showConfirm({
+        title: 'Graduate Employee?',
+        body: 'This employee will be moved from onboarding to the Active Directory. Make sure all onboarding steps are complete.',
+        confirmText: 'Yes, Graduate',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_gradConf || !_gradConf.confirmed) return;
     
     showToast('Graduating employee...');
     try {
@@ -586,10 +630,15 @@ function renderDocumentsChecklist(docList, bondPeriod) {
     }).join('');
 }
 
-async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldSwitchView = true) {
+// Full view detail opening
+async function openEmployeeProfileDetail(empId, defaultTab = 'personal', updateUrl = true) {
+    // If URL already has a ptab, use it instead of the argument default
+    const urlTab = getUrlParam('ptab');
+    if (urlTab) defaultTab = urlTab;
+    
     currentDetailEmployeeId = empId;
-    if (shouldSwitchView) {
-        switchView('employeeDetailView', true, { employeeId: empId, employeeTab: tabToFocus });
+    if (updateUrl) {
+        switchView('employeeDetailView', true, { employeeId: empId, employeeTab: defaultTab });
     }
     
     try {
@@ -600,6 +649,10 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
             document.getElementById('detailProfileName').textContent = `${emp.first_name} ${emp.last_name}`;
             document.getElementById('detailProfileDesignation').textContent = emp.designation;
             document.getElementById('detailProfileEmpId').textContent = emp.emp_id;
+            const editEmpDept = document.getElementById('editEmpDept');
+            if (editEmpDept) {
+                editEmpDept.value = emp.department_id || '';
+            }
             document.getElementById('detailProfileDept').textContent = emp.department;
             
             const statusBadge = document.getElementById('detailProfileStatusBadge');
@@ -611,8 +664,47 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
             bitrixBadge.textContent = emp.bitrix_sync_status;
             bitrixBadge.style.backgroundColor = emp.bitrix_sync_status === 'Synced' ? '#22c55e' : (emp.bitrix_sync_status === 'Pending' ? '#f59e0b' : '#ef4444');
             bitrixBadge.style.color = 'white';
-            
             document.getElementById('detailBitrixActions').style.display = emp.bitrix_sync_status === 'Failed' ? 'block' : 'none';
+
+            // Check Onboarding Welcome Email form card visibility
+            const welcomeEmailCard = document.getElementById('onboardingWelcomeEmailCard');
+            if (welcomeEmailCard) {
+                const today = new Date().toISOString().split('T')[0];
+                const isBeforeJoiningDate = !emp.joining_date || today < emp.joining_date;
+                
+                if (!emp.onboarding_complete && isBeforeJoiningDate) {
+                    welcomeEmailCard.style.display = 'block';
+                    
+                    const onboardEmailInput = document.getElementById('onboardEmailInput');
+                    const onboardJoiningDateInput = document.getElementById('onboardJoiningDateInput');
+                    
+                    if (onboardEmailInput) {
+                        onboardEmailInput.value = emp.work_email || emp.email || '';
+                    }
+                    if (onboardJoiningDateInput) {
+                        onboardJoiningDateInput.value = emp.joining_date || '';
+                    }
+                    
+                    checkOnboardEmailBtnState();
+                } else {
+                    welcomeEmailCard.style.display = 'none';
+                }
+            }
+
+            // Check "Invite to Bitrix" button visibility (independent of progress completion)
+            const inviteToBitrixBtn = document.getElementById('inviteToBitrixBtn');
+            if (inviteToBitrixBtn) {
+                const isLocal = emp.id && emp.id.toString().startsWith('LOCAL-');
+                const d = new Date();
+                const today = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                const isJoiningDateReached = emp.joining_date && today >= emp.joining_date;
+                
+                if (isLocal && isJoiningDateReached) {
+                    inviteToBitrixBtn.style.display = 'inline-flex';
+                } else {
+                    inviteToBitrixBtn.style.display = 'none';
+                }
+            }
 
             const img = document.getElementById('detailProfilePhoto');
             const fallback = document.getElementById('detailProfilePhotoFallback');
@@ -691,17 +783,17 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
             
             // Normalize Department Select (append if missing)
             const selectDept = document.getElementById('editEmpDept');
-            if (selectDept && emp.department) {
-                let deptFound = Array.from(selectDept.options).some(o => o.value === String(emp.department));
+            if (selectDept && emp.department_id) {
+                let deptFound = Array.from(selectDept.options).some(o => o.value === String(emp.department_id));
                 if (!deptFound) {
-                    const newOpt = document.createElement('option');
-                    newOpt.value = emp.department;
+                    let newOpt = document.createElement('option');
+                    newOpt.value = emp.department_id;
                     newOpt.text = emp.department;
                     selectDept.appendChild(newOpt);
                 }
             }
             if (selectDept) {
-                selectDept.value = emp.department || '';
+                selectDept.value = emp.department_id || '';
             }
 
             document.getElementById('editEmpDesignation').value = emp.designation || '';
@@ -728,7 +820,7 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
 
             const joinInput = document.getElementById('editEmpJoining');
             joinInput.value = emp.joining_date;
-            if (currentUser && currentUser.role === 'ADMIN') {
+            if (currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'HR')) {
                 joinInput.removeAttribute('disabled');
                 joinInput.style.backgroundColor = 'var(--bg-color)';
                 document.getElementById('joiningDateHelpText').style.display = 'none';
@@ -750,7 +842,7 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
                 }
             }
             
-            switchProfileTab(tabToFocus);
+            switchProfileTab(defaultTab, false);
         }
     } catch (e) {
         console.error(e);
@@ -758,9 +850,10 @@ async function openEmployeeProfileDetail(empId, tabToFocus = 'personal', shouldS
     }
 }
 
-// Switch Profile Detail Tab Views
-function switchProfileTab(tabId) {
+// Switch Employee Profile Sub-tabs
+function switchProfileTab(tabId, updateUrl = true) {
     activeProfileTab = tabId;
+    if (updateUrl) setUrlParam('ptab', tabId);
     
     const tabs = ['personal', 'docs', 'salary', 'letters', 'audit'];
     tabs.forEach(t => {
@@ -803,13 +896,20 @@ async function triggerManualBitrixRetry() {
 
 // ---------- EDIT PERSONAL PROFILE SUBMIT ----------
 document.addEventListener('DOMContentLoaded', () => {
+    const onboardEmailInput = document.getElementById('onboardEmailInput');
+    const onboardJoiningDateInput = document.getElementById('onboardJoiningDateInput');
+    if (onboardEmailInput) {
+        onboardEmailInput.addEventListener('input', checkOnboardEmailBtnState);
+    }
+    if (onboardJoiningDateInput) {
+        onboardJoiningDateInput.addEventListener('change', checkOnboardEmailBtnState);
+    }
+
     const editForm = document.getElementById('editEmployeeForm');
     if (editForm) {
         editForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!currentDetailEmployeeId) return;
-            
-            showToast('Saving changes...');
             
             const formData = new FormData();
             formData.append('first_name', document.getElementById('editEmpFirstName').value);
@@ -887,8 +987,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (onboardForm) {
         onboardForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            showToast('Creating employee profile...');
-            
             const formData = new FormData();
             formData.append('first_name', document.getElementById('empFirstName').value);
             formData.append('last_name', document.getElementById('empLastName').value);
@@ -1106,6 +1204,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             showToast('Uploading file...');
+
             const formData = new FormData();
             formData.append('employee', currentDetailEmployeeId);
             formData.append('doc_type', docType);
@@ -1146,15 +1245,24 @@ function togglePfInput() {
 
 // Live calculation of Gross, Deductions, and Net salary
 function calculateTakeHomeSalary() {
-    const gross = parseFloat(document.getElementById('salGrossSalary').value || 0);
+    const ctc = parseFloat(document.getElementById('salCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('salPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('salEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('salGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
     const pf = parseFloat(document.getElementById('salPfContribution').value || 0);
     const esi = parseFloat(document.getElementById('salEsi').value || 0);
     const lwf = parseFloat(document.getElementById('salLabourWelfareFund').value || 0);
     const pt = parseFloat(document.getElementById('salProfessionalTax').value || 0);
-    const other = parseFloat(document.getElementById('salOtherDeductions').value || 0);
 
-    const totalDeductions = pf + esi + lwf + pt + other;
+    const totalDeductions = pf + esi + lwf + pt;
     const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('salInHandSalary');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
 
     const summaryGross = document.getElementById('salSummaryGross');
     if (summaryGross) summaryGross.value = gross.toFixed(2);
@@ -1164,6 +1272,30 @@ function calculateTakeHomeSalary() {
 
     const summaryNet = document.getElementById('salSummaryNet');
     if (summaryNet) summaryNet.value = net.toFixed(2);
+}
+
+// Dynamic calculation of customizer salary override fields
+function calculateCustomizerSalary() {
+    const ctc = parseFloat(document.getElementById('custCTC').value || 0);
+    const pfEmployer = parseFloat(document.getElementById('custPfEmployer').value || 0);
+    const esiEmployer = parseFloat(document.getElementById('custEsiEmployer').value || 0);
+
+    const gross = ctc - (pfEmployer + esiEmployer);
+    const grossInput = document.getElementById('custGrossSalary');
+    if (grossInput) grossInput.value = gross.toFixed(2);
+
+    const pf = parseFloat(document.getElementById('custPfEmployee').value || 0);
+    const esi = parseFloat(document.getElementById('custEsiEmployee').value || 0);
+    const lwf = parseFloat(document.getElementById('custLwf').value || 0);
+    const pt = parseFloat(document.getElementById('custPT').value || 0);
+
+    const totalDeductions = pf + esi + lwf + pt;
+    const net = gross - totalDeductions;
+
+    const inHandInput = document.getElementById('custInHand');
+    if (inHandInput) inHandInput.value = net.toFixed(2);
+
+    debounceLetterPreview();
 }
 
 // Repeatable allowances/deductions legacy no-ops
@@ -1180,8 +1312,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             if (!currentDetailEmployeeId) return;
 
-            showToast('Saving salary structure...');
-
             const data = {
                 employee: currentDetailEmployeeId,
                 effective_from: document.getElementById('salEffectiveFrom').value,
@@ -1190,7 +1320,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 esi: parseFloat(document.getElementById('salEsi').value || 0),
                 labour_welfare_fund: parseFloat(document.getElementById('salLabourWelfareFund').value || 0),
                 professional_tax: parseFloat(document.getElementById('salProfessionalTax').value || 0),
-                other_deductions: parseFloat(document.getElementById('salOtherDeductions').value || 0)
+                other_deductions: 0,
+                
+                ctc: parseFloat(document.getElementById('salCTC').value || 0),
+                basic_salary: 0,
+                hra: 0,
+                conveyance: 0,
+                medical_allowance: 0,
+                special_allowance: 0,
+                monthly_bonus: 0,
+                esi_employer: parseFloat(document.getElementById('salEsiEmployer').value || 0),
+                pf_employer: parseFloat(document.getElementById('salPfEmployer').value || 0),
+                pf_employee: parseFloat(document.getElementById('salPfContribution').value || 0),
+                esi_employee: parseFloat(document.getElementById('salEsi').value || 0),
+                lwf: parseFloat(document.getElementById('salLabourWelfareFund').value || 0),
+                in_hand_salary: parseFloat(document.getElementById('salInHandSalary').value || 0)
             };
 
             try {
@@ -1235,23 +1379,32 @@ async function loadProfileSalaryHistory() {
                 const effFrom = document.getElementById('salEffectiveFrom');
                 if (effFrom) effFrom.value = latest.effective_from || '';
 
+                const ctc = document.getElementById('salCTC');
+                if (ctc) ctc.value = latest.ctc || '';
+
                 const gross = document.getElementById('salGrossSalary');
                 if (gross) gross.value = latest.gross_salary || '';
 
+                const pfEmployer = document.getElementById('salPfEmployer');
+                if (pfEmployer) pfEmployer.value = latest.pf_employer || '';
+
+                const esiEmployer = document.getElementById('salEsiEmployer');
+                if (esiEmployer) esiEmployer.value = latest.esi_employer || '';
+
                 const pf = document.getElementById('salPfContribution');
-                if (pf) pf.value = latest.pf_contribution || '';
+                if (pf) pf.value = latest.pf_employee || latest.pf_contribution || '';
 
                 const esi = document.getElementById('salEsi');
-                if (esi) esi.value = latest.esi || '';
+                if (esi) esi.value = latest.esi_employee || latest.esi || '';
 
                 const lwf = document.getElementById('salLabourWelfareFund');
-                if (lwf) lwf.value = latest.labour_welfare_fund || '';
+                if (lwf) lwf.value = latest.lwf || latest.labour_welfare_fund || '';
 
                 const pt = document.getElementById('salProfessionalTax');
                 if (pt) pt.value = latest.professional_tax || '';
 
-                const other = document.getElementById('salOtherDeductions');
-                if (other) other.value = latest.other_deductions || '';
+                const inHand = document.getElementById('salInHandSalary');
+                if (inHand) inHand.value = latest.in_hand_salary || '';
                 
                 calculateTakeHomeSalary();
 
@@ -1278,7 +1431,9 @@ let activeLetterType = null;
 let previewDebounceTimer = null;
 let loadedTemplates = [];
 
-function switchLettersSubTab(tab) {
+// Secondary level tabs inside Letters
+function switchLettersSubTab(tab, updateUrl = true) {
+    if (updateUrl) setUrlParam('ltab', tab);
     const genBtn = document.getElementById('subTabGenerateBtn');
     const tempBtn = document.getElementById('subTabTemplateBtn');
     const genTab = document.getElementById('lettersSubTabGenerate');
@@ -1350,7 +1505,16 @@ async function openLetterWorkspace(type) {
             }
             
             const today = new Date();
-            const formattedToday = today.getDate() + 'th ' + today.toLocaleString('default', { month: 'long' }) + ' ' + today.getFullYear();
+            const getOrdinalSuffix = (day) => {
+                if (day > 3 && day < 21) return 'th';
+                switch (day % 10) {
+                    case 1:  return 'st';
+                    case 2:  return 'nd';
+                    case 3:  return 'rd';
+                    default: return 'th';
+                }
+            };
+            const formattedToday = today.getDate() + getOrdinalSuffix(today.getDate()) + ' ' + today.toLocaleString('default', { month: 'long' }) + ' ' + today.getFullYear();
             
             document.getElementById('custLetterDate').value = formattedToday;
             document.getElementById('custJoiningDate').value = emp.joining_date || '';
@@ -1370,23 +1534,20 @@ async function openLetterWorkspace(type) {
             document.getElementById('custSignatoryDesignation').value = 'Authorized Signatory';
             
             if (latestSalary) {
-                document.getElementById('custCTC').value = parseFloat(latestSalary.gross_salary || 0);
-                document.getElementById('custInHand').value = parseFloat(latestSalary.net_salary || 0);
-                document.getElementById('custBasic').value = parseFloat(latestSalary.gross_salary || 0);
-                document.getElementById('custHra').value = 0;
-                document.getElementById('custConveyance').value = 0;
-                document.getElementById('custMedical').value = 0;
-                document.getElementById('custSpecial').value = 0;
-                document.getElementById('custBonus').value = 0;
+                document.getElementById('custCTC').value = parseFloat(latestSalary.ctc || latestSalary.gross_salary || 0);
+                document.getElementById('custInHand').value = parseFloat(latestSalary.in_hand_salary || latestSalary.net_salary || 0);
                 
-                document.getElementById('custEsiEmployer').value = 0;
-                document.getElementById('custPfEmployer').value = 0;
-                document.getElementById('custPfEmployee').value = parseFloat(latestSalary.pf_contribution || 0);
-                document.getElementById('custEsiEmployee').value = parseFloat(latestSalary.esi || 0);
-                document.getElementById('custLwf').value = parseFloat(latestSalary.labour_welfare_fund || 0);
+                const grossEl = document.getElementById('custGrossSalary');
+                if (grossEl) grossEl.value = parseFloat(latestSalary.gross_salary || 0);
+                
+                document.getElementById('custEsiEmployer').value = parseFloat(latestSalary.esi_employer || 0);
+                document.getElementById('custPfEmployer').value = parseFloat(latestSalary.pf_employer || 0);
+                document.getElementById('custPfEmployee').value = parseFloat(latestSalary.pf_employee || latestSalary.pf_contribution || 0);
+                document.getElementById('custEsiEmployee').value = parseFloat(latestSalary.esi_employee || latestSalary.esi || 0);
+                document.getElementById('custLwf').value = parseFloat(latestSalary.lwf || latestSalary.labour_welfare_fund || 0);
                 document.getElementById('custPT').value = parseFloat(latestSalary.professional_tax || 200);
             } else {
-                const salaryFields = ['custCTC', 'custInHand', 'custBasic', 'custHra', 'custConveyance', 'custMedical', 'custSpecial', 'custBonus', 'custEsiEmployer', 'custPfEmployer', 'custPfEmployee', 'custEsiEmployee', 'custLwf', 'custPT'];
+                const salaryFields = ['custCTC', 'custInHand', 'custGrossSalary', 'custEsiEmployer', 'custPfEmployer', 'custPfEmployee', 'custEsiEmployee', 'custLwf', 'custPT'];
                 salaryFields.forEach(f => {
                     const el = document.getElementById(f);
                     if (el) el.value = 0;
@@ -1442,18 +1603,19 @@ async function updateLetterPreview() {
         
         ctc: document.getElementById('custCTC').value,
         in_hand: document.getElementById('custInHand').value,
-        basic: document.getElementById('custBasic').value,
-        hra: document.getElementById('custHra').value,
-        conveyance: document.getElementById('custConveyance').value,
-        medical: document.getElementById('custMedical').value,
-        special: document.getElementById('custSpecial').value,
-        monthly_bonus: document.getElementById('custBonus').value,
+        basic: 0,
+        hra: 0,
+        conveyance: 0,
+        medical: 0,
+        special: 0,
+        monthly_bonus: 0,
         esi_employer: document.getElementById('custEsiEmployer').value,
         pf_employer: document.getElementById('custPfEmployer').value,
         pf_employee: document.getElementById('custPfEmployee').value,
         esi_employee: document.getElementById('custEsiEmployee').value,
         lwf: document.getElementById('custLwf').value,
         professional_tax: document.getElementById('custPT').value,
+        gross_salary: document.getElementById('custGrossSalary').value,
     };
     
     try {
@@ -1673,6 +1835,15 @@ async function updateLetterPreview() {
 async function downloadCustomizedLetter() {
     if (!currentDetailEmployeeId || !activeLetterType) return;
     
+    const _letterConf = await showConfirm({
+        title: `Generate ${activeLetterType.toUpperCase()} Letter?`,
+        body: 'This will generate a customized PDF letter and automatically download it. The letter will also be saved to the employee document history.',
+        confirmText: 'Yes, Generate & Download',
+        cancelText: 'Cancel',
+        icon: 'modalSuccess',
+    });
+    if (!_letterConf || !_letterConf.confirmed) return;
+
     showToast(`Generating ${activeLetterType.toUpperCase()} PDF...`);
     
     const custom_context = {
@@ -1693,18 +1864,19 @@ async function downloadCustomizedLetter() {
         
         ctc: document.getElementById('custCTC').value,
         in_hand: document.getElementById('custInHand').value,
-        basic: document.getElementById('custBasic').value,
-        hra: document.getElementById('custHra').value,
-        conveyance: document.getElementById('custConveyance').value,
-        medical: document.getElementById('custMedical').value,
-        special: document.getElementById('custSpecial').value,
-        monthly_bonus: document.getElementById('custBonus').value,
+        basic: 0,
+        hra: 0,
+        conveyance: 0,
+        medical: 0,
+        special: 0,
+        monthly_bonus: 0,
         esi_employer: document.getElementById('custEsiEmployer').value,
         pf_employer: document.getElementById('custPfEmployer').value,
         pf_employee: document.getElementById('custPfEmployee').value,
         esi_employee: document.getElementById('custEsiEmployee').value,
         lwf: document.getElementById('custLwf').value,
         professional_tax: document.getElementById('custPT').value,
+        gross_salary: document.getElementById('custGrossSalary').value,
     };
     
     try {
@@ -1717,9 +1889,12 @@ async function downloadCustomizedLetter() {
         
         if (res.ok) {
             const data = await res.json();
-            showToast(`${activeLetterType.toUpperCase()} generated and saved in history.`);
+            showSuccessModal({
+                title: 'Letter Generated!',
+                subtitle: `The ${activeLetterType.toUpperCase()} letter has been saved to the employee's document history and downloaded automatically.`,
+                btnText: 'Done',
+            });
             loadProfileLettersList();
-            
             if (data.document && data.document.file) {
                 downloadSecureFile(data.document.file, `${activeLetterType}_letter.pdf`);
             }
@@ -1850,15 +2025,19 @@ async function saveTemplateChanges() {
         payload.allow_hr_edit = document.getElementById('allowHrEditCheckbox').checked;
     }
     
-    showToast('Saving template changes...');
     try {
+
         const res = await apiFetch(`/onboarding/templates/${selectedId}/`, {
             method: 'PATCH',
             body: JSON.stringify(payload)
         });
         
         if (res.ok) {
-            showToast('Template updated successfully!');
+            showSuccessModal({
+                title: 'Template Updated!',
+                subtitle: 'The letter template has been saved successfully. New letters generated from this template will use the updated content.',
+                btnText: 'Done',
+            });
             const updated = await res.json();
             const index = loadedTemplates.findIndex(t => t.id === selectedId);
             if (index !== -1) {
@@ -2067,7 +2246,13 @@ function formatSimpleDate(dateStr) {
 }
 
 async function softDeleteEmployee(empId) {
-    if (!confirm('Are you sure you want to soft delete this employee profile?')) return;
+    const _delConf = await showDangerConfirm({
+        title: 'Delete Employee Profile?',
+        body: 'This will soft-delete the employee profile. The record will be removed from the active directory but can be recovered by an administrator.',
+        confirmText: 'Yes, Delete Profile',
+        cancelText: 'Cancel',
+    });
+    if (!_delConf || !_delConf.confirmed) return;
     try {
         const res = await apiFetch(`/employees/${empId}/`, {
             method: 'DELETE'
@@ -2156,3 +2341,253 @@ async function triggerExitFormality(empId) {
         }
     }, 100);
 }
+
+// ---------- NEW ONBOARDING EMAIL & BITRIX INVITE FLOWS ----------
+function checkOnboardEmailBtnState() {
+    const emailInput = document.getElementById('onboardEmailInput');
+    const dateInput = document.getElementById('onboardJoiningDateInput');
+    const sendBtn = document.getElementById('sendOnboardEmailBtn');
+    
+    if (emailInput && dateInput && sendBtn) {
+        const emailVal = emailInput.value.trim();
+        const joiningDateVal = dateInput.value;
+        
+        if (emailVal && joiningDateVal && emailVal.includes('@')) {
+            sendBtn.removeAttribute('disabled');
+            sendBtn.style.opacity = '1';
+            sendBtn.style.cursor = 'pointer';
+            sendBtn.style.backgroundColor = '#7c3aed';
+        } else {
+            sendBtn.setAttribute('disabled', 'true');
+            sendBtn.style.opacity = '0.5';
+            sendBtn.style.cursor = 'not-allowed';
+            sendBtn.style.backgroundColor = '#94a3b8';
+        }
+    }
+}
+
+async function saveOnboardEmailDetails() {
+    const emailVal = document.getElementById('onboardEmailInput').value.trim();
+    const joiningDateVal = document.getElementById('onboardJoiningDateInput').value;
+    
+    if (!emailVal || !joiningDateVal) {
+        showToast('Please fill in both email and joining date.', 'error');
+        return;
+    }
+    
+    showToast('Saving details...');
+    try {
+        const res = await apiFetch(`/employees/${currentDetailEmployeeId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                work_email: emailVal,
+                email: emailVal,
+                joining_date: joiningDateVal
+            })
+        });
+        
+        if (res.ok) {
+            showToast('Details saved successfully.');
+            await openEmployeeProfileDetail(currentDetailEmployeeId, 'personal', false);
+        } else {
+            const err = await res.json();
+            showToast('Failed to save details: ' + JSON.stringify(err), 'error');
+        }
+    } catch (e) {
+        showToast('Error saving details: ' + e, 'error');
+    }
+}
+
+async function sendOnboardingWelcomeEmailManual() {
+    const emailVal = document.getElementById('onboardEmailInput').value.trim();
+    const joiningDateVal = document.getElementById('onboardJoiningDateInput').value;
+    
+    if (!emailVal || !joiningDateVal) {
+        showToast('Please fill in both email and joining date.', 'error');
+        return;
+    }
+    
+    showToast('Saving details and sending email...');
+    try {
+        const saveRes = await apiFetch(`/employees/${currentDetailEmployeeId}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                work_email: emailVal,
+                email: emailVal,
+                joining_date: joiningDateVal
+            })
+        });
+        
+        if (!saveRes.ok) {
+            const err = await saveRes.json();
+            showToast('Failed to save details: ' + JSON.stringify(err), 'error');
+            return;
+        }
+        
+        const res = await apiFetch(`/employees/${currentDetailEmployeeId}/send-welcome-email/`, {
+            method: 'POST'
+        });
+        
+        if (res.ok) {
+            showToast('Onboarding welcome email sent successfully.');
+            await openEmployeeProfileDetail(currentDetailEmployeeId, 'personal', false);
+        } else {
+            const err = await res.json();
+            showToast('Failed to send email: ' + (err.error || JSON.stringify(err)), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e, 'error');
+    }
+}
+
+async function inviteEmployeeToBitrix() {
+    const _bitrixConf = await showConfirm({
+        title: 'Invite to Bitrix24?',
+        body: 'This will create the employee\'s user profile and CRM contact on Bitrix24. The action will sync their details to the platform.',
+        confirmText: 'Yes, Invite',
+        cancelText: 'Cancel',
+    });
+    if (!_bitrixConf || !_bitrixConf.confirmed) {
+        return;
+    }
+    
+    showToast('Fetching latest employee details...');
+    try {
+        const empRes = await apiFetch(`/employees/${currentDetailEmployeeId}/`);
+        if (!empRes.ok) {
+            showToast('Failed to fetch employee details before inviting.', 'error');
+            return;
+        }
+        const emp = await empRes.json();
+        
+        showToast('Inviting employee to Bitrix24...');
+        
+        const payload = {
+            name: `${emp.first_name} ${emp.last_name}`.trim(),
+            first_name: emp.first_name,
+            last_name: emp.last_name || '',
+            email: emp.work_email || emp.email || emp.personal_email || '',
+            work_email: emp.work_email || emp.email || '',
+            personal_email: emp.personal_email || '',
+            phone: emp.phone || '',
+            designation: emp.designation || '',
+            department: emp.department_id || '',
+            dob: emp.dob || '',
+            gender: emp.gender || '',
+            crmID: emp.id,
+            crmId: emp.id,
+            local_id: emp.id
+        };
+
+        const res = await apiFetch(`/api/onboarding/employees/bitrix-webhook/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+            showToast('Bitrix invitation queued. Please wait a moment while they are synced.');
+            
+            // Wait 2.5 seconds to let the Celery task complete background execution, then refresh
+            setTimeout(async () => {
+                await openEmployeeProfileDetail(currentDetailEmployeeId, 'personal', true);
+            }, 2500);
+        } else {
+            const err = await res.json();
+            showToast('Failed to invite to Bitrix: ' + (err.error || JSON.stringify(err)), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e, 'error');
+    }
+}
+
+// Download Salary Slip Modal Logic
+function openDownloadExitedSalaryModal(empId, empName) {
+    const empIdInput = document.getElementById('downloadExitedSalaryEmpId');
+    const empNameSpan = document.getElementById('downloadExitedSalaryEmpName');
+    
+    if (empIdInput) empIdInput.value = empId;
+    if (empNameSpan) empNameSpan.textContent = empName;
+    
+    // Populate years
+    const yearSelect = document.getElementById('downloadExitedSalaryYear');
+    if (yearSelect) {
+        yearSelect.innerHTML = '';
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear; y >= currentYear - 5; y--) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.text = y;
+            yearSelect.appendChild(opt);
+        }
+    }
+    
+    // Set current month
+    const monthSelect = document.getElementById('downloadExitedSalaryMonth');
+    if (monthSelect) {
+        monthSelect.value = new Date().getMonth() + 1;
+    }
+    
+    const modal = document.getElementById('downloadExitedSalaryModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDownloadExitedSalaryModal() {
+    const modal = document.getElementById('downloadExitedSalaryModal');
+    if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('downloadExitedSalaryForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const empId = document.getElementById('downloadExitedSalaryEmpId').value;
+            const month = document.getElementById('downloadExitedSalaryMonth').value;
+            const year = document.getElementById('downloadExitedSalaryYear').value;
+            const empName = document.getElementById('downloadExitedSalaryEmpName').textContent;
+            
+            showToast('Checking salary slip...');
+            try {
+                const url = `/api/salary/slip/download?type=single&employee_id=${empId}&month=${month}&year=${year}`;
+                const res = await apiFetch(url, { method: 'GET' });
+                
+                if (res.ok) {
+                    const blob = await res.blob();
+                    if (blob.size === 0) {
+                        showToast('Salary slip not available for the selected period.', 'error');
+                        return;
+                    }
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `Payslip_${empName.replace(/ /g, '_')}_${month}_${year}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    showToast('Salary slip downloaded successfully.');
+                    closeDownloadExitedSalaryModal();
+                } else {
+                    const data = await res.json();
+                    if (res.status === 404 || data.error) {
+                        showToast('Salary slip not available for the selected period.', 'error');
+                    } else {
+                        showToast('Failed to download salary slip.', 'error');
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Salary slip not available for the selected period.', 'error');
+            }
+        });
+    }
+});

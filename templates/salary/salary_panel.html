@@ -2,12 +2,24 @@
 <div id="salaryView" class="view-panel">
     <div class="flex-row-header">
         <h2>Salary Structure &amp; Payroll Dashboard</h2>
-        <div style="display: flex; gap: 10px;">
+        <!-- <div style="display: flex; gap: 10px;">
             <button class="btn btn-primary" id="setupSalaryBtn" onclick="openSalaryStructureModal()">Setup Structure</button>
-        </div>
+        </div> -->
     </div>
 
-    <!-- PAYROLL CONTROL PANEL CARD -->
+    
+
+    <!-- DYNAMIC TABS FOR DATA VIEWS -->
+    <div style="display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; gap: 20px;">
+        <span id="tabSlips" onclick="switchSalaryTab('slips')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;" class="active-tab">Salary Slips Registry</span>
+        <!-- <span id="tabStructures" onclick="switchSalaryTab('structures')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;">Employee Structures</span> -->
+        <span id="tabBatches" onclick="switchSalaryTab('batches')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;">Import Batches (Audit Log)</span>
+        <span id="tabDismissed" onclick="switchSalaryTab('dismissed')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;">Dismissed Employees</span>
+    </div>
+
+    <!-- TAB 1: SALARY SLIPS REGISTRY -->
+    <div id="salaryTabSlips" class="salary-tab-content">
+<!-- PAYROLL CONTROL PANEL CARD -->
     <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);" id="payrollAdminPanel">
         <h3 style="margin-top: 0; color: var(--primary-color);">Monthly Payroll Processing (Admin Only)</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end;">
@@ -32,23 +44,50 @@
                 <label>Target Year*</label>
                 <input type="number" id="payrollYear" value="2026" style="margin-top: 5px;">
             </div>
-            <div style="display: flex; gap: 10px; grid-column: span 2;">
-                <button class="btn btn-primary" onclick="exportExcelTemplate()" style="flex: 1; background-color: #0f766e;">Export Template</button>
-                <button class="btn btn-primary" onclick="openImportModal()" style="flex: 1; background-color: #2563eb;">Import Excel</button>
-                <button class="btn btn-primary" onclick="publishSlipsMonth()" style="flex: 1; background-color: #16a34a;">Publish Month</button>
+            <div style="display: flex; gap: 10px; grid-column: span 2; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="loadPayrollGrid()" style="flex: 1; background-color: #f59e0b; min-width: 120px;">Edit Payroll Sheet</button>
+                <button class="btn btn-primary" onclick="exportExcelTemplate()" style="flex: 1; background-color: #0f766e; min-width: 120px;">Export Template</button>
+                <button class="btn btn-primary" onclick="openImportModal()" style="flex: 1; background-color: #2563eb; min-width: 120px;">Import Excel</button>
+                <!-- <button class="btn btn-primary" onclick="publishSlipsMonth()" style="flex: 1; background-color: #16a34a; min-width: 120px;">Publish Month</button> -->
+                <button class="btn btn-primary" onclick="openManualGenerateModal()" style="flex: 1; background-color: #7c3aed; min-width: 150px;">Generate Manually</button>
+            </div>
+        </div>
+
+        <!-- EDITABLE PAYROLL GRID CONTAINER -->
+        <div id="payrollGridContainer" style="display: none; margin-top: 20px; overflow-x: auto; background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: var(--primary-color);">Editable Payroll Grid (<span id="payrollGridMonthYear"></span>)</h4>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn" onclick="cancelPayrollGrid()" style="background-color: #6b7280; color: white;">Cancel</button>
+                    <button class="btn btn-primary" onclick="savePayrollGrid()" style="background-color: #16a34a;">Save Changes</button>
+                </div>
+            </div>
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table id="payrollGridTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead style="background-color: #f3f4f6; position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Name</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Designation</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Month Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Worked Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Weekend</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">CL</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Extra</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Payable Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Month Salary</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Payable Salary</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Extra days wrk</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Fine/Advance</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Net Payable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payrollGridBody">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- DYNAMIC TABS FOR DATA VIEWS -->
-    <div style="display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; gap: 20px;">
-        <span id="tabSlips" onclick="switchSalaryTab('slips')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;" class="active-tab">Salary Slips Registry</span>
-        <span id="tabStructures" onclick="switchSalaryTab('structures')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;">Employee Structures</span>
-        <span id="tabBatches" onclick="switchSalaryTab('batches')" style="padding: 10px 5px; font-weight: 600; cursor: pointer; color: var(--text-color); border-bottom: 2px solid transparent;">Import Batches (Audit Log)</span>
-    </div>
-
-    <!-- TAB 1: SALARY SLIPS REGISTRY -->
-    <div id="salaryTabSlips" class="salary-tab-content">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <h3 style="margin: 0;">Payslips List</h3>
             <div style="display: flex; gap: 10px;" id="slipBulkDownloadActions">
@@ -135,6 +174,111 @@
             </table>
         </div>
     </div>
+
+    <!-- TAB 4: DISMISSED EMPLOYEES -->
+    <div id="salaryTabDismissed" class="salary-tab-content" style="display: none;">
+<!-- PAYROLL CONTROL PANEL CARD -->
+    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);" id="dismissedPayrollAdminPanel">
+        <h3 style="margin-top: 0; color: var(--primary-color);">Monthly Payroll Processing (Admin Only)</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end;">
+            <div>
+                <label>Target Month*</label>
+                <select id="dismissedPayrollMonth" style="margin-top: 5px;">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6" selected>June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div>
+                <label>Target Year*</label>
+                <input type="number" id="dismissedPayrollYear" value="2026" style="margin-top: 5px;">
+            </div>
+            <div style="display: flex; gap: 10px; grid-column: span 2; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="loadDismissedPayrollGrid()" style="flex: 1; background-color: #f59e0b; min-width: 120px;">Edit Payroll Sheet</button>
+                <button class="btn btn-primary" onclick="exportDismissedExcelTemplate()" style="flex: 1; background-color: #0f766e; min-width: 120px;">Export Template</button>
+                <button class="btn btn-primary" onclick="openDismissedImportModal()" style="flex: 1; background-color: #2563eb; min-width: 120px;">Import Excel</button>
+                <!-- <button class="btn btn-primary" onclick="publishDismissedSlipsMonth()" style="flex: 1; background-color: #16a34a; min-width: 120px;">Publish Month</button> -->
+                <button class="btn btn-primary" onclick="openDismissedManualGenerateModal()" style="flex: 1; background-color: #7c3aed; min-width: 150px;">Generate Manually</button>
+            </div>
+        </div>
+
+        <!-- EDITABLE PAYROLL GRID CONTAINER -->
+        <div id="dismissedPayrollGridContainer" style="display: none; margin-top: 20px; overflow-x: auto; background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: var(--primary-color);">Editable Payroll Grid (<span id="dismissedPayrollGridMonthYear"></span>)</h4>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn" onclick="cancelDismissedPayrollGrid()" style="background-color: #6b7280; color: white;">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveDismissedPayrollGrid()" style="background-color: #16a34a;">Save Changes</button>
+                </div>
+            </div>
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table id="dismissedPayrollGridTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead style="background-color: #f3f4f6; position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Name</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Designation</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Month Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Worked Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Weekend</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">CL</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Extra</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Payable Days</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Month Salary</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Payable Salary</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Extra days wrk</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Fine/Advance</th>
+                            <th style="padding: 10px; border: 1px solid #e5e7eb; white-space: nowrap;">Net Payable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dismissedPayrollGridBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Dismissed Employees Payslips</h3>
+            <div style="display: flex; gap: 10px;" id="dismissedBulkDownloadActions">
+                <button class="btn btn-primary" style="font-size: 9pt; padding: 6px 12px; background-color: #475569;" onclick="downloadDismissedSlipBulk()">Bulk Download Month ZIP</button>
+                
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead id="dismissedRegistryTableHeader">
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="dismissedSlipsTableBody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" id="dismissedSlipsPaginationFooter" style="display: none; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-accent, #e2e8f0); background: #fafafa; margin-top: 15px; border-radius: 0 0 8px 8px;">
+            <div style="font-size: 9pt; color: var(--text-secondary, #64748b);">
+                Showing <span id="dismissedPageStart">0</span> to <span id="dismissedPageEnd">0</span> of <span id="dismissedTotalCount">0</span> entries
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="dismissedPrevBtn" onclick="changeDismissedPage(-1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;" disabled>Previous</button>
+                <button id="dismissedNextBtn" onclick="changeDismissedPage(1)" class="btn" style="padding: 5px 12px; font-size: 9pt; background: #fff; border: 1px solid var(--border-accent, #e2e8f0); cursor: pointer; border-radius: 4px;" disabled>Next</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- MODAL 5: DEFINE SALARY STRUCTURE -->
@@ -155,28 +299,40 @@
             </div>
             <div class="form-grid" style="margin-top: 10px;">
                 <div>
+                    <label>Monthly CTC*</label>
+                    <input type="number" id="structCTC" step="0.01" value="0" required oninput="calculateModalSalary()">
+                </div>
+                <div>
+                    <label>PF Employer Share</label>
+                    <input type="number" id="structPfEmployer" step="0.01" value="0" oninput="calculateModalSalary()">
+                </div>
+                <div>
+                    <label>ESI Employer Share</label>
+                    <input type="number" id="structEsiEmployer" step="0.01" value="0" oninput="calculateModalSalary()">
+                </div>
+                <div>
                     <label>Gross Salary (Monthly)*</label>
-                    <input type="number" id="structGrossSalary" step="0.01" required>
+                    <input type="number" id="structGrossSalary" step="0.01" required oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>PF Contribution</label>
-                    <input type="number" id="structPfContribution" step="0.01" value="0">
+                    <label>PF Employee Share</label>
+                    <input type="number" id="structPfContribution" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>ESI</label>
-                    <input type="number" id="structEsi" step="0.01" value="0">
+                    <label>ESI Employee Share</label>
+                    <input type="number" id="structEsi" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>Labour Welfare Fund</label>
-                    <input type="number" id="structLabourWelfareFund" step="0.01" value="0">
+                    <label>Labour Welfare Fund (LWF)</label>
+                    <input type="number" id="structLabourWelfareFund" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
                     <label>Professional Tax</label>
-                    <input type="number" id="structProfessionalTax" step="0.01" value="0">
+                    <input type="number" id="structProfessionalTax" step="0.01" value="0" oninput="calculateModalSalary()">
                 </div>
                 <div>
-                    <label>Other Deductions</label>
-                    <input type="number" id="structOtherDeductions" step="0.01" value="0">
+                    <label>In-Hand Salary*</label>
+                    <input type="number" id="structInHandSalary" step="0.01" required value="0" oninput="calculateModalSalary()">
                 </div>
             </div>
             <div style="margin-top: 20px; text-align: right;">
@@ -674,5 +830,109 @@
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<!-- MODAL: MANUAL GENERATE -->
+<div class="modal" id="salaryManualGenerateModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Generate Individual Payslip</h3>
+            <button onclick="closeManualGenerateModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="salaryManualGenerateForm" style="margin-top: 15px;">
+            <div>
+                <label>Select Employee*</label>
+                <select id="manualGenerateEmployee" required style="margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color);">
+                    <option value="">-- Choose Employee --</option>
+                </select>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Select Month*</label>
+                <select id="manualGenerateMonth" required style="margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color);">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Select Year*</label>
+                <input type="number" id="manualGenerateYear" value="2026" required style="margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color);">
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary" style="padding: 8px 16px; border-radius: 6px; font-weight: 700;">Generate Payslip</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- MODAL: DISMISSED IMPORT EXCEL -->
+<div class="modal" id="dismissedSalaryImportModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Import Dismissed Salary Excel</h3>
+            <button onclick="closeDismissedImportModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="dismissedSalaryImportForm" style="margin-top: 15px;">
+            <div>
+                <label>Select Excel File*</label>
+                <input type="file" id="dismissedImportExcelFile" accept=".xlsx" required>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary">Upload &amp; Process</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: DISMISSED MANUAL GENERATE -->
+<div class="modal" id="dismissedSalaryManualGenerateModal">
+    <div class="modal-content">
+        <div class="flex-row-header">
+            <h3 style="margin:0;">Generate Dismissed Payslip</h3>
+            <button onclick="closeDismissedManualGenerateModal()" style="background:none; border:none; font-size:16pt; cursor:pointer;">&times;</button>
+        </div>
+        <form id="dismissedSalaryManualGenerateForm" style="margin-top: 15px;">
+            <div>
+                <label>Select Employee*</label>
+                <select id="dismissedManualGenerateEmployee" required style="margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color);">
+                    <option value="">-- Choose Employee --</option>
+                </select>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Select Month*</label>
+                <select id="dismissedManualGenerateMonth" required style="margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color);">
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+            <div style="margin-top: 15px;">
+                <label>Select Year*</label>
+                <input type="number" id="dismissedManualGenerateYear" value="2026" required style="margin-top: 5px; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color);">
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="submit" class="btn btn-primary" style="padding: 8px 16px; border-radius: 6px; font-weight: 700;">Generate Payslip</button>
+            </div>
+        </form>
     </div>
 </div>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Probation Checklist Submission | DevEx Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --primary: #7c3aed;
+            --primary-hover: #6d28d9;
+            --text-main: #0f172a;
+            --text-secondary: #475569;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .header-logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header-logo img {
+            height: 50px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 20pt;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+        }
+
+        p.desc {
+            color: var(--text-secondary);
+            font-size: 10pt;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .employee-badge {
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 9pt;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 9.5pt;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 10pt;
+            font-family: inherit;
+            color: var(--text-main);
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+            background-color: #f8fafc;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+            background-color: #ffffff;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            background-color: var(--primary);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 20px;
+            font-size: 10pt;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-top: 30px;
+            box-shadow: 0 4px 6px -1px rgba(124, 58, 237, 0.2);
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>{{ checklist.title }}</h2>
+            <p class="desc">{{ checklist.description|default:"Please fill in the daily/weekly probation checklist form below to record your updates." }}</p>
+
+            <div class="employee-badge">
+                <span>Employee: <strong>{{ employee.first_name }} {{ employee.last_name|default:"" }}</strong></span>
+                <span>Designation: <strong>{{ employee.designation|default:"N/A" }}</strong></span>
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                {% for question in checklist.questions %}
+                <div class="form-group">
+                    <label for="{{ question.id }}">{{ question.label }}</label>
+                    {% if question.type == 'textarea' %}
+                        <textarea id="{{ question.id }}" name="{{ question.id }}" required placeholder="Type your answer here..."></textarea>
+                    {% elif question.type == 'select' %}
+                        <select id="{{ question.id }}" name="{{ question.id }}" required>
+                            <option value="">Select option...</option>
+                            {% for opt in question.options %}
+                                <option value="{{ opt }}">{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    {% else %}
+                        <input type="text" id="{{ question.id }}" name="{{ question.id }}" required placeholder="Type your answer here...">
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn">Submit Checklist Form</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

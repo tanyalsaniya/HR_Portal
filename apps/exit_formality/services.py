@@ -8,6 +8,30 @@ from django.template import Template, Context
 from weasyprint import HTML
 from employee_onboarding.models import EmployeeDocument, LetterTemplate
 
+import re
+from django.utils.safestring import mark_safe, SafeData
+
+def sanitize_html_context(val):
+    if callable(val):
+        return val
+    elif isinstance(val, dict):
+        return {k: sanitize_html_context(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [sanitize_html_context(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(sanitize_html_context(v) for v in val)
+    elif isinstance(val, str) and not isinstance(val, SafeData):
+        formatted = val.replace('\n', '<br>')
+        # Convert ordinals like 1st, 2nd, 3rd, 22nd to superscript HTML
+        def replace_ordinal(match):
+            return f"{match.group(1)}<sup>{match.group(2)}</sup>"
+        formatted = re.sub(r'\b(\d+)(st|nd|rd|th|ST|ND|RD|TH)\b', replace_ordinal, formatted)
+        return mark_safe(formatted)
+    elif isinstance(val, MockObj):
+        sanitized_kwargs = {k: sanitize_html_context(v) for k, v in val.__dict__.items() if k != '_original'}
+        return MockObj(val._original, **sanitized_kwargs)
+    return val
+
 class MockObj:
     def __init__(self, original_obj=None, **kwargs):
         self._original = original_obj
@@ -16,7 +40,8 @@ class MockObj:
 
     def __getattr__(self, name):
         if self._original is not None:
-            return getattr(self._original, name)
+            val = getattr(self._original, name)
+            return sanitize_html_context(val)
         raise AttributeError(f"'MockObj' object has no attribute '{name}'")
 
 def get_exit_letter_context(exit_request, custom_context=None):
@@ -118,6 +143,9 @@ def get_exit_letter_context(exit_request, custom_context=None):
         'pf': (Decimal(salary_struct.pf) * ratio).quantize(Decimal('0.01')) if salary_struct else Decimal(0),
         'professional_tax': (Decimal(salary_struct.professional_tax) * ratio).quantize(Decimal('0.01')) if salary_struct else Decimal(0),
         'tds': (Decimal(salary_struct.tds) * ratio).quantize(Decimal('0.01')) if salary_struct else Decimal(0),
+        'esi': (Decimal(getattr(salary_struct, 'esi', 0)) * ratio).quantize(Decimal('0.01')) if salary_struct else Decimal(0),
+        'lwf': (Decimal(getattr(salary_struct, 'labour_welfare_fund', 0)) * ratio).quantize(Decimal('0.01')) if salary_struct else Decimal(0),
+        'other_deductions': (Decimal(getattr(salary_struct, 'other_deductions', 0)) * ratio).quantize(Decimal('0.01')) if salary_struct else Decimal(0),
     }
     
     # Allow custom_context overrides for prorated components
@@ -130,7 +158,8 @@ def get_exit_letter_context(exit_request, custom_context=None):
         prorated['medical'], prorated['special'], prorated['monthly_bonus']
     ])
     deductions_prorated = sum([
-        prorated['pf'], prorated['professional_tax'], prorated['tds']
+        prorated['pf'], prorated['professional_tax'], prorated['tds'],
+        prorated['esi'], prorated['lwf'], prorated['other_deductions']
     ])
     net_prorated = gross_prorated - deductions_prorated
     
@@ -141,6 +170,9 @@ def get_exit_letter_context(exit_request, custom_context=None):
     signatory_designation = custom_context.get('signatory_designation', getattr(settings, 'LETTER_SIGNATORY_DESIGNATION', 'Authorized Signatory'))
     
     date_str = custom_context.get('date', datetime.date.today().strftime('%d %B %Y'))
+
+    from salary.services import num_to_words
+    net_prorated_words = num_to_words(net_prorated)
 
     context = {
         'employee': mock_employee,
@@ -156,12 +188,13 @@ def get_exit_letter_context(exit_request, custom_context=None):
         'gross_prorated': gross_prorated,
         'deductions_prorated': deductions_prorated,
         'net_prorated': net_prorated,
+        'net_prorated_words': net_prorated_words,
         'company_name': company_name,
         'company_address': company_address,
         'signatory_name': signatory_name,
         'signatory_designation': signatory_designation,
     }
-    return context
+    return sanitize_html_context(context)
 
 def render_exit_letter_to_html(exit_request, doc_type, custom_context=None):
     context = get_exit_letter_context(exit_request, custom_context)

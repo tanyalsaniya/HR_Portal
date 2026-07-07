@@ -1,21 +1,53 @@
 <!-- VIEW 6: AUDIT LOGS (Admin Only) -->
-<div id="logsView" class="view-panel">
-    <h2>System Audit Trail</h2>
-    <div class="table-responsive">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Model</th>
-                    <th>Object ID</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody id="logsTableBody">
-                <!-- Populated dynamically -->
-            </tbody>
-        </table>
+<div id="logsView" class="view-panel" style="display: none;">
+    <div class="flex-row-header" style="margin-bottom: 20px;">
+        <div>
+            <h2>System Activity Logs & Audit Trail</h2>
+            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 9.5pt;">Monitor real-time user activities, failed logins, and system database updates.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="exportAuditLogs('excel')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                Excel
+            </button>
+            <button class="btn btn-secondary" onclick="exportAuditLogs('csv')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                CSV
+            </button>
+            <button class="btn btn-secondary" onclick="exportAuditLogs('pdf')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Logs Table Card -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div class="table-responsive">
+            <table class="data-table" style="margin: 0; border: none; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="padding-left: 20px; width: 15%;">Timestamp</th>
+                        <th style="width: 15%;">User</th>
+                        <th style="width: 15%;">Role</th>
+                        <th style="width: 15%;">IP Address</th>
+                        <th style="width: 15%;">Action Type</th>
+                        <th style="padding-right: 20px; width: 25%;">Description</th>
+                    </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid var(--border-color); background: #fcfcfc;">
+            <div id="logsPaginationSummary" style="font-size: 9pt; color: #64748b;">
+                Showing 0 to 0 of 0 activities
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn" id="btnPrevLogsPage" onclick="prevLogsPage()" style="padding: 6px 12px; font-size: 8.5pt;" disabled>&larr; Previous</button>
+                <span id="logsCurrentPageNumber" style="font-size: 9pt; font-weight: 600; color: var(--primary-color); padding: 0 10px;">1</span>
+                <button class="btn" id="btnNextLogsPage" onclick="nextLogsPage()" style="padding: 6px 12px; font-size: 8.5pt;" disabled>Next &rarr;</button>
+            </div>
+        </div>
     </div>
 </div>

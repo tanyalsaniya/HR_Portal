@@ -1,6 +1,6 @@
 // static/js/app.js
 // Central client-side logic for the MTVL HR Portal V2.0
-
+console.log('HR Portal V2.0 - app.js loaded');
 const API_BASE = '/api';
 let currentUser = null;
 
@@ -64,6 +64,9 @@ async function apiFetch(endpoint, options = {}) {
     options.headers = options.headers || {};
     options.headers['Accept'] = 'application/json';
     options.headers['X-Requested-With'] = 'XMLHttpRequest';
+    options.headers['ngrok-skip-browser-warning'] = '69420';
+    options.cache = 'no-store'; // Force browser to always fetch fresh data
+
     if (accessToken) {
         options.headers['Authorization'] = `Bearer ${accessToken}`;
     }
@@ -89,7 +92,9 @@ async function apiFetch(endpoint, options = {}) {
         endpoint.startsWith('/exits') ||
         endpoint.startsWith('/students') ||
         endpoint.startsWith('/logs') ||
-        endpoint.startsWith('/roles')
+        endpoint.startsWith('/roles') ||
+        endpoint.startsWith('/media') ||
+        endpoint.startsWith('/static')
     ) {
         url = endpoint;
     } else {
@@ -153,7 +158,12 @@ async function attemptTokenRefresh(refreshToken) {
     return false;
 }
 
-function logout() {
+async function logout() {
+    try {
+        await apiFetch('/auth/logout/', { method: 'POST' });
+    } catch (e) {
+        console.error('Logout error:', e);
+    }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     window.location.href = '/login/';
@@ -175,23 +185,15 @@ function getCookie(name) {
 }
 
 // ---------- UI TOAST NOTIFICATION ----------
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type} show`;
-    toast.innerHTML = `
-        <span class="toast-message">${message}</span>
-        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
-    `;
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+// NOTE: showToast is fully defined by alerts.js (loaded before app.js).
+// This stub provides a safe fallback in case alerts.js hasn't executed yet.
+if (typeof window.showToast !== 'function') {
+    window.showToast = function (message, type = 'success') {
+        console.warn('[HR Portal] alerts.js not loaded yet — fallback toast:', type, message);
+        // Minimal fallback: log only. alerts.js will override this.
+    };
 }
+
 
 // ---------- SPA ROUTER ----------
 const viewToPath = {
@@ -202,25 +204,35 @@ const viewToPath = {
     'salaryView': '/salaries/',
     'salaryHistoryView': '/salaries/employee/',
     'exitView': '/exits/',
+    'exitDetailView': '/exits/detail/',
     'studentView': '/students/',
     'studentDetailView': '/students/detail/',
     'logsView': '/logs/',
-    'rolesView': '/roles/'
+    'rolesView': '/roles/',
+    'probationView': '/probation/'
 };
 
 const pathToView = {
     '/': 'dashboardView',
     '/dashboard/': 'dashboardView',
     '/employees/': 'onboardingView',
+    '/employees/onboarding/': 'onboardingView',
+    '/employees/active/': 'onboardingView',
+    '/employees/offboarding/': 'onboardingView',
+    '/employees/dismissed/': 'onboardingView',
     '/employees/onboard/': 'onboardingFormView',
     '/employees/detail/': 'employeeDetailView',
     '/salaries/': 'salaryView',
     '/exits/': 'exitView',
     '/exits/detail/': 'exitDetailView',
+    '/exits/clearances/': 'exitDetailView',
+    '/exits/documents/': 'exitDetailView',
+    '/exits/form/': 'exitDetailView',
     '/students/': 'studentView',
     '/students/detail/': 'studentDetailView',
     '/logs/': 'logsView',
-    '/roles/': 'rolesView'
+    '/roles/': 'rolesView',
+    '/probation/': 'probationView'
 };
 
 const views = [
@@ -237,7 +249,8 @@ const views = [
     'logsView',
     'rolesView',
     'exitLetterWorkspace',
-    'exitTemplateEditor'
+    'exitTemplateEditor',
+    'probationView'
 ];
 
 function getEmployeeIdFromUrl() {
@@ -246,17 +259,33 @@ function getEmployeeIdFromUrl() {
 }
 
 function getEmployeeDetailIdFromUrl() {
-    const match = window.location.pathname.match(/^\/employees\/(\d+)\/?$/);
+    const match = window.location.pathname.match(/^\/employees\/([A-Za-z0-9\-]+)\/?$/);
+    if (match && ['onboard', 'onboarding', 'active', 'offboarding', 'dismissed', 'detail'].includes(match[1])) {
+        return null;
+    }
+    return match ? match[1] : null;
+}
+
+function getExitIdFromUrl() {
+    // Matches /exits/123/ or /exits/123/clearances/ or /exits/123/documents/ or /exits/123/form/
+    const match = window.location.pathname.match(/^\/exits\/(\d+)(\/|\/(clearances|documents|form)\/)?$/);
     return match ? parseInt(match[1]) : null;
 }
 
 function getStudentIdFromUrl() {
-    const match = window.location.pathname.match(/^\/students\/(\d+)\/?$/);
-    return match ? parseInt(match[1]) : null;
+    const match = window.location.pathname.match(/^\/students\/([A-Za-z0-9\-]+)\/?$/);
+    return match ? match[1] : null;
 }
 
 function switchView(viewId, pushState = true, extraParams = {}) {
     showGlobalLoader(false);
+
+    // Prevent HR users from accessing Roles & Permissions view
+    if (viewId === 'rolesView' && currentUser && (currentUser.role === 'HR' || currentUser.role_code === 'HR')) {
+        showToast('You do not have permission to access this page.', 'error');
+        hideGlobalLoader();
+        return;
+    }
 
     const targetView = document.getElementById(viewId);
     if (!targetView) {
@@ -273,9 +302,21 @@ function switchView(viewId, pushState = true, extraParams = {}) {
 
     // Update sidebar active classes
     const links = document.querySelectorAll('.sidebar-link');
+    // Sub-views should highlight the parent sidebar item
+    const salarySubViews = ['salaryHistoryView'];
+    const onboardingSubViews = ['employeeDetailView', 'onboardingFormView'];
+    const studentSubViews = ['studentDetailView'];
+    
+    let effectiveSidebarView = viewId;
+    if (salarySubViews.includes(viewId)) effectiveSidebarView = 'salaryView';
+    if (onboardingSubViews.includes(viewId)) effectiveSidebarView = 'onboardingView';
+    if (studentSubViews.includes(viewId)) effectiveSidebarView = 'studentView';
+    // Exit detail is a sub-view of Exit Tracker — keep sidebar item highlighted
+    const exitSubViews = ['exitDetailView', 'exitLetterWorkspace', 'exitTemplateEditor'];
+    if (exitSubViews.includes(viewId)) effectiveSidebarView = 'exitView';
     links.forEach(l => {
         l.classList.remove('active');
-        if (l.getAttribute('data-view') === viewId) {
+        if (l.getAttribute('data-view') === effectiveSidebarView) {
             l.classList.add('active');
         }
     });
@@ -299,12 +340,19 @@ function switchView(viewId, pushState = true, extraParams = {}) {
             }
         }
         else if (viewId === 'exitView') loadExitData();
+        else if (viewId === 'exitDetailView' && extraParams.exitId && !extraParams.skipDataLoad && typeof openExitDetailModal === 'function') {
+            // Only load data when arriving via refresh/popstate — NOT when called from within openExitDetailModal
+            openExitDetailModal(extraParams.exitId, true);
+        }
         else if (viewId === 'studentView') loadStudentData();
         else if (viewId === 'studentDetailView' && extraParams.studentId && !extraParams.skipStudentDetailLoad && typeof openStudentProfileDetail === 'function') {
             openStudentProfileDetail(extraParams.studentId, extraParams.studentTab || 'personal', false);
         }
         else if (viewId === 'logsView') loadLogsData();
         else if (viewId === 'rolesView') loadRolesData();
+        else if (viewId === 'probationView') {
+            if (typeof loadProbationData === 'function') loadProbationData();
+        }
     } catch (e) {
         console.error(`Error loading view "${viewId}":`, e);
         showToast('Unable to load this page section. Please refresh and try again.', 'error');
@@ -315,17 +363,23 @@ function switchView(viewId, pushState = true, extraParams = {}) {
         let path = viewToPath[viewId] || '/';
         if (viewId === 'salaryHistoryView' && extraParams.employeeId) {
             path = `/salaries/employee/${extraParams.employeeId}/`;
+            if (extraParams.isDismissed) {
+                path += '?type=dismissed';
+            }
         } else if (viewId === 'employeeDetailView' && extraParams.employeeId) {
             path = `/employees/${extraParams.employeeId}/`;
         } else if (viewId === 'studentDetailView' && extraParams.studentId) {
             path = `/students/${extraParams.studentId}/`;
+        } else if (viewId === 'exitDetailView' && extraParams.exitId) {
+            path = `/exits/${extraParams.exitId}/clearances/`;
         }
         history.pushState({
             viewId: viewId,
             employeeId: extraParams.employeeId || null,
             employeeTab: extraParams.employeeTab || null,
             studentId: extraParams.studentId || null,
-            studentTab: extraParams.studentTab || null
+            studentTab: extraParams.studentTab || null,
+            exitId: extraParams.exitId || null,
         }, '', path);
     }
 
@@ -343,22 +397,31 @@ window.addEventListener('popstate', (event) => {
             employeeId: event.state.employeeId,
             employeeTab: event.state.employeeTab,
             studentId: event.state.studentId,
-            studentTab: event.state.studentTab
+            studentTab: event.state.studentTab,
+            exitId: event.state.exitId,
         });
     } else {
+        let currentPath = window.location.pathname;
+        if (!currentPath.endsWith('/')) {
+            currentPath += '/';
+        }
         let viewId = 'dashboardView';
-        if (window.location.pathname.match(/\/salaries\/employee\/(\d+)\/?/)) {
+        const exitId = getExitIdFromUrl();
+        if (currentPath.match(/\/salaries\/employee\/(\d+)\//)) {
             viewId = 'salaryHistoryView';
+        } else if (exitId) {
+            viewId = 'exitDetailView';
         } else if (getEmployeeDetailIdFromUrl()) {
             viewId = 'employeeDetailView';
         } else if (getStudentIdFromUrl()) {
             viewId = 'studentDetailView';
         } else {
-            viewId = pathToView[window.location.pathname] || 'dashboardView';
+            viewId = pathToView[currentPath] || 'dashboardView';
         }
         switchView(viewId, false, {
             employeeId: getEmployeeDetailIdFromUrl(),
-            studentId: getStudentIdFromUrl()
+            studentId: getStudentIdFromUrl(),
+            exitId: exitId,
         });
     }
 });
@@ -367,39 +430,68 @@ window.addEventListener('popstate', (event) => {
 async function checkNotifications() {
     if (!localStorage.getItem('accessToken')) return;
 
+    // Type → icon emoji map
+    const typeIcons = {
+        info:    '💬',
+        success: '✅',
+        warning: '⚠️',
+        urgent:  '🔴',
+        error:   '❌',
+    };
+
     try {
         const res = await apiFetch('/notifications/feed/');
         if (res.ok) {
             const data = await res.json();
-            const notifications = data.results || data;
-            const unread = notifications.filter(n => !n.is_read);
-            
+            const notifications = (Array.isArray(data) ? data : (data.results || [])).slice(0, 5);
+            const unreadCount = data.unread_count !== undefined ? data.unread_count : notifications.filter(n => !n.is_read).length;
+
             // Update Bell Badge
             const badge = document.getElementById('notifBadge');
             if (badge) {
-                if (unread.length > 0) {
-                    badge.textContent = unread.length;
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
                     badge.style.display = 'block';
                 } else {
                     badge.style.display = 'none';
                 }
             }
 
+            // Update subtitle
+            const subtitle = document.getElementById('notifSubtitle');
+            if (subtitle) {
+                subtitle.textContent = unreadCount > 0
+                    ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
+                    : 'You\'re all caught up!';
+            }
+
             // Populate Panel
             const listContainer = document.getElementById('notifList');
             if (listContainer) {
                 if (notifications.length === 0) {
-                    listContainer.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+                    listContainer.innerHTML = `
+                        <div class="notif-empty">
+                            <div class="notif-empty-icon">🔔</div>
+                            <h4>All caught up!</h4>
+                            <p>No new notifications right now.<br>Check back later.</p>
+                        </div>`;
                     return;
                 }
 
                 listContainer.innerHTML = notifications.map(n => {
-                    const typeClass = 'notif-' + (n.notif_type || 'info').toLowerCase();
-                    const unreadClass = n.is_read ? '' : 'unread';
+                    const typeKey = (n.notif_type || 'info').toLowerCase();
+                    const typeClass = 'notif-' + typeKey;
+                    const icon = typeIcons[typeKey] || '🔔';
                     return `
-                        <div class="notif-item ${unreadClass} ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
-                            <div class="notif-text">${n.message}</div>
-                            <div class="notif-time">${formatDate(n.created_at)}</div>
+                        <div class="notif-item unread ${typeClass}" onclick="markNotifRead(${n.id}, '${n.link || '#'}')">
+                            <div class="notif-icon-wrap">${icon}</div>
+                            <div class="notif-content">
+                                <div class="notif-text">${n.message}</div>
+                                <div class="notif-time">
+                                    <span>🕐</span>
+                                    ${formatDate(n.created_at)}
+                                </div>
+                            </div>
                         </div>
                     `;
                 }).join('');

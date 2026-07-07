@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>System Activity Logs Report</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 15mm;
+            @bottom-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 8pt;
+                color: #64748b;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #1e293b;
+        }
+        .header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .title {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #1e3a8a;
+            margin: 0;
+        }
+        .subtitle {
+            font-size: 9pt;
+            color: #64748b;
+            margin: 2px 0 0 0;
+        }
+        .meta {
+            text-align: right;
+            font-size: 8pt;
+            color: #64748b;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            text-align: left;
+            padding: 8px 6px;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 8pt;
+        }
+        td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 8pt;
+            vertical-align: top;
+            word-break: break-all;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 7.5pt;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-success {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        .badge-failed {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1 class="title">System Activity Logs Report</h1>
+            <p class="subtitle">{{ company_name }} Audit Trail</p>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 13%;">Timestamp</th>
+                <th style="width: 12%;">User Name</th>
+                <th style="width: 10%;">Role</th>
+                <th style="width: 15%;">Action</th>
+                <th style="width: 10%;">Module</th>
+                <th style="width: 25%;">Description</th>
+                <th style="width: 10%;">IP Address</th>
+                <th style="width: 5%;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+                <td>{{ log.user_name|default:"System" }}</td>
+                <td>{{ log.user_role|default:"N/A" }}</td>
+                <td><strong>{{ log.action }}</strong></td>
+                <td>{{ log.module_name|default:"N/A" }}</td>
+                <td>{{ log.description }}</td>
+                <td>{{ log.ip_address|default:"N/A" }}</td>
+                <td>
+                    <span class="badge {% if log.status == 'SUCCESS' %}badge-success{% else %}badge-failed{% endif %}">
+                        {{ log.status }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
